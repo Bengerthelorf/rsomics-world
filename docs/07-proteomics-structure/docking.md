@@ -1,0 +1,93 @@
+# Molecular docking
+
+> Small-molecule docking, scoring, and binding-pose prediction, plus the
+> emerging class of diffusion / structure-prediction-based docking tools.
+
+## Scope
+
+Includes: classical empirical / physics-based docking (AutoDock Vina, Smina,
+rDock, Glide), CNN-rescored docking (GNINA), and structure-prediction-style
+diffusion docking (DiffDock, RoseTTAFold-AllAtom). Excludes: free-energy
+methods (FEP, TI) — out of scope at this stage.
+
+## Design notes
+
+- AutoDock Vina is the open-source workhorse: BSD-3, ~10k LOC C++, well-
+  documented scoring function, and the basis for Smina, GNINA, and many
+  forks. A pure-Rust Vina is a tractable, high-leverage target.
+- GNINA replaces Vina's empirical scoring with a CNN. Inference path is
+  small — could be packaged as `candle`/`burn`. Real bottleneck is the
+  training data and pretrained weights, not the code.
+- DiffDock is a graph-diffusion model for blind docking. Pure-Rust
+  inference is feasible via `candle` but the model is non-trivial
+  (equivariant message passing). Phase 4+ research project.
+- Commercial tools (Glide / Schrödinger Suite) are closed source and
+  industry-dominant in pharma; no port path.
+- Receptor and ligand prep (PDBQT generation, hydrogens, partial charges)
+  is half the practical pain. AutoDockTools, MGLTools, OpenBabel — none
+  Rust-native. `openbabel-rs` exists as FFI. Worth a focused crate
+  `rsomics-mol-prep` that wraps OpenBabel via FFI.
+- License watch: AutoDock Vina **Apache-2.0**, Smina **Apache-2.0 + GPL-2**,
+  GNINA **Apache-2.0** (depends on libmolgrid), rDock **LGPL-3**, DiffDock
+  **MIT**, RoseTTAFold-AllAtom **MIT** code + non-commercial weights,
+  Glide **proprietary commercial**.
+
+## TODO
+
+- [ ] **`AutoDock Vina`** — empirical-scoring small-molecule docking (the open default).
+  - Reference impl: `C++` · [ccsb-scripps/AutoDock-Vina](https://github.com/ccsb-scripps/AutoDock-Vina) · `Apache-2.0`
+  - Existing Rust: none verified
+  - Existing non-C alternatives: `Smina`, `GNINA` (forks)
+  - Priority: `P1`
+  - Notes: Permissive license, small codebase, published scoring function.
+    Pure-Rust port is a clean, well-scoped project. `rsomics-vina` could
+    be the open Rust docking core that others build on. Inner loops
+    benefit from SIMD; `simba`/`packed_simd` realistic.
+
+- [ ] **`Smina`** — fork of Vina with improved scoring-function development support.
+  - Reference impl: `C++` · [mwojcikowski/smina](https://github.com/mwojcikowski/smina) · `Apache-2.0 + GPL-2`
+  - Existing Rust: none verified
+  - Existing non-C alternatives: `AutoDock Vina`, `GNINA`
+  - Priority: `P2`
+  - Notes: Once `rsomics-vina` exists, Smina's scoring-function-development
+    affordances slot in as features. Don't build a separate crate.
+
+- [ ] **`GNINA`** — Vina + CNN-based scoring.
+  - Reference impl: `C++` (libtorch / CUDA) · [gnina/gnina](https://github.com/gnina/gnina) · `Apache-2.0`
+  - Existing Rust: none verified
+  - Existing non-C alternatives: `DiffDock` (different paradigm)
+  - Priority: `P2`
+  - Notes: Built on Smina + libtorch. The CNN is small. Rust port =
+    `rsomics-vina` core + `candle`/`burn` for the rescoring head. Phase 4+.
+
+- [ ] **`rDock`** — high-throughput virtual-screening docking.
+  - Reference impl: `C++` · [rxdock/rxdock](https://gitlab.com/rxdock/rxdock) (community maintenance) · `LGPL-3`
+  - Existing Rust: none verified
+  - Existing non-C alternatives: `AutoDock Vina`
+  - Priority: `P2`
+  - Notes: Specializes in virtual screening throughput and protein-RNA
+    docking. Niche. Skip in favor of Vina port unless RNA-docking is
+    requested.
+
+- [ ] **`DiffDock`** — diffusion-model blind docking.
+  - Reference impl: `Python` (PyTorch + PyG) · [gcorso/DiffDock](https://github.com/gcorso/DiffDock) · `MIT`
+  - Existing Rust: none verified
+  - Existing non-C alternatives: —
+  - Priority: `P2`
+  - Notes: Equivariant GNN diffusion. Pure-Rust inference is a candle/burn
+    research project; PyG-style ops not yet first-class in `candle`. Phase 4+.
+
+- [ ] **`RoseTTAFold-AllAtom`** — biomolecular complex prediction (covers docking-like outputs).
+  - Reference impl: `Python` (PyTorch) · [baker-laboratory/RoseTTAFold-All-Atom](https://github.com/baker-laboratory/RoseTTAFold-All-Atom) · `MIT` code + non-commercial weights
+  - Existing Rust: none verified
+  - Existing non-C alternatives: `AlphaFold3`, `Boltz-1`, `Chai-1`
+  - Priority: `P2`
+  - Notes: Overlaps heavily with AF3/Boltz/Chai (covered in
+    `structure-prediction.md`). Don't duplicate the port effort.
+
+- [ ] **`Glide`** (Schrödinger) — commercial industry-standard docking.
+  - Reference impl: closed-source · schrodinger.com · commercial
+  - Existing Rust: none
+  - Existing non-C alternatives: —
+  - Priority: `P2`
+  - Notes: No port path; closed source. Listed for completeness.
