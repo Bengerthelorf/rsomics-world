@@ -1,0 +1,15 @@
+[package]
+name = "rsomics-common"
+version = "0.0.0"
+description = "Shared primitives for every rsomics-* crate (errors, CLI scaffold, runner, progress, exit codes)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
