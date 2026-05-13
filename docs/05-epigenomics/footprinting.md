@@ -34,49 +34,90 @@ analysis under a future regulatory-genomics topic.
 
 - [ ] **`TOBIAS`** — Tn5-bias-corrected ATAC-seq footprinting framework.
   - Reference impl: `Python / Cython` · [loosolab/TOBIAS](https://github.com/loosolab/TOBIAS) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: Python multiprocessing
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: maybe — per-position bias correction is SIMT-friendly
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Algorithm is well-documented (ATACorrect bias model + BINDetect
-    differential binding). Compact Rust rewrite using `noodles-bam`,
-    `ndarray`, and a motif-scanning primitive. Best Rust target in
-    this sub-area.
+  - Layer: `B` (tool — `rsomics-footprint`)
+  - Consumes primitives: `noodles-bam`, `ndarray`, `rsomics-coverage`, future `rsomics-motif`, `rsomics-intervals`
+  - Notes: Algorithm is well-documented (ATACorrect bias model + BINDetect differential binding). Compact Rust rewrite using `noodles-bam`, `ndarray`, and a motif-scanning primitive. Best Rust target in this sub-area.
 
 - [ ] **`HINT-ATAC`** — HMM-based footprinting for ATAC-seq.
   - Reference impl: `Python` · [CostaLab/reg-gen](https://github.com/CostaLab/reg-gen) · `GPL-3.0`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: Python multiprocessing
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: maybe — HMM Baum-Welch is GPU-friendly at scale
+  - Upstream license: `GPL-3.0`
   - Priority: `P2`
-  - Notes: Older HMM footprinter; TOBIAS outperforms it in benchmarks.
-    Listed for completeness.
+  - Layer: `subcommand-of-rsomics-footprint`
+  - Consumes primitives: `noodles-bam`, `rsomics-coverage`, future `rsomics-stats` (HMM machinery)
+  - Notes: Older HMM footprinter; TOBIAS outperforms it in benchmarks. Listed for completeness.
 
 - [ ] **`BinDNase`** — DNase-seq footprinter using bin-level statistics.
-  - Reference impl: `Python / R` · academic publication · `unspecified`
-  - Existing Rust: none.
+  - Reference impl: `Python / R` · academic publication · unspecified
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: limited
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: no — niche, no upside
+  - Upstream license: unspecified
   - Priority: `P2`
+  - Layer: —
+  - Consumes primitives: —
   - Notes: Niche; rarely used today.
 
 - [ ] **`PIQ`** — Bayesian footprinter (Pique).
-  - Reference impl: `R` · [vplaboratory/piq](https://bitbucket.org/thashim/piq-single/) · `unspecified`
-  - Existing Rust: none.
+  - Reference impl: `R` · [thashim/piq-single](https://bitbucket.org/thashim/piq-single/) · unspecified (Bitbucket-hosted, GitHub aliveness check N/A)
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: R BiocParallel
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: no — niche, older
+  - Upstream license: unspecified
   - Priority: `P2`
-  - Notes: Niche; older method. Not a porting target.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Niche; older method. Not a porting target. Hosted on Bitbucket; aliveness check via gh not possible.
 
 - [ ] **`CENTIPEDE`** — original Bayesian footprinter.
-  - Reference impl: `R` · [Pique CRAN](https://cran.r-project.org/) · `GPL-3.0`
-  - Existing Rust: none.
+  - Reference impl: `R` · CRAN · `GPL-3.0`
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: R BiocParallel
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: no — classical
+  - Upstream license: `GPL-3.0`
   - Priority: `P2`
+  - Layer: —
+  - Consumes primitives: —
   - Notes: Classical method; superseded by TOBIAS in practice.
 
-- [ ] **ATAC V-plot tooling** — fragment-size × position visualisation
-  tools (Greenleaf-lab style `ATAC-Vsignal`, `pyatac`).
-  - Reference impl: `Python` · [GreenleafLab/pyatac](https://github.com/GreenleafLab/pyatac) · `MIT`
-  - Existing Rust: none.
+- [ ] **ATAC V-plot tooling** — fragment-size × position visualisation tools (Greenleaf-lab style `ATAC-Vsignal`, `pyatac`).
+  - Reference impl: `Python` · canonical Greenleaf-lab `pyatac` URL is dead (no live GitHub repo found via search). V-plot concept is widely used; implementations scattered across lab repos · MIT-style typical
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: trivial parallel across features
+  - SIMD: auto-vectorize
+  - Quadrant: —
+  - GPU-amenable: maybe — 2D histogram of fragment midpoint × length is GPU-trivial
+  - Upstream license: MIT (typical for ATAC analysis tooling)
   - Priority: `P2`
-  - Notes: Small pure-Rust win — the V-plot is just a 2D histogram of
-    fragment midpoint × fragment length around a feature, parallelised
-    across features. Bundle into `rsomics-footprint` as a side feature.
+  - Layer: `subcommand-of-rsomics-footprint` (V-plot mode)
+  - Consumes primitives: `noodles-bam`, `ndarray`, `rsomics-intervals`
+  - Notes: Small pure-Rust win — the V-plot is just a 2D histogram of fragment midpoint × fragment length around a feature, parallelised across features. Bundle into `rsomics-footprint` as a side feature. **Original entry's `GreenleafLab/pyatac` URL is dead** — logged to `.autopilot/needs-review/external-2026-05-14.md`; will need user adjudication on whether to find a successor V-plot tool or treat the concept as standalone.
