@@ -52,21 +52,47 @@ A flat checklist. Each entry uses the schema below.
 - [ ] **<canonical tool name>** — <one-line purpose>
   - Reference impl: <language> · <repo URL or "—"> · <license>
   - Existing Rust: <crate name + URL, or "none">
-  - Existing Rust kind: pure-port | FFI-wrapper | partial-port | none
+  - Existing Rust kind: pure-port | FFI-wrapper | partial-port | rust-native | none
   - Existing non-C alternatives: <Zig / Go / C++ rewrites, or "—">
   - Parallelism: rayon | std::thread | tokio | async-runtime | single-threaded
   - SIMD: explicit (std::simd / packed_simd) | auto-vectorize | none
-  - GPU-amenable: yes | no | maybe — <one-sentence why>
+  - Quadrant: ① | ② | ③ | ④
+  - GPU-amenable: yes | maybe | no — <one-sentence judgment basis>
   - Upstream license: <SPDX>
   - Priority: P0 / P1 / P2
   - Layer: A (foundation) | B (tool) | adopt | subcommand-of-<crate>
   - Consumes primitives: <list of Layer A crates, or "—" for A entries>
-  - Notes: <SIMD-critical? Already production-ready? Wrap vs rewrite? Algorithmic notes?>
+  - Notes: <supplementary commentary; never the canonical answer for fields above>
 ```
 
 Every tool gets an entry, *even if a mature Rust implementation already
 exists*. Mark such entries with `[x]` and explain in the notes whether we
 plan to (a) adopt as-is, (b) extend, or (c) leave alone.
+
+#### `Existing Rust kind` — five values
+
+- **`pure-port`** — Rust faithfully reimplements a specific C/C++ upstream (noodles ↔ htslib, needletail ↔ readfq, divsufsort ↔ libdivsufsort, lz4_flex ↔ lz4 C). Cross-validation against the upstream binary is the acceptance test.
+- **`FFI-wrapper`** — Rust API over an existing C/C++ library (rust-htslib, libdeflater, hts-sys, cudarc, hdf5-metno-sys). Upstream C library stays the perf reference; license obligations follow the upstream's linking model on a per-crate basis.
+- **`partial-port`** — Pure-Rust port covers a subset of the upstream's behavior (ruzstd decoder vs. zstd's full codec; rust-bio FM-index without FMD variant; AnnData crates missing `.uns`).
+- **`rust-native`** — Rust-native concept with no specific upstream to port. Reference-impl field may cite an ecosystem analogue ("PyTorch", "Go runtime", "Intel TBB", "Mash") for orientation, but the Rust crate is not a code port. Examples: `rayon`, `tokio`, `candle`, `niffler`, `std::simd`, `fastbloom`, MinHash and HyperLogLog implementations of academic algorithms.
+- **`none`** — no Rust implementation exists yet.
+
+#### `Quadrant` — canonical field, four values
+
+- **①** — Pure-Rust with explicit parallelism (`rayon` / `std::simd` / `target_feature`) or pure-Rust orchestration over a perf-tuned codec. The goal state.
+- **②** — FFI wrapper over C/C++ (`cc`, `bindgen`, `*-sys`, hand-FFI). C upstream stays the perf reference; adopt for speed but tag clearly as not a Rust rewrite.
+- **③** — Pure-Rust but single-threaded in the hot path. **Avoid** in hot paths — inherits the disease we're curing. Surfaces opportunities for a Layer A replacement.
+- **④** — Pure-Rust, non-hot, edge utility. Adoption decision doesn't move the needle on perf; pick on API/ergonomics. Examples: `clap`, `serde`, `anyhow`, `regex`, `niffler`-style format sniffers, small-format parsers.
+
+A single entry may compose multiple quadrants across backends (e.g. `flate2` is ① with `miniz_oxide`, ② with `zlib-ng`). When that happens, write `Quadrant: ①+②` and let the Notes explain the split.
+
+#### `GPU-amenable` — three values, strict definitions
+
+- **`yes`** — clear GPU win; algorithm maps directly to SIMT (DL inference, large embarrassingly-parallel kernels, dense linear algebra). Speedup expected on relevant input sizes.
+- **`maybe`** — requires algorithmic restructure to exploit GPU, OR only a portion of the work is GPU-amenable, OR the win is only at very large inputs. Engineering cost is non-trivial.
+- **`no`** — inherently serial, I/O-bound, latency-dominated, or trivially small such that GPU offers no win (parsing, indexing, small lookups).
+
+The trailing sentence on the line must state the judgment basis in one sentence ("dense matmul"; "irregular graph traversal"; "I/O-bound, parsing-only").
 
 ### TODO.md legend
 
@@ -77,17 +103,16 @@ plan to (a) adopt as-is, (b) extend, or (c) leave alone.
 | `[~]` (partial-port) | Pure-Rust port exists but is incomplete (stub, missing subcommand, single-threaded hot path) |
 | `[x]` | Production-grade pure-Rust implementation exists — adopt |
 
-## External-dependency quadrants
+## External-dependency quadrants — detection cues
 
-For every adopted external crate, classify and document its quadrant in the
-TODO entry's `Existing Rust kind` and `Parallelism` / `SIMD` fields:
+The `Quadrant` field is canonical (see the schema definitions above). This table gives the detection cues that drive the field value:
 
-| Quadrant | What it is | Acceptable for | Note |
+| Quadrant | Detection cue | Examples | Stance |
 |---|---|---|---|
-| ① Pure Rust + explicit parallelism (rayon / std::simd) | e.g. `noodles`, `rayon`, `polars`, `needletail` | Adopt freely | The goal state |
-| ② FFI wrapper over C (`cc`, `bindgen`, `*-sys`) | e.g. `rust-htslib`, `minimap2-rs` | Adopt for speed; tag clearly as "FFI wrapper, not Rust rewrite" | C upstream stays the perf reference |
-| ③ Pure Rust but single-threaded in hot path | varies — verify per case | **Avoid** in hot paths | Inherits the disease we're curing |
-| ④ Pure Rust, non-hot, edge utility | `clap`, `serde`, `anyhow`, `regex` | Adopt freely | Doesn't matter |
+| ① pure-rust + explicit parallelism | `rayon::par_iter`, `std::simd`, `target_feature`, `crossbeam` channels for parallel pipelines | `noodles`, `rayon`, `polars`, `needletail`, `fastbloom`, `zarrs` | The goal state — adopt freely |
+| ② FFI wrapper over C | `[build-dependencies] cc` or `bindgen`, `*-sys` crate, `build.rs` compiling C | `rust-htslib`, `libdeflater`, `cudarc`, `xz2`, `anndata-hdf5` | Adopt for speed; tag clearly. License obligations follow upstream's linking model per crate, not blanket |
+| ③ pure-rust but single-threaded hot path | pure-Rust crate, no rayon / SIMD in its perf-critical modules | dated `rust-bio` FM-index path; some single-threaded parsers | Avoid in hot paths — opportunity for a Layer A replacement |
+| ④ pure-rust edge utility | small, non-hot, edge-of-program | `clap`, `serde`, `anyhow`, `niffler` (orchestration), small parsers | Decision is API/ergonomics, not perf |
 
 Detection cues:
 - Quadrant ②: `[build-dependencies] cc`/`bindgen`, `*-sys` crate name, presence of `build.rs`
