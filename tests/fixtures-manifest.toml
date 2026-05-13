@@ -1,0 +1,24 @@
+# Public benchmark data manifest.
+#
+# Tier 1 fixtures live in git under `tests/golden/` per crate and are not
+# listed here. Tier 2 fixtures are downloaded on demand by CI and dev shells
+# into `tests/fixtures-cache/` (gitignored). Tier 3 and 4 fixtures are
+# provisioned out-of-band and consumed via `BCMR_BENCH_DATA`.
+#
+# Schema:
+#   name      slug, used as the cache filename stem
+#   tier      2 | 3 | 4
+#   url       HTTPS source (must be a stable URL; GitHub Releases or EBI/NCBI)
+#   sha256    hex digest of the downloaded file
+#   size_mb   approximate size in megabytes (for disk-quota planning)
+#   license   SPDX or short tag for the source's redistribution terms
+#   source    human-readable origin (consortium, paper, accession)
+
+# [[fixture]]
+# name = "hg002-chr22-fastq"
+# tier = 2
+# url = "https://..."
+# sha256 = "..."
+# size_mb = 1800
+# license = "CC0-1.0"
+# source = "Genome in a Bottle (HG002, chr22 subset)"
