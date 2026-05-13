@@ -5,6 +5,8 @@
 use std::fs;
 use std::path::PathBuf;
 
+use rsomics_fastp::filter::FilterConfig;
+
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -28,4 +30,48 @@ fn copy_se_is_identity() {
         actual, expected,
         "identity copy must preserve the input byte-for-byte"
     );
+}
+
+#[test]
+fn process_se_classifies_each_failure_mode() {
+    let input = fixture("se_mixed.fastq");
+    let out = tempfile::Builder::new()
+        .suffix(".fastq")
+        .tempfile()
+        .expect("tempfile");
+    let json = tempfile::Builder::new()
+        .suffix(".json")
+        .tempfile()
+        .expect("tempfile");
+
+    let outcome = rsomics_fastp::io::process_se(
+        &input,
+        out.path(),
+        Some(json.path()),
+        FilterConfig::default(),
+    )
+    .expect("process_se");
+
+    // Fixture covers each failure mode once + one pass.
+    assert_eq!(outcome.filtering.passed_filter_reads, 1);
+    assert_eq!(outcome.filtering.too_short_reads, 1);
+    assert_eq!(outcome.filtering.too_many_n_reads, 1);
+    assert_eq!(outcome.filtering.low_quality_reads, 1);
+    assert_eq!(outcome.pre_filter.total_reads, 4);
+    assert_eq!(outcome.post_filter.total_reads, 1);
+
+    // JSON report renders and parses back.
+    let json_text = fs::read_to_string(json.path()).expect("read json");
+    let parsed: serde_json::Value = serde_json::from_str(&json_text).expect("json parse");
+    assert_eq!(parsed["filtering_result"]["passed_filter_reads"], 1);
+    assert_eq!(parsed["filtering_result"]["too_many_N_reads"], 1);
+    assert_eq!(parsed["summary"]["before_filtering"]["total_reads"], 4);
+    assert_eq!(parsed["summary"]["after_filtering"]["total_reads"], 1);
+
+    // Only the passing read should appear in the output FASTQ.
+    let out_text = fs::read_to_string(out.path()).expect("read output");
+    assert!(out_text.contains("@pass_high_q"));
+    assert!(!out_text.contains("@too_short"));
+    assert!(!out_text.contains("@too_many_n"));
+    assert!(!out_text.contains("@low_quality"));
 }
