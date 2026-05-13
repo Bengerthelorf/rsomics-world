@@ -133,7 +133,7 @@ population-genetics analyses (see [population-genetics](population-genetics.md))
   - Consumes primitives: —
   - Notes: Older alternative to RAxML-NG / IQ-TREE2. Skip; both successors cover this niche better.
 
-- [x] **`UShER`** — ultra-fast sample placement onto existing trees.
+- [A] **`UShER`** — ultra-fast sample placement onto existing trees.
   - Reference impl: `C++` · [yatisht/usher](https://github.com/yatisht/usher) · `MIT`
   - Existing Rust: none verified
   - Existing Rust kind: `none`
@@ -144,9 +144,9 @@ population-genetics analyses (see [population-genetics](population-genetics.md))
   - GPU-amenable: maybe — parsimony placement parallelises trivially
   - Upstream license: `MIT`
   - Priority: `P0`
-  - Layer: `B` (tool — `rsomics-usher` if upstream becomes stale; otherwise subprocess-adopt)
-  - Consumes primitives: future `rsomics-phylo-tree` (MAT data structure), `noodles-vcf`, `rayon`
-  - Notes: Built for SARS-CoV-2-scale (10M+-leaf) trees. Mutation-annotated tree (MAT) data structure is published; pure-Rust port is a clean, bounded project. Adopt as-is for now (MIT, actively maintained); revisit Rust port if upstream becomes stale. The `[x]` mark here reflects "adopt the upstream binary" — the schema doesn't have a perfect tag for this case (same Foldseek-style ambiguity surfaced in module 07 spot-check); kept `[x]` because UShER is permissively-licensed (not Foldseek's GPL-3 forced-subprocess situation).
+  - Layer: `subcommand-of-rsomics-iqtree` (wraps the upstream UShER binary via subprocess); a Rust port to `rsomics-usher` is a fallback if upstream becomes stale
+  - Consumes primitives: subprocess call to UShER binary; `noodles-vcf` for input formatting
+  - Notes: Built for SARS-CoV-2-scale (10M+-leaf) trees. MIT, actively maintained. The `[A]` mark per the post-Phase-1 schema revision: adopt the upstream binary via subprocess, no rewrite planned. The MAT data structure is published; pure-Rust port remains a clean fallback option if upstream stalls.
 
 - [ ] **`TreeShrink`** — outlier-branch detection across tree sets.
   - Reference impl: `Python` (+ `R`) · [uym2/TreeShrink](https://github.com/uym2/TreeShrink) · `GPL`

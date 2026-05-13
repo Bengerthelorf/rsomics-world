@@ -157,7 +157,7 @@ and docking (see [docking](docking.md)).
   - Consumes primitives: `pdbtbx`, `nalgebra`
   - Notes: Classic, well-specified algorithm. Pure-Rust port is small and high-value (every downstream tool calls DSSP-equivalent at some point).
 
-- [ ] **`Foldseek`** — fast structural homology (3Di alphabet + SIMD).
+- [A] **`Foldseek`** — fast structural homology (3Di alphabet + SIMD).
   - Reference impl: `C++` (heavily SIMD-optimized) · [steineggerlab/foldseek](https://github.com/steineggerlab/foldseek) · `GPL-3`
   - Existing Rust: none verified
   - Existing Rust kind: `none`
@@ -170,7 +170,7 @@ and docking (see [docking](docking.md)).
   - Priority: `P0`
   - Layer: `subcommand-of-rsomics-structure` (`--homology foldseek` mode via subprocess; GPL-3 inheritance forbids link)
   - Consumes primitives: subprocess call to Foldseek binary
-  - Notes: Category leader. The 3Di alphabet idea is published; the SIMD kernels are not trivially portable. Use Foldseek as the substrate via subprocess; don't rewrite. GPL-3 means we wrap by subprocess, not link.
+  - Notes: Category leader. The 3Di alphabet idea is published; the SIMD kernels are not trivially portable. Use Foldseek as the substrate via subprocess; don't rewrite. GPL-3 means we wrap by subprocess, not link. `[A]` marker per the post-Phase-1 schema revision: adopt via subprocess, no rewrite planned.
 
 - [ ] **`TM-align`** — pairwise structural alignment with TM-score.
   - Reference impl: `C++` (and Fortran) · [zhanggroup.org/TM-align/](https://zhanggroup.org/TM-align/) · academic-use license (not OSI)

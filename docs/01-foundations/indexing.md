@@ -36,7 +36,7 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
 - [x] **`.fai` FASTA index** — record-offset table for random access into a FASTA file.
   - Reference impl: `C` · [samtools/htslib/faidx.c](https://github.com/samtools/htslib) · `MIT`
   - Existing Rust: [`noodles-fasta`](https://crates.io/crates/noodles-fasta) `0.61.0` (fai reader + writer); `rust-htslib::faidx` (FFI)
-  - Existing Rust kind: `pure-port` (noodles) / `FFI-wrapper` (rust-htslib)
+  - Existing Rust kind: `pure-port/FFI-wrapper`
   - Existing non-C alternatives: `pyfaidx` (Python)
   - Parallelism: single-threaded (index build is trivially small)
   - SIMD: none needed (linear scan)

@@ -34,7 +34,7 @@ BGZF (those live in [`indexing.md`](indexing.md)).
 - [x] **`flate2`** — DEFLATE/gzip/zlib codec for Rust.
   - Reference impl: `C` · [madler/zlib](https://github.com/madler/zlib) · `Zlib`
   - Existing Rust: [`flate2`](https://github.com/rust-lang/flate2-rs) `1.1.9` (pluggable: `miniz_oxide` pure-Rust default, `zlib-ng` FFI, `cloudflare-zlib`); supplementary [`libflate`](https://github.com/sile/libflate) `2.3.0` (pure-Rust)
-  - Existing Rust kind: `pure-port` (default `miniz_oxide` backend) / `FFI-wrapper` (`zlib-ng` backend)
+  - Existing Rust kind: `pure-port/FFI-wrapper`
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec (wrap with `gzp` for parallel)
   - SIMD: inherited via backend dep (`miniz_oxide` `simd` feature; or `zlib-ng` hand SIMD when that backend is selected). flate2 itself contains no SIMD.
@@ -64,7 +64,7 @@ BGZF (those live in [`indexing.md`](indexing.md)).
 - [x] **`BGZF`** — Blocked GNU Zip Format used by samtools/htslib.
   - Reference impl: `C` · [samtools/htslib/bgzf.c](https://github.com/samtools/htslib/blob/develop/bgzf.c) · `MIT`
   - Existing Rust: [`noodles-bgzf`](https://crates.io/crates/noodles-bgzf) `0.47.0` (pure-Rust); [`bgzip`](https://github.com/informationsea/bgzip-rs) `0.3.1`; [`gzp`](https://github.com/sstadick/gzp) `2.0.2` (multithreaded write path)
-  - Existing Rust kind: `pure-port` (noodles-bgzf) / `partial-port` (parallel decoder open)
+  - Existing Rust kind: `pure-port/partial-port`
   - Existing non-C alternatives: —
   - Parallelism: noodles-bgzf reader is single-threaded; gzp uses `flume` channels for parallel write
   - SIMD: inherits codec dep (`miniz_oxide` SIMD or `libdeflate` SIMD depending on backend)
@@ -109,7 +109,7 @@ BGZF (those live in [`indexing.md`](indexing.md)).
 - [x] **`zstd`** — Facebook's zstandard codec.
   - Reference impl: `C` · [facebook/zstd](https://github.com/facebook/zstd) · `BSD-3-Clause OR GPL-2.0`
   - Existing Rust: [`zstd`](https://github.com/gyscos/zstd-rs) `0.13.3` (FFI, multi-threaded encoder); [`ruzstd`](https://github.com/KillingSpark/zstd-rs) `0.8.3` (pure-Rust decoder only)
-  - Existing Rust kind: `FFI-wrapper` (production) / `partial-port` (`ruzstd` decoder only)
+  - Existing Rust kind: `FFI-wrapper/partial-port`
   - Existing non-C alternatives: —
   - Parallelism: zstd-rs exposes the upstream's multi-threaded encoder
   - SIMD: inherits zstd's hand-written SIMD
@@ -124,7 +124,7 @@ BGZF (those live in [`indexing.md`](indexing.md)).
 - [x] **`lz4`** — fast streaming compressor.
   - Reference impl: `C` · [lz4/lz4](https://github.com/lz4/lz4) · `BSD-2-Clause`
   - Existing Rust: [`lz4_flex`](https://github.com/PSeitz/lz4_flex) `0.13.1` (pure-Rust); [`lz4-sys`](https://crates.io/crates/lz4-sys) `1.11.1+lz4-1.10.0` (FFI)
-  - Existing Rust kind: `pure-port` (lz4_flex) / `FFI-wrapper` (lz4-sys)
+  - Existing Rust kind: `pure-port/FFI-wrapper`
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec; caller schedules
   - SIMD: lz4_flex relies on auto-vectorize; lz4-sys inherits upstream's hand SIMD
@@ -139,7 +139,7 @@ BGZF (those live in [`indexing.md`](indexing.md)).
 - [~] **`xz` / `liblzma`** — high-ratio LZMA codec.
   - Reference impl: `C` · [tukaani-project/xz](https://github.com/tukaani-project/xz) · `0BSD OR LGPL-2.1`
   - Existing Rust: [`xz2`](https://github.com/alexcrichton/xz2-rs) `0.1.7` (FFI); [`lzma-rs`](https://github.com/gendx/lzma-rs) `0.3.0` (pure-Rust, partial)
-  - Existing Rust kind: `FFI-wrapper` (xz2) / `partial-port` (lzma-rs)
+  - Existing Rust kind: `FFI-wrapper/partial-port`
   - Existing non-C alternatives: —
   - Parallelism: single-threaded
   - SIMD: none
