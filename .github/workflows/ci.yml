@@ -44,8 +44,14 @@ jobs:
     runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize poisoned rustup binaries on macOS images
+        if: runner.os == 'macOS'
+        run: |
+          rm -rf "$HOME/.cargo/bin" "$HOME/.rustup"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
-      - run: rustup run ${{ matrix.toolchain }} cargo test --workspace --all-features
+      - run: cargo test --workspace --all-features
