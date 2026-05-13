@@ -38,3 +38,7 @@ pedantic = { level = "warn", priority = -1 }
 [[bin]]
 name = "rsomics-fastp"
 path = "src/main.rs"
+
+[[bench]]
+name = "fastp"
+harness = false
