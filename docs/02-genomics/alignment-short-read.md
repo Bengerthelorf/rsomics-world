@@ -31,68 +31,95 @@ separate problem under module 08).
   permissive licence, already compiles against Rust components.
 - NovoAlign remains commercial / closed-source. We document it for
   completeness but cannot port or wrap it.
-- 10x Genomics ships [`rust-bwa`](https://github.com/10XGenomics/rust-bwa) —
-  FFI only; no pure-Rust BWA implementation exists.
 
 ## TODO
 
-- [~] **`bwa-mem` / `bwa-mem2`** — seed-and-extend Burrows-Wheeler aligner.
-  - Reference impl: `C` · [lh3/bwa](https://github.com/lh3/bwa) · `MIT/GPL-3.0` (dual)
-  - Modern reference impl: `C++` · [bwa-mem2/bwa-mem2](https://github.com/bwa-mem2/bwa-mem2) · `MIT`
-  - Existing Rust: [`rust-bwa`](https://github.com/10XGenomics/rust-bwa) (FFI wrapper, BWA C API);
-    no pure-Rust port verified
-  - Existing non-C alternatives: `bwa-meme` (learned-index C++ fork);
-    `BWA-MEME` uses Rust for *training* the learned index, not alignment
+- [~] **`bwa-mem` / `bwa-mem2` / `bwa-mem3`** — seed-and-extend Burrows-Wheeler aligner.
+  - Reference impl: `C` · [lh3/bwa](https://github.com/lh3/bwa) `MIT/GPL-3.0` (dual). Modern: `C++` · [bwa-mem2/bwa-mem2](https://github.com/bwa-mem2/bwa-mem2) `MIT`.
+  - Existing Rust: [`rust-bwa`](https://github.com/10XGenomics/rust-bwa) (FFI wrapper of the BWA C API, not on crates.io — install from source); [`bwa-mem2-rs`](https://github.com/fg-labs/bwa-mem2-rs) `0.1.1` (FFI wrapper of bwa-mem3 with packed-BAM output and caller-owned parallelism)
+  - Existing Rust kind: `FFI-wrapper` (both options wrap C/C++)
+  - Existing non-C alternatives: `bwa-meme` (learned-index C++ fork)
+  - Parallelism: inherits upstream pthread model; caller-owned in bwa-mem2-rs
+  - SIMD: inherits upstream's hand AVX2 / AVX-512 / NEON intrinsics
+  - Quadrant: ②
+  - GPU-amenable: maybe — banded SW kernel is SIMT-amenable (NVIDIA Parabricks fq2bam ships it), but the seeding stage is irregular
+  - Upstream license: `MIT` (bwa-mem2 + bwa-mem3); `MIT/GPL-3.0` dual (original bwa)
   - Priority: `P0`
-  - Notes: Inner SW kernel is SIMD-critical. Start with the FFI wrapper
-    to unblock downstream pipelines; plan pure-Rust port after the
-    foundations FM-index work lands. Compare against `bwa-mem2` not
-    `bwa 0.7.17` for fairness.
+  - Layer: `B` (tool — `rsomics-bwa` after the foundations FM-index work lands; for now adopt FFI)
+  - Consumes primitives: `rsomics-fm-index` (foundation, see [`01-foundations/data-structures.md`](../01-foundations/data-structures.md)), `block-aligner` for the SW kernel, `noodles-bam` for output
+  - Notes: Inner SW kernel is SIMD-critical. Start with the FFI wrapper to unblock downstream pipelines; plan pure-Rust port after `rsomics-fm-index` lands. Compare against `bwa-mem2` (or bwa-mem3 if production-stable) — not against `bwa 0.7.17` — for fairness. `bwa-mem2-rs` v0.1.1 is a recent caller-owned-parallelism design that fits the `rsomics-*` thread-model contract better than the older 10x wrapper.
 
-- [ ] **`Bowtie2`** — gapped seed-extend aligner with end-to-end and local
-  modes.
+- [ ] **`Bowtie2`** — gapped seed-extend aligner with end-to-end and local modes.
   - Reference impl: `C++` · [BenLangmead/bowtie2](https://github.com/BenLangmead/bowtie2) · `GPL-3.0`
   - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE4 / AVX2 hand-written
+  - Quadrant: —
+  - GPU-amenable: maybe — same SW kernel rationale as bwa-mem
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: GPL-3.0 license complicates re-derivation; a clean-room Rust
-    port can ship under MIT/Apache-2.0 as a sibling. Bowtie2 retains a
-    loyal user base (epigenetics, ATAC-seq) so module 05 will need it.
+  - Layer: `B` (tool — `rsomics-bowtie2`)
+  - Consumes primitives: `rsomics-fm-index`, `block-aligner`, `noodles-bam`
+  - Notes: GPL-3.0 license complicates re-derivation; a clean-room Rust port can ship under MIT/Apache-2.0 as a sibling — see `## Origin` section template in CONVENTIONS.md. Bowtie2 retains a loyal user base (epigenetics, ATAC-seq) so module 05 will need it.
 
 - [ ] **`SNAP`** — hash-based aligner, parallel-friendly.
   - Reference impl: `C++` · [amplab/snap](https://github.com/amplab/snap) · `Apache-2.0`
   - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads with strong scaling
+  - SIMD: upstream SSE4 / AVX2
+  - Quadrant: —
+  - GPU-amenable: maybe — hash-table lookup is SIMT-trivial; SW extension is the same
+  - Upstream license: `Apache-2.0`
   - Priority: `P2`
-  - Notes: Apache-2.0 licence is friendly. Hash-table index simplifies
-    parallelism vs. FM-index. Strong scaling claims but limited adoption
-    in 2026 pipelines — keep on the radar but not a priority.
+  - Layer: `B` (tool — `rsomics-snap`)
+  - Consumes primitives: `block-aligner`, `noodles-bam`, a hash-table-index primitive (not in foundations today)
+  - Notes: Apache-2.0 licence is friendly. Hash-table index simplifies parallelism vs. FM-index. Strong scaling claims but limited adoption in 2026 pipelines — keep on the radar but not a priority.
 
 - [ ] **`Strobealign`** — strobemer seed-extend aligner.
   - Reference impl: `C++` · [ksahlin/strobealign](https://github.com/ksahlin/strobealign) · `MIT`
-  - Existing Rust: none verified (strobealign itself requires Rust at *build*
-    time for an auxiliary component, but the aligner is C++)
+  - Existing Rust: none verified (strobealign itself requires Rust at *build* time for an auxiliary component, but the aligner is C++)
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE4 / AVX2
+  - Quadrant: —
+  - GPU-amenable: maybe — strobemer seeding parallelises but the index touches are random-access
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Faster than bwa-mem2 on 150–300 bp reads with comparable
-    accuracy. Algorithm is younger (less battle-tested) but the
-    code is small and re-derivable. Strong candidate for an *early*
-    Rust rewrite where we are not chasing a moving target.
+  - Layer: `B` (tool — `rsomics-strobealign`)
+  - Consumes primitives: `rsomics-kmer` (the ntHash crate; strobemers are k-mer-based), `block-aligner`, `noodles-bam`
+  - Notes: Faster than bwa-mem2 on 150–300 bp reads with comparable accuracy. Algorithm is younger (less battle-tested) but the code is small and re-derivable. Strong candidate for an *early* Rust rewrite where we are not chasing a moving target.
 
 - [ ] **`NovoAlign`** — commercial proprietary aligner.
   - Reference impl: closed-source · [novocraft.com](https://www.novocraft.com/) · proprietary
   - Existing Rust: n/a
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: upstream-defined
+  - SIMD: upstream-defined
+  - Quadrant: —
+  - GPU-amenable: unknown — closed source
+  - Upstream license: proprietary
   - Priority: `P2`
-  - Notes: Cannot port (closed source). Document interop only:
-    `noodles-sam` should parse its outputs without warnings.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Cannot port (closed source). Document interop only: `noodles-sam` should parse its outputs without warnings.
 
-- [~] **`block-aligner`** — SIMD-accelerated banded SW kernel (reusable
-  by any new aligner).
+- [x] **`block-aligner`** — SIMD-accelerated banded SW kernel (reusable by any new aligner).
   - Reference impl: `Rust` · [Daniel-Liu-c0deb0t/block-aligner](https://github.com/Daniel-Liu-c0deb0t/block-aligner) · `MIT`
-  - Existing Rust: [`block-aligner`](https://crates.io/crates/block-aligner)
+  - Existing Rust: [`block-aligner`](https://crates.io/crates/block-aligner) `0.5.1`
+  - Existing Rust kind: `rust-native` (Rust-native SW kernel; the adaptive block-based algorithm is the crate's own contribution)
   - Existing non-C alternatives: `ksw2` (C, used by minimap2); `WFA2-lib` (C)
+  - Parallelism: per-call kernel; caller schedules across reads with rayon
+  - SIMD: explicit (SSE2 / AVX2 / NEON / WASM-SIMD feature flags)
+  - Quadrant: ①
+  - GPU-amenable: maybe — the algorithm has been ported to GPU in the literature; engineering cost is non-trivial
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: Adopt as the standard SW kernel for any pure-Rust short-read
-    aligner work. SSE2/AVX2/NEON/WASM-SIMD paths already shipped. Avoids
-    re-implementing the most-vectorised inner loop in the field.
+  - Layer: `A` (foundation — `rsomics-align-core`)
+  - Consumes primitives: —
+  - Notes: Adopt as the standard SW kernel for any pure-Rust short-read aligner work. Avoids re-implementing the most-vectorised inner loop in the field. The Layer-A `rsomics-align-core` either wraps `block-aligner` directly or contributes upstream.
