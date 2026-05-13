@@ -117,14 +117,14 @@ fn process_se_classifies_each_failure_mode() {
             .as_array()
             .expect("mean curve is array")
             .len(),
-        cycles as usize
+        usize::try_from(cycles).expect("cycles fits in usize")
     );
     assert_eq!(
         r1_before["content_curves"]["GC"]
             .as_array()
             .expect("GC curve is array")
             .len(),
-        cycles as usize
+        usize::try_from(cycles).expect("cycles fits in usize")
     );
     assert!(parsed["read2_before_filtering"].is_null());
 

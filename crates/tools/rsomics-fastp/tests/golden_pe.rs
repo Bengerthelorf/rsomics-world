@@ -82,7 +82,7 @@ fn process_pe_rejects_pair_when_either_mate_fails() {
             .as_array()
             .expect("r1 mean curve")
             .len(),
-        r1_cycles as usize
+        usize::try_from(r1_cycles).expect("cycles fits in usize")
     );
     assert!(r2["content_curves"]["GC"].is_array());
 }

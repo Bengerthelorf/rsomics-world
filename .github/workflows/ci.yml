@@ -54,4 +54,10 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
+      - name: Install upstream fastp for compat tests
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fastp
+          fastp --version
       - run: rustup run ${{ matrix.toolchain }} cargo test --workspace --all-features
