@@ -38,12 +38,13 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec (wrap with `gzp` for parallel)
   - SIMD: inherited via backend dep (`miniz_oxide` `simd` feature; or `zlib-ng` hand SIMD when that backend is selected). flate2 itself contains no SIMD.
-  - GPU-amenable: no
+  - Quadrant: ①+② (① with default `miniz_oxide` + `simd` feature; ② when `zlib-ng` backend selected)
+  - GPU-amenable: no — DEFLATE is inherently bit-serial
   - Upstream license: `Zlib`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ① with default backend (pure-Rust scheduler, SIMD via `miniz_oxide`'s `simd` feature). Quadrant ② when `zlib-ng` backend is selected. Default `miniz_oxide` is portable and safe; switch to `zlib-ng` when throughput matters and ship a feature flag.
+  - Notes: Default `miniz_oxide` is portable and safe; switch to `zlib-ng` when throughput matters and ship a feature flag.
 
 - [x] **`libdeflate`** — block-oriented DEFLATE optimised for known-size inputs.
   - Reference impl: `C` · [ebiggers/libdeflate](https://github.com/ebiggers/libdeflate) · `MIT`
@@ -52,12 +53,13 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec (caller schedules parallel blocks)
   - SIMD: inherits libdeflate's hand-written CRC32 / vector intrinsics
-  - GPU-amenable: no
+  - Quadrant: ②
+  - GPU-amenable: no — bit-serial DEFLATE
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ②. FFI-only today. A pure-Rust libdeflate-equivalent (block-DEFLATE with `std::simd` / `target_feature` vector intrinsics) is a real opportunity but a multi-month project. SIMD-critical inner loops.
+  - Notes: FFI-only today. A pure-Rust libdeflate-equivalent (block-DEFLATE with `std::simd` / `target_feature` vector intrinsics) is a real opportunity but a multi-month project. SIMD-critical inner loops.
 
 - [x] **`BGZF`** — Blocked GNU Zip Format used by samtools/htslib.
   - Reference impl: `C` · [samtools/htslib/bgzf.c](https://github.com/samtools/htslib/blob/develop/bgzf.c) · `MIT`
@@ -66,40 +68,43 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: noodles-bgzf reader is single-threaded; gzp uses `flume` channels for parallel write
   - SIMD: inherits codec dep (`miniz_oxide` SIMD or `libdeflate` SIMD depending on backend)
-  - GPU-amenable: no
+  - Quadrant: ① (noodles-bgzf) / ①+② (gzp with default libdeflater backend)
+  - GPU-amenable: no — block layout is fixed and DEFLATE is bit-serial
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt` (writers); `A` (a future parallel `rsomics-bgzf` decoder)
   - Consumes primitives: future on `rsomics-bgzf` would consume noodles-bgzf primitives
-  - Notes: Quadrant ① for noodles-bgzf; Quadrant ①+② hybrid for gzp (pure-Rust scheduler over either flate2/miniz_oxide or libdeflater backend). Adopt `noodles-bgzf` for IO correctness; pair with `gzp` / `libdeflater` for multithreaded *write* paths. Parallel *decoder* is an open project (tracking [zaeleus/noodles#17](https://github.com/zaeleus/noodles/issues/17)).
+  - Notes: Adopt `noodles-bgzf` for IO correctness; pair with `gzp` / `libdeflater` for multithreaded *write* paths. Parallel *decoder* is an open project (tracking [zaeleus/noodles#17](https://github.com/zaeleus/noodles/issues/17)).
 
 - [x] **`bgzip` (CLI)** — samtools companion for creating BGZF files.
   - Reference impl: `C` · [samtools/htslib/bgzip.c](https://github.com/samtools/htslib) · `MIT`
   - Existing Rust: [`crabz`](https://github.com/sstadick/crabz) `0.10.0` (pigz-style multithreaded gzip/BGZF CLI built on `gzp`)
-  - Existing Rust kind: `pure-port` (pure-Rust scheduling over FFI codec backend by default)
+  - Existing Rust kind: `rust-native` (crabz is a Rust-native pigz-style CLI, not a code-port of samtools/bgzip)
   - Existing non-C alternatives: `bgzip` ships as part of htslib
   - Parallelism: rayon-equivalent worker pool via `gzp` (`flume` + N workers)
   - SIMD: inherits libdeflate SIMD (default backend) or miniz_oxide SIMD
-  - GPU-amenable: no
+  - Quadrant: ①+② (Rust-native scheduling + FFI codec backend by default)
+  - GPU-amenable: no — bit-serial DEFLATE
   - Upstream license: `MIT`
   - Priority: `P1`
-  - Layer: `B` (tool) — adopt `crabz` as `rsomics-bgzip` once renamed/aliased
+  - Layer: `subcommand-of-rsomics-zip`
   - Consumes primitives: `gzp`, `libdeflater`
-  - Notes: Already beats `bgzip --threads` on large inputs by using libdeflate per block. Quadrant ①+② (Rust scheduler + FFI codec).
+  - Notes: Already beats `bgzip --threads` on large inputs by using libdeflate per block. **Gap to close on adoption**: crabz handles BGZF block layout via `gzp::deflate::Bgzf` but does not emit a `.gzi` virtual-offset index alongside the output (samtools' `bgzip --index` does). Adding `.gzi` emission is the first follow-up TODO inside `rsomics-zip` — see also [`indexing.md`](indexing.md) `.gzi` entry.
 
 - [x] **`pigz`** — parallel gzip CLI.
   - Reference impl: `C` · [madler/pigz](https://github.com/madler/pigz) · `Zlib`
   - Existing Rust: [`crabz`](https://github.com/sstadick/crabz) `0.10.0`; library is [`gzp`](https://crates.io/crates/gzp) `2.0.2`
-  - Existing Rust kind: `pure-port` (Rust scheduler + FFI codec)
+  - Existing Rust kind: `rust-native` (crabz is independent Rust-native; takes the pigz approach but does not port pigz's code)
   - Existing non-C alternatives: —
   - Parallelism: parallel block compression via `gzp`
   - SIMD: inherits codec backend
-  - GPU-amenable: no
+  - Quadrant: ①+② (Rust-native scheduler + FFI codec backend by default)
+  - GPU-amenable: no — bit-serial DEFLATE
   - Upstream license: `Zlib`
   - Priority: `P1`
-  - Layer: `B` (tool) — same binary as the BGZF CLI; one tool with `gzip` and `bgzip` subcommands
+  - Layer: `subcommand-of-rsomics-zip` — collapsed with `bgzip` into one `rsomics-zip` binary with `gzip` and `bgzip` subcommands
   - Consumes primitives: `gzp`, `libdeflater` / `flate2`
-  - Notes: `crabz` is the closest Rust equivalent. Ship as the default gzip binary in `rsomics-*` containers. Quadrant ①+②.
+  - Notes: `crabz` is the closest Rust equivalent. The single `rsomics-zip` binary ships as the default gzip / bgzip companion in `rsomics-*` containers.
 
 - [x] **`zstd`** — Facebook's zstandard codec.
   - Reference impl: `C` · [facebook/zstd](https://github.com/facebook/zstd) · `BSD-3-Clause OR GPL-2.0`
@@ -108,12 +113,13 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: zstd-rs exposes the upstream's multi-threaded encoder
   - SIMD: inherits zstd's hand-written SIMD
-  - GPU-amenable: no
+  - Quadrant: ② (production path); ① for `ruzstd` decoder
+  - GPU-amenable: no — codec is bit-serial
   - Upstream license: `BSD-3-Clause OR GPL-2.0` (user picks); typically `BSD-3-Clause` in our adoption
   - Priority: `P1`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Use FFI `zstd` for production (much faster, multi-threaded encoder). Quadrant ② for production path. `ruzstd` is decoder-only and lags upstream; not yet a drop-in replacement (Quadrant ① but partial).
+  - Notes: Use FFI `zstd` for production (much faster, multi-threaded encoder). `ruzstd` is decoder-only and lags upstream; not yet a drop-in replacement.
 
 - [x] **`lz4`** — fast streaming compressor.
   - Reference impl: `C` · [lz4/lz4](https://github.com/lz4/lz4) · `BSD-2-Clause`
@@ -122,12 +128,13 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec; caller schedules
   - SIMD: lz4_flex relies on auto-vectorize; lz4-sys inherits upstream's hand SIMD
-  - GPU-amenable: no
+  - Quadrant: ① (lz4_flex) / ② (lz4-sys)
+  - GPU-amenable: no — codec is byte-serial
   - Upstream license: `BSD-2-Clause`
   - Priority: `P2`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ① for lz4_flex (within ~10% of C library, `no unsafe by default`). Used mostly for intermediate scratch files; rarely a user-facing format in genomics.
+  - Notes: `lz4_flex` is within ~10% of the C library, `no unsafe by default`. Used mostly for intermediate scratch files; rarely a user-facing format in genomics.
 
 - [~] **`xz` / `liblzma`** — high-ratio LZMA codec.
   - Reference impl: `C` · [tukaani-project/xz](https://github.com/tukaani-project/xz) · `0BSD OR LGPL-2.1`
@@ -136,23 +143,25 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing non-C alternatives: —
   - Parallelism: single-threaded
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: ② (xz2) / ③ (lzma-rs)
+  - GPU-amenable: no — LZMA is bit-serial
   - Upstream license: `0BSD` (xz core); some legacy parts `LGPL-2.1`
   - Priority: `P2`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ② via xz2 (FFI is fine for archival ingest). Only relevant for SRA archive ingest and some legacy CRAM. Not a focus.
+  - Notes: FFI is fine for archival ingest. Only relevant for SRA archive ingest and some legacy CRAM. Not a focus.
 
 - [x] **`niffler`** — format-sniffing reader (auto-detect gzip/bgzf/zstd/xz).
   - Reference impl: — (Rust-native concept; analogous to Python `xopen`)
   - Existing Rust: [`niffler`](https://github.com/luizirber/niffler) `3.0.1`; supplementary [`zopen`](https://crates.io/crates/zopen) `1.0.1` (hosted on chiselapp, GitHub aliveness unverifiable)
-  - Existing Rust kind: `pure-port`
+  - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: `xopen` (Python)
   - Parallelism: single-threaded sniffer; the underlying codec defines parallelism
   - SIMD: inherits codec dep
-  - GPU-amenable: no
+  - Quadrant: ④ at the sniffing layer; the actual codec quadrant flows through (e.g. ② when xz is detected)
+  - GPU-amenable: no — file-header lookup, microsecond-class work
   - Upstream license: `MIT`
   - Priority: `P1`
   - Layer: `adopt`
   - Consumes primitives: `flate2`, `zstd`, `xz2` (all transitively)
-  - Notes: Quadrant ④ edge utility wrapper. Adopt `niffler` as the default open-by-extension helper in CLI tools. Eliminates a class of "forgot to gunzip" user errors.
+  - Notes: Adopt `niffler` as the default open-by-extension helper in CLI tools. Eliminates a class of "forgot to gunzip" user errors.
