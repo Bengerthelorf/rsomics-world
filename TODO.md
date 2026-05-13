@@ -4,29 +4,42 @@ A flat aggregated view across modules. The authoritative checklists live in
 each module's per-topic file under `docs/`. This file is a one-page index +
 status dashboard.
 
-Legend: `[ ]` open · `[x]` mature Rust exists, adopt as-is · `[~]` partial
-Rust (FFI binding or incomplete pure-Rust port) · P0 must-have · P1 high
-value · P2 nice to have.
+Legend (4 values, see [`CONVENTIONS.md`](CONVENTIONS.md) for full definitions):
 
-## Status dashboard (as of 2026-05)
+- `[ ]` **open** — no Rust implementation, on our queue.
+- `[~]` **partial** — Rust crate exists but incomplete (FFI-wrapper, partial-port, or rust-native research-grade).
+- `[x]` **adopt** — production-grade pure-Rust crate exists; adopt as a direct dependency.
+- `[A]` **subprocess-adopt** — upstream is fine as-is; we invoke it as a process but don't link or rewrite.
 
-| Module | Open | Partial | Adopt | Total |
-|---|---:|---:|---:|---:|
-| [01 — Foundations](docs/01-foundations/) | 6 | 13 | 26 | 45 |
-| [02 — Genomics](docs/02-genomics/) | 57 | 7 | 4 | 68 |
-| [03 — Transcriptomics](docs/03-transcriptomics/) | 28 | 3 | 1 | 32 |
-| [04 — Single-cell & spatial](docs/04-single-cell/) | 37 | 12 | 2 | 51 |
-| [05 — Epigenomics](docs/05-epigenomics/) | 37 | 1 | 1 | 39 |
-| [06 — Metagenomics](docs/06-metagenomics/) | 37 | 0 | 2 | 39 |
-| [07 — Proteomics & structure](docs/07-proteomics-structure/) | 36 | 0 | 4 | 40 |
-| [08 — Phylogenetics & popgen](docs/08-phylogenetics-popgen/) | 28 | 0 | 1 | 29 |
-| [09 — Workflow & utility](docs/09-workflow-utility/) | 28 | 0 | 3 | 31 |
-| **Total** | **294** | **36** | **44** | **374** |
+Priorities: P0 must-have · P1 high value · P2 nice to have.
 
-44 tools already have production-grade Rust implementations — we adopt
-those rather than rewrite. 36 have partial coverage (typically FFI
-wrappers like `minimap2-rs` or hybrid crates like `piscem`). 294 are
-genuine open work.
+## Status dashboard (post-Phase-1 reclassification, 2026-05-14)
+
+| Module | `[ ]` open | `[~]` partial | `[x]` adopt | `[A]` subprocess | Total |
+|---|---:|---:|---:|---:|---:|
+| [01 — Foundations](docs/01-foundations/) | 7 | 12 | 26 | 0 | 45 |
+| [02 — Genomics](docs/02-genomics/) | 55 | 5 | 8 | 0 | 68 |
+| [03 — Transcriptomics](docs/03-transcriptomics/) | 28 | 2 | 2 | 0 | 32 |
+| [04 — Single-cell & spatial](docs/04-single-cell/) | 37 | 12 | 2 | 0 | 51 |
+| [05 — Epigenomics](docs/05-epigenomics/) | 37 | 1 | 1 | 0 | 39 |
+| [06 — Metagenomics](docs/06-metagenomics/) | 37 | 0 | 2 | 0 | 39 |
+| [07 — Proteomics & structure](docs/07-proteomics-structure/) | 36 | 0 | 3 | 1 | 40 |
+| [08 — Phylogenetics & popgen](docs/08-phylogenetics-popgen/) | 28 | 0 | 0 | 1 | 29 |
+| [09 — Workflow & utility](docs/09-workflow-utility/) | 28 | 0 | 3 | 0 | 31 |
+| **Total** | **293** | **32** | **47** | **2** | **374** |
+
+47 tools already have production-grade pure-Rust implementations — we adopt those rather than rewrite. 32 have partial coverage (FFI wrappers like `rust-htslib`, partial ports like `ruzstd`, or rust-native research-grade tools like `rust-mdbg`). 2 we adopt via subprocess only (UShER, Foldseek). 293 are genuine open work.
+
+### Layer assignment breakdown
+
+| Layer | Count |
+|---|---:|
+| A (foundation crate) | 14 |
+| B (standalone tool binary) | 115 |
+| `adopt` (existing Rust crate as direct dep) | 60 |
+| `subcommand-of-<crate>` (folded into an umbrella binary) | 107 |
+| `—` (not pursued — legacy / GUI / proprietary / commercial / closed-source / deprecated; or cross-reference to canonical entry) | 78 |
+| **Total** | **374** |
 
 ## Module entry points
 
