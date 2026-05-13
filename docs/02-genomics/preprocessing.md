@@ -37,18 +37,18 @@ and largely closed-source) and post-alignment QC (samtools stats, mosdepth
 
 - [x] **`fastp`** — all-in-one FASTQ preprocessor.
   - Reference impl: `C/C++` · [OpenGene/fastp](https://github.com/OpenGene/fastp) · `MIT`
-  - Existing Rust: [`fasterp`](https://crates.io/crates/fasterp) `0.2.1` (pure-Rust port, fastp-compatible JSON output)
+  - Existing Rust: [`fasterp`](https://crates.io/crates/fasterp) `0.2.1` (pure-Rust port, fastp-compatible JSON output; default `native` feature pulls `libdeflater` + `flate2/zlib-ng` FFI codec, plus AWS SDK + tokio for cloud streaming)
   - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: —
   - Parallelism: rayon over read pairs
-  - SIMD: auto-vectorize on quality + base counting; explicit candidates for `std::simd` in adapter overlap scan
-  - Quadrant: ①
+  - SIMD: auto-vectorize on quality + base counting; explicit candidates for `std::simd` in adapter overlap scan; codec SIMD inherited from `libdeflater` / `zlib-ng`
+  - Quadrant: ①+②
   - GPU-amenable: maybe — read-level parallelism is SIMT-trivial; engineering cost vs. CPU performance is marginal
   - Upstream license: `MIT`
   - Priority: `P0`
-  - Layer: `B` (tool — adopt `fasterp` as `rsomics-fastp` or contribute upstream)
+  - Layer: `B` (tool — `rsomics-fastp`, written original from scratch rather than adopting fasterp wholesale; see Notes)
   - Consumes primitives: `needletail`, `noodles-fastq`, future `rsomics-stats`
-  - Notes: Adopt fasterp as the target. Audit feature parity (UMI, polyG trimming, overlap correction, output splitting). One-pass SIMD-friendly inner loops on quality + base counting.
+  - Notes: Audit feature parity (UMI, polyG trimming, overlap correction, output splitting). One-pass SIMD-friendly inner loops on quality + base counting. **Phase 2 verdict**: write `rsomics-fastp` original rather than adopt fasterp. Reasons: (1) fasterp's `default = ["native"]` feature pulls FFI codec backends (`libdeflater`, `flate2/zlib-ng`), making its hot path Quadrant ② not the ① this entry originally claimed; (2) fasterp's AWS-SDK + tokio dep surface is wider than a focused fastp-equivalent needs; (3) writing original lets us own the codec backend choice (zlib-rs default; libdeflater behind a feature flag) and establish the rsomics-* tool playbook (compat.rs + benches + golden tests) on a clean slate. fasterp + upstream fastp serve as compat-test references.
 
 - [ ] **`Trimmomatic`** — adapter + quality trimming (Java).
   - Reference impl: `Java` · [usadellab/Trimmomatic](https://github.com/usadellab/Trimmomatic) · `GPL-3.0`
