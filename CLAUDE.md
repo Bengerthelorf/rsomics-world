@@ -77,7 +77,7 @@ Autopilot is autonomous **within a phase**. Between phases, halt and let the use
 
 Each phase ends by writing `.autopilot/gates/gate-<N>-<date>.md` summarizing:
 1. What changed (file list + commit shas).
-2. Decisions taken without asking (with reasoning).
+2. **Decisions taken without asking (with reasoning).** List every autonomous choice — version pins, runner-label substitutions, default values picked, schema additions, scope expansions, naming choices — even when the choice feels like a neutral substitution or an improvement. Distinguish direct user policy ("user said untrack ROADMAP.md") from autopilot autonomy ("substituted retired macos-13 with macos-15-intel"). User policy doesn't go in this section; autonomy does.
 3. Needs-review backlog (count + categories).
 4. What the next phase requires the user to bless.
 5. Recommended next phase prompt.
