@@ -86,18 +86,18 @@ docking (see [docking](docking.md)).
 
 - [ ] **`ESMFold`** — Meta's MSA-free language-model-based predictor.
   - Reference impl: `Python` (PyTorch) · [facebookresearch/esm](https://github.com/facebookresearch/esm) · `MIT` — **upstream repo archived 2026 (Meta deprioritised the ESM line)**
-  - Existing Rust: partial — `candle-transformers` ships ESM-2 weights inference; ESMFold-specific head not yet packaged
-  - Existing Rust kind: `partial-port`
+  - Existing Rust: none verified. `candle-transformers` does **not** currently ship ESM (verified via FreshEye spot-check); a future port would extend candle-transformers to add the ESM-2 LM + folding head
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
   - Parallelism: PyTorch GPU
   - SIMD: PyTorch kernels
-  - Quadrant: ②
+  - Quadrant: —
   - GPU-amenable: yes — language-model + folding head, dense DL
   - Upstream license: `MIT`
   - Priority: `P1`
   - Layer: `B` (tool — `rsomics-esmfold`)
   - Consumes primitives: `candle` or `burn`, future `rsomics-mmseqs` (optional), `pdbtbx`
-  - Notes: Best candidate for the first pure-Rust structure-prediction binary. No MSA dependency, single-sequence forward pass. Weights and architecture are open. Extend `candle-transformers` to add the ESMFold folding head; this is a tractable Phase-4 project. **Upstream Meta repo is now archived** — community-maintained forks exist.
+  - Notes: Best candidate for the first pure-Rust structure-prediction binary. No MSA dependency, single-sequence forward pass. Weights and architecture are open. The realistic Phase-4 plan is to add an `esm` module to `candle-transformers` (currently missing) covering ESM-2 LM + folding head. **Upstream Meta repo is now archived** — community-maintained forks exist.
 
 - [ ] **`RoseTTAFold`** / `RoseTTAFold2` — Baker-lab's three-track architecture.
   - Reference impl: `Python` (PyTorch) · [RosettaCommons/RoseTTAFold](https://github.com/RosettaCommons/RoseTTAFold) · `MIT` (code) + Rosetta-DL non-commercial weights

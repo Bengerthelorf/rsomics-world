@@ -129,8 +129,8 @@ vendors ship closed-source converters; we'll wrap ProteoWizard
 
 - [ ] **`OpenMS`** — comprehensive open MS framework.
   - Reference impl: `C++` · [OpenMS/OpenMS](https://github.com/OpenMS/OpenMS) · `BSD-3-Clause`
-  - Existing Rust: none verified, but `mzdata` covers a slice
-  - Existing Rust kind: `partial-port` (via mzdata's coverage of mzML IO)
+  - Existing Rust: none verified. `mzdata` provides an independent Rust mzML IO library that overlaps with one slice of OpenMS but is not a partial port — it's its own design
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: `pyOpenMS` bindings
   - Parallelism: upstream pthreads
   - SIMD: upstream SSE
@@ -140,7 +140,7 @@ vendors ship closed-source converters; we'll wrap ProteoWizard
   - Priority: `P1`
   - Layer: `B` (tool — `rsomics-ms-*` family of crates, each covering one primitive: peak picking, feature finding, isobaric quant)
   - Consumes primitives: `mzdata`, `mzpeaks`, `ndarray`, future `rsomics-stats`
-  - Notes: Huge surface area (~1000+ tools). Don't reimplement wholesale. Identify a few high-value primitives and ship them as `rsomics-ms-*` crates. Defer the rest to OpenMS itself via FFI.
+  - Notes: Huge surface area (~1000+ tools). Don't reimplement wholesale. Identify a few high-value primitives and ship them as `rsomics-ms-*` crates. Defer the rest to OpenMS itself via FFI. `mzdata` provides a Rust mzML IO foundation we'd build on top of — not a Rust port of OpenMS.
 
 - [ ] **`FragPipe`** — Java-based GUI/pipeline wrapping MSFragger + family.
   - Reference impl: `Java` · [Nesvilab/FragPipe](https://github.com/Nesvilab/FragPipe) · academic-only (mixed)

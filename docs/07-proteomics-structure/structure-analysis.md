@@ -157,7 +157,7 @@ and docking (see [docking](docking.md)).
   - Consumes primitives: `pdbtbx`, `nalgebra`
   - Notes: Classic, well-specified algorithm. Pure-Rust port is small and high-value (every downstream tool calls DSSP-equivalent at some point).
 
-- [x] **`Foldseek`** — fast structural homology (3Di alphabet + SIMD).
+- [ ] **`Foldseek`** — fast structural homology (3Di alphabet + SIMD).
   - Reference impl: `C++` (heavily SIMD-optimized) · [steineggerlab/foldseek](https://github.com/steineggerlab/foldseek) · `GPL-3`
   - Existing Rust: none verified
   - Existing Rust kind: `none`
