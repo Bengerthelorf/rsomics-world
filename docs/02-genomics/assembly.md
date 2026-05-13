@@ -80,7 +80,7 @@ this doc is about the full assembler pipelines built on top.
   - Consumes primitives: `rsomics-kmer`, future `rsomics-chain`, `noodles-bam`
   - Notes: Build system + Perl glue is most of the complexity. Hybrid workflows are increasingly replaced by long-read-only with HiFi.
 
-- [~] **`sparrowhawk`** — bacterial dBG assembler (Rust-native).
+- [x] **`sparrowhawk`** — bacterial dBG assembler (Rust-native).
   - Reference impl: `Rust` · [bacpop/sparrowhawk](https://github.com/bacpop/sparrowhawk) · `Apache-2.0`
   - Existing Rust: [`sparrowhawk`](https://github.com/bacpop/sparrowhawk) (binary tool, install from source — crates.io name is squatted by an unrelated Shogi library)
   - Existing Rust kind: `rust-native`
@@ -217,7 +217,7 @@ this doc is about the full assembler pipelines built on top.
   - Consumes primitives: `rsomics-kmer`, `block-aligner`, `noodles-fasta`
   - Notes: Small codebase, MIT licence — a tractable Rust port if a contributor wants a benchmark target.
 
-- [~] **`rust-mdbg`** — minimizer-space dBG long-read assembler (Rust-native).
+- [x] **`rust-mdbg`** — minimizer-space dBG long-read assembler (Rust-native).
   - Reference impl: `Rust` · [ekimb/rust-mdbg](https://github.com/ekimb/rust-mdbg) · `MIT`
   - Existing Rust: [`rust-mdbg`](https://github.com/ekimb/rust-mdbg) (binary tool, install from source); companion library [`rust-seq2kminmers`](https://crates.io/crates/rust-seq2kminmers) `0.1.0`
   - Existing Rust kind: `rust-native`

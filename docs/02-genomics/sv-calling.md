@@ -195,14 +195,14 @@ will live in module 05 or here, TBD.
   - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: —
   - Parallelism: rayon
-  - SIMD: auto-vectorize
-  - Quadrant: ①
+  - SIMD: auto-vectorize at the algorithm layer; FFI deps carry their own SIMD
+  - Quadrant: ②
   - GPU-amenable: no — clustering + statistical inference, latency-dominated
   - Upstream license: `BSD-3-Clause-Clear`
   - Priority: `P1`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Already Rust. Adopt as the canonical HiFi joint SV/CNV caller. Document interop with our `rsomics-vcf` stack.
+  - Notes: Already Rust. The SV+CNV algorithm itself is rust-native, but the hot-path deps are FFI: `rust-htslib` for BAM IO (Quadrant ②), `rust-wfa2` (contains `wfa2-sys` FFI to WFA2-lib C) for alignment, `spoa` (C++ FFI) for consensus. That puts the *effective* perf class at Quadrant ② rather than ①. Adopt as the canonical HiFi joint SV/CNV caller. Document interop with our `rsomics-vcf` stack.
 
 - [ ] **`Severus`** — somatic long-read SV caller.
   - Reference impl: `Python` · [KolmogorovLab/Severus](https://github.com/KolmogorovLab/Severus) · `BSD-3-Clause`
