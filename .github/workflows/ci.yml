@@ -60,4 +60,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fastp
           fastp --version
-      - run: rustup run ${{ matrix.toolchain }} cargo test --workspace --all-features
+      - name: Resolve toolchain cargo
+        run: |
+          # The ~/.cargo/bin proxies (cargo, rustup) on GH's macOS images
+          # intermittently masquerade as rustup-init. Hop straight to the
+          # toolchain's cargo binary to dodge the proxy entirely.
+          CARGO=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -path '*/bin/cargo' -type f | head -n 1)
+          if [ -z "$CARGO" ]; then CARGO="$(command -v cargo)"; fi
+          echo "TOOLCHAIN_CARGO=$CARGO" >> "$GITHUB_ENV"
+          "$CARGO" --version
+      - name: cargo test
+        run: "$TOOLCHAIN_CARGO" test --workspace --all-features
