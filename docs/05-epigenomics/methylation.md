@@ -119,14 +119,14 @@ methylation lives in module 04.
   - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: —
   - Parallelism: rayon
-  - SIMD: auto-vectorize
-  - Quadrant: ①
+  - SIMD: inherits htslib's hand SIMD via `rust-htslib`
+  - Quadrant: ②
   - GPU-amenable: no — bedMethyl summarisation is memory-bandwidth-bound
   - Upstream license: `MPL-2.0`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Adopt as-is. Canonical tool for nanopore modBAM → bedMethyl and DMR/DML analysis on long reads. Already uses `noodles-bam`; rsomics packages it and contributes when needed. crates.io name not published — install from source (squat catalog updated).
+  - Notes: Adopt as-is. Canonical tool for nanopore modBAM → bedMethyl and DMR/DML analysis on long reads. The modkit *algorithm* is rust-native (ONT's own modBAM processing), but the BAM IO depends on `rust-htslib` (FFI wrapper of C htslib), putting the effective perf class at Quadrant ② — same kind-vs-quadrant distinction as Sawfish and oarfish. The effective quadrant becomes ① if/when modkit migrates to `noodles-bam`. crates.io name not published — install from source (squat catalog updated).
 
 - [ ] **`nanopolish`** (call-methylation) — legacy HMM modified-base caller from signal-level data.
   - Reference impl: `C++` · [jts/nanopolish](https://github.com/jts/nanopolish) · `MIT`
