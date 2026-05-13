@@ -35,69 +35,106 @@ Multimodal joint integration (RNA + ATAC, CITE-seq) is in
 ## TODO
 
 - [ ] **`Harmony`** — iterative PCA correction by cluster soft-assignment.
-  - Reference impl: `R` · [immunogenomics/harmony](https://github.com/immunogenomics/harmony) · `GPL-3.0`
-    · Python port [`slowkow/harmonypy`](https://github.com/slowkow/harmonypy)
-  - Existing Rust: none.
-  - Existing non-C alternatives: harmonypy (Python).
+  - Reference impl: `R` · [immunogenomics/harmony](https://github.com/immunogenomics/harmony) · `GPL-3.0`; Python port [`slowkow/harmonypy`](https://github.com/slowkow/harmonypy)
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: harmonypy (Python)
+  - Parallelism: R BiocParallel / Python
+  - SIMD: BLAS via ndarray-linalg analogues
+  - Quadrant: —
+  - GPU-amenable: yes — iterative PCA correction is dense linear algebra
+  - Upstream license: `GPL-3.0`
   - Priority: `P0`
-  - Notes: Small algorithm (a few hundred lines of pure
-    linear algebra and k-means). The single most-used scRNA batch
-    correction method. Excellent first-target Rust port — entire
-    algorithm fits in one `ndarray-linalg` + `linfa-clustering` crate.
+  - Layer: `subcommand-of-rsomics-integrate` (single integration umbrella binary)
+  - Consumes primitives: `linfa-clustering`, `linfa-reduction`, `ndarray-linalg`, `anndata-rs`
+  - Notes: Small algorithm (a few hundred lines of pure linear algebra and k-means). The single most-used scRNA batch correction method. Excellent first-target Rust port — entire algorithm fits in one `ndarray-linalg` + `linfa-clustering` crate. GPL-3.0 upstream means clean-room derivation per CONVENTIONS.md.
 
-- [ ] **`scVI`** — variational-autoencoder-based batch correction and
-  imputation.
+- [ ] **`scVI`** — variational-autoencoder-based batch correction and imputation.
   - Reference impl: `Python` · [scverse/scvi-tools](https://github.com/scverse/scvi-tools) · `BSD-3-Clause`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: TF/PyTorch GPU
+  - SIMD: TF/PyTorch kernels
+  - Quadrant: —
+  - GPU-amenable: yes — VAE training and inference are dense DL
+  - Upstream license: `BSD-3-Clause`
   - Priority: `P1`
-  - Notes: Needs a deep-learning backend (`candle` / `burn`) and a
-    `torch.distributions`-equivalent layer (negative binomial,
-    zero-inflated NB). Long road. Near term: pyo3 bridge to
-    scvi-tools using `anndata-rs` as the shared store.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `candle` or `burn`, `anndata-rs`, future `rsomics-stats` (NB / ZINB distributions)
+  - Notes: Needs a deep-learning backend (`candle` / `burn`) and a `torch.distributions`-equivalent layer (negative binomial, zero-inflated NB). Long road. Near term: pyo3 bridge to scvi-tools using `anndata-rs` as the shared store.
 
 - [ ] **`BBKNN`** — batch-balanced k-NN graph.
   - Reference impl: `Python` · [Teichlab/bbknn](https://github.com/Teichlab/bbknn) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: rayon over batches
+  - SIMD: auto-vectorize
+  - Quadrant: —
+  - GPU-amenable: maybe — per-batch k-NN is GPU-friendly
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Very small algorithm: do per-batch k-NN, splice neighbour
-    lists. With `hnsw_rs` already in rsomics-sc this is a few hundred
-    lines. Cheap, high-impact rewrite.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `hnsw_rs`, `anndata-rs`, `petgraph`
+  - Notes: Very small algorithm: do per-batch k-NN, splice neighbour lists. With `hnsw_rs` already in rsomics-sc this is a few hundred lines. Cheap, high-impact rewrite.
 
 - [ ] **`Scanorama`** — panorama-stitching cell alignment.
   - Reference impl: `Python` · [brianhie/scanorama](https://github.com/brianhie/scanorama) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: rayon over batch pairs
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: maybe — SVD correction is dense
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Algorithm is nearest-neighbour matching + SVD-based
-    correction. Fits within the same `linfa` + `hnsw_rs` core that
-    Harmony uses.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `hnsw_rs`, `linfa-reduction`, `ndarray-linalg`, `anndata-rs`
+  - Notes: Algorithm is nearest-neighbour matching + SVD-based correction. Fits within the same `linfa` + `hnsw_rs` core that Harmony uses.
 
-- [ ] **`LIGER` / `rliger`** — non-negative matrix factorisation
-  integration.
+- [ ] **`LIGER` / `rliger`** — non-negative matrix factorisation integration.
   - Reference impl: `R / C++` · [welch-lab/liger](https://github.com/welch-lab/liger) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: PyLiger (Python).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: PyLiger (Python)
+  - Parallelism: R BiocParallel + C++
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: maybe — iNMF is dense linear algebra
+  - Upstream license: `GPL-3.0`
   - Priority: `P2`
-  - Notes: iNMF kernel is amenable to Rust (`ndarray-linalg`). Less
-    commonly used than Harmony / scVI; lower priority.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `ndarray-linalg`, `anndata-rs`, future `rsomics-stats`
+  - Notes: iNMF kernel is amenable to Rust (`ndarray-linalg`). Less commonly used than Harmony / scVI; lower priority.
 
 - [ ] **`MNN` / `fastMNN`** — mutual nearest-neighbour batch correction.
   - Reference impl: `R / C++` · [Bioconductor batchelor](https://bioconductor.org/packages/release/bioc/html/batchelor.html) · `GPL-3.0`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: R BiocParallel
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: maybe — same family as BBKNN
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: Small algorithm; the cosine-normalised MNN search reuses the
-    same HNSW infrastructure. Pair with Harmony in a single
-    `rsomics-integrate` crate.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `hnsw_rs`, `ndarray-linalg`, `anndata-rs`
+  - Notes: Small algorithm; the cosine-normalised MNN search reuses the same HNSW infrastructure. Pair with Harmony in a single `rsomics-integrate` crate.
 
-- [ ] **`Symphony`** — reference-mapping (project new cells onto an
-  existing Harmony-integrated reference).
+- [ ] **`Symphony`** — reference-mapping (project new cells onto an existing Harmony-integrated reference).
   - Reference impl: `R / Python` · [immunogenomics/symphony](https://github.com/immunogenomics/symphony) · `GPL-3.0`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: R BiocParallel
+  - SIMD: BLAS
+  - Quadrant: —
+  - GPU-amenable: maybe — same family as Harmony
+  - Upstream license: `GPL-3.0`
   - Priority: `P2`
-  - Notes: Natural extension of a Rust Harmony — the reference-mapping
-    logic is light on top of an existing Harmony embedding. Worth
-    bundling once Harmony is ported.
+  - Layer: `subcommand-of-rsomics-integrate`
+  - Consumes primitives: `linfa-reduction`, `ndarray-linalg`, `anndata-rs`
+  - Notes: Natural extension of a Rust Harmony — the reference-mapping logic is light on top of an existing Harmony embedding. Worth bundling once Harmony is ported.
