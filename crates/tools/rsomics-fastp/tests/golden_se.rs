@@ -33,6 +33,41 @@ fn copy_se_is_identity() {
 }
 
 #[test]
+fn copy_se_writes_gzipped_output_when_extension_is_gz() {
+    use std::io::Read;
+
+    let input = fixture("se_basic.fastq");
+    let tmp = tempfile::Builder::new()
+        .suffix(".fastq.gz")
+        .tempfile()
+        .expect("tempfile");
+
+    rsomics_fastp::io::copy_se(&input, tmp.path()).expect("copy_se");
+
+    // Output must start with the gzip magic bytes.
+    let mut head = [0u8; 2];
+    std::fs::File::open(tmp.path())
+        .expect("open gz output")
+        .read_exact(&mut head)
+        .expect("read magic");
+    assert_eq!(head, [0x1f, 0x8b], "gzipped output missing gzip magic");
+
+    // Round-tripping through needletail must recover the original record content.
+    let mut reader = needletail::parse_fastx_file(tmp.path()).expect("parse gz");
+    let expected = std::fs::read(&input).expect("read input");
+    let mut decoded = Vec::with_capacity(expected.len());
+    while let Some(rec) = reader.next() {
+        rec.expect("record")
+            .write(&mut decoded, None)
+            .expect("write");
+    }
+    assert_eq!(
+        decoded, expected,
+        "gzipped round-trip must recover the original byte stream"
+    );
+}
+
+#[test]
 fn process_se_classifies_each_failure_mode() {
     let input = fixture("se_mixed.fastq");
     let out = tempfile::Builder::new()

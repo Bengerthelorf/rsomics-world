@@ -22,6 +22,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
+flate2.workspace = true
 needletail = "0.7"
 noodles = { workspace = true, features = ["fastq"] }
 libdeflater = { version = "1.25", optional = true }

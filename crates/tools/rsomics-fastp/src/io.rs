@@ -3,14 +3,70 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use needletail::parse_fastx_file;
 
 use crate::filter::{FilterConfig, FilterResult, classify};
 use crate::report::{FastpJsonReport, FilteringResult};
 use crate::stats::ReadStats;
 
+/// FASTQ output sink. Both arms write through a `BufWriter` so needletail's
+/// small per-record writes batch into larger I/O. The gzip variant must be
+/// `finalize`d to emit the gzip trailer cleanly; `Drop` calls `try_finish`
+/// which writes the trailer but silently swallows late errors (e.g. disk full
+/// during the final flush), so the explicit `finalize` is the supported path.
+enum FastqWriter {
+    Plain(BufWriter<File>),
+    Gzip(GzEncoder<BufWriter<File>>),
+}
+
+impl FastqWriter {
+    fn create(path: &Path) -> Result<Self> {
+        let file = File::create(path)
+            .with_context(|| format!("creating output FASTQ {}", path.display()))?;
+        let buf = BufWriter::new(file);
+        if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("gz"))
+        {
+            Ok(Self::Gzip(GzEncoder::new(buf, Compression::default())))
+        } else {
+            Ok(Self::Plain(buf))
+        }
+    }
+
+    fn finalize(self) -> Result<()> {
+        match self {
+            Self::Plain(mut w) => w.flush().context("flushing plain output writer")?,
+            Self::Gzip(w) => {
+                w.finish().context("finishing gzip output stream")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Write for FastqWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Plain(w) => w.write(buf),
+            Self::Gzip(w) => w.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Plain(w) => w.flush(),
+            Self::Gzip(w) => w.flush(),
+        }
+    }
+}
+
 /// Identity-copy a single-end FASTQ file. No transformation; validates the
 /// reader / writer plumbing in isolation before filtering layers ride on top.
+/// Input compression is auto-detected by needletail; output is gzipped iff the
+/// path ends in `.gz`.
 ///
 /// # Errors
 ///
@@ -19,17 +75,13 @@ use crate::stats::ReadStats;
 pub fn copy_se(input: &Path, output: &Path) -> Result<()> {
     let mut reader = parse_fastx_file(input)
         .with_context(|| format!("opening input FASTQ {}", input.display()))?;
-    let mut writer = BufWriter::new(
-        File::create(output)
-            .with_context(|| format!("creating output FASTQ {}", output.display()))?,
-    );
+    let mut writer = FastqWriter::create(output)?;
     while let Some(record) = reader.next() {
         let rec = record.context("malformed FASTQ record")?;
         rec.write(&mut writer, None)
             .context("writing record to output")?;
     }
-    writer.flush().context("flushing output writer")?;
-    Ok(())
+    writer.finalize()
 }
 
 /// Outcome of a single-end preprocessing run — both pre- and post-filter
@@ -56,10 +108,7 @@ pub fn process_se(
 ) -> Result<SeOutcome> {
     let mut reader = parse_fastx_file(input)
         .with_context(|| format!("opening input FASTQ {}", input.display()))?;
-    let mut writer = BufWriter::new(
-        File::create(output)
-            .with_context(|| format!("creating output FASTQ {}", output.display()))?,
-    );
+    let mut writer = FastqWriter::create(output)?;
 
     let mut pre = ReadStats::default();
     let mut post = ReadStats::default();
@@ -79,7 +128,7 @@ pub fn process_se(
                 .context("writing record to output")?;
         }
     }
-    writer.flush().context("flushing output writer")?;
+    writer.finalize()?;
 
     if let Some(path) = json_path {
         let report = FastpJsonReport::from_stats(

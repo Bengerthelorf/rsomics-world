@@ -458,6 +458,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
+ "flate2",
  "libdeflater",
  "needletail",
  "noodles",
