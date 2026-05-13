@@ -59,6 +59,7 @@ When adopting, the TODO entry's `Existing Rust kind` field records ①②③④ 
 ## Operating mode
 
 - **No clarifying questions.** Decide, commit, document the reason in the commit body.
+- **Don't stop unless a real decision is needed.** Autopilot means autopilot. Inside a phase, when the directive is clear (e.g. "implement rsomics-fastp's preprocessing pipeline"), keep going through the next logical sub-task without surfacing for confirmation. **Halt only when**: (a) you hit one of the gate-defined stop conditions or halt triggers, (b) a genuine decision arises that materially changes scope or requires user judgment (not a stylistic preference, not a "good stopping point"), or (c) you finish the phase. Session-end courtesy halts ("opening landed, ready for next session") are not allowed — if there is more work scoped within the current phase / directive, do it. If the user wanted you to stop, they would say so.
 - **Solo, no PRs.** Direct commits to `main`. Conventional prefixes:
   - `docs(<module>):` for catalog content (under `docs/`)
   - `feat(<crate>):` for new crate or feature
