@@ -10,6 +10,7 @@ use needletail::parse_fastx_file;
 use crate::filter::{FilterConfig, FilterResult, classify};
 use crate::report::{FastpJsonReport, FilteringResult};
 use crate::stats::ReadStats;
+use crate::trim::{AdapterConfig, find_adapter_3p};
 
 /// FASTQ output sink. Both arms write through a `BufWriter` so needletail's
 /// small per-record writes batch into larger I/O. The gzip variant must be
@@ -84,6 +85,24 @@ pub fn copy_se(input: &Path, output: &Path) -> Result<()> {
     writer.finalize()
 }
 
+/// Write one FASTQ record from individual id / seq / qual slices. Needed when
+/// trimming has produced new (shorter) seq / qual that diverge from needletail's
+/// stored record bytes, so we can't use `record.write`.
+fn write_record<W: Write>(
+    writer: &mut W,
+    id: &[u8],
+    seq: &[u8],
+    qual: &[u8],
+) -> std::io::Result<()> {
+    writer.write_all(b"@")?;
+    writer.write_all(id)?;
+    writer.write_all(b"\n")?;
+    writer.write_all(seq)?;
+    writer.write_all(b"\n+\n")?;
+    writer.write_all(qual)?;
+    writer.write_all(b"\n")
+}
+
 /// Outcome of a single-end preprocessing run — both pre- and post-filter
 /// statistics, plus the per-category filter counts.
 #[derive(Debug)]
@@ -105,9 +124,10 @@ pub struct PeOutcome {
     pub filtering: FilteringResult,
 }
 
-/// Stream a single-end FASTQ through quality / length / N filters and accumulate
-/// per-read statistics, writing only the passing reads to `output`. Optionally
-/// emit a fastp-compatible JSON report to `json_path`.
+/// Stream a single-end FASTQ through optional adapter trimming, then quality
+/// / length / N filters, accumulating per-read statistics and writing only
+/// passing reads to `output`. Optionally emit a fastp-compatible JSON report
+/// to `json_path`.
 ///
 /// # Errors
 ///
@@ -117,6 +137,7 @@ pub fn process_se(
     output: &Path,
     json_path: Option<&Path>,
     cfg: FilterConfig,
+    adapter: Option<&AdapterConfig>,
 ) -> Result<SeOutcome> {
     let mut reader = parse_fastx_file(input)
         .with_context(|| format!("opening input FASTQ {}", input.display()))?;
@@ -132,11 +153,17 @@ pub fn process_se(
         let qual = rec.qual().context("FASTQ record missing quality scores")?;
         pre.observe(&seq, qual);
 
-        let outcome = classify(&seq, qual, cfg);
+        let trim_at = adapter
+            .and_then(|cfg| find_adapter_3p(&seq, cfg))
+            .unwrap_or(seq.len());
+        let seq_t = &seq[..trim_at];
+        let qual_t = &qual[..trim_at];
+
+        let outcome = classify(seq_t, qual_t, cfg);
         filtering.record(outcome);
         if matches!(outcome, FilterResult::Pass) {
-            post.observe(&seq, qual);
-            rec.write(&mut writer, None)
+            post.observe(seq_t, qual_t);
+            write_record(&mut writer, rec.id(), seq_t, qual_t)
                 .context("writing record to output")?;
         }
     }
@@ -177,7 +204,7 @@ pub fn process_se(
 ///
 /// Returns `Err` if input parsing, output writing, JSON serialization fails,
 /// or the two input files have a different number of records.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub fn process_pe(
     in1: &Path,
     in2: &Path,
@@ -185,6 +212,7 @@ pub fn process_pe(
     out2: &Path,
     json_path: Option<&Path>,
     cfg: FilterConfig,
+    adapter: Option<&AdapterConfig>,
 ) -> Result<PeOutcome> {
     let mut r1_reader =
         parse_fastx_file(in1).with_context(|| format!("opening input R1 {}", in1.display()))?;
@@ -213,15 +241,26 @@ pub fn process_pe(
                 pre_r1.observe(&seq1, q1);
                 pre_r2.observe(&seq2, q2);
 
-                let v1 = classify(&seq1, q1, cfg);
-                let v2 = classify(&seq2, q2, cfg);
+                let t1 = adapter
+                    .and_then(|cfg| find_adapter_3p(&seq1, cfg))
+                    .unwrap_or(seq1.len());
+                let t2 = adapter
+                    .and_then(|cfg| find_adapter_3p(&seq2, cfg))
+                    .unwrap_or(seq2.len());
+                let seq1_t = &seq1[..t1];
+                let q1_t = &q1[..t1];
+                let seq2_t = &seq2[..t2];
+                let q2_t = &q2[..t2];
+
+                let v1 = classify(seq1_t, q1_t, cfg);
+                let v2 = classify(seq2_t, q2_t, cfg);
                 let pair_verdict = pair_filter_result(v1, v2);
                 filtering.record(pair_verdict);
                 if matches!(pair_verdict, FilterResult::Pass) {
-                    post_r1.observe(&seq1, q1);
-                    post_r2.observe(&seq2, q2);
-                    rec1.write(&mut w1, None).context("writing R1 record")?;
-                    rec2.write(&mut w2, None).context("writing R2 record")?;
+                    post_r1.observe(seq1_t, q1_t);
+                    post_r2.observe(seq2_t, q2_t);
+                    write_record(&mut w1, rec1.id(), seq1_t, q1_t).context("writing R1 record")?;
+                    write_record(&mut w2, rec2.id(), seq2_t, q2_t).context("writing R2 record")?;
                 }
             }
             (None, None) => break,

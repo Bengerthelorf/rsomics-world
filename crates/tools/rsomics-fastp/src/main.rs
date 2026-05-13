@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use rsomics_fastp::filter::FilterConfig;
+use rsomics_fastp::trim::AdapterConfig;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -48,6 +49,14 @@ struct Args {
     /// Reject reads with more than this many N bases.
     #[arg(long = "n_base_limit", default_value_t = 5)]
     n_base_limit: usize,
+
+    /// Adapter sequence to trim from the 3' end. Defaults to Illumina `TruSeq`
+    /// (`AGATCGGAAGAGCACACGTCTGAACTCCAGTCA`). Pass an empty string to disable.
+    #[arg(
+        long = "adapter_sequence",
+        default_value = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
+    )]
+    adapter_sequence: String,
 }
 
 fn main() -> Result<()> {
@@ -58,6 +67,15 @@ fn main() -> Result<()> {
         length_required: args.length_required,
         n_base_limit: args.n_base_limit,
     };
+    let adapter = if args.adapter_sequence.is_empty() {
+        None
+    } else {
+        Some(AdapterConfig {
+            sequence: args.adapter_sequence.as_bytes().to_vec(),
+            min_match_len: 5,
+            max_mismatch_rate: 0.2,
+        })
+    };
     match (args.in2, args.out2) {
         (Some(in2), Some(out2)) => {
             rsomics_fastp::io::process_pe(
@@ -67,10 +85,17 @@ fn main() -> Result<()> {
                 &out2,
                 args.json.as_deref(),
                 cfg,
+                adapter.as_ref(),
             )?;
         }
         (None, None) => {
-            rsomics_fastp::io::process_se(&args.in1, &args.out1, args.json.as_deref(), cfg)?;
+            rsomics_fastp::io::process_se(
+                &args.in1,
+                &args.out1,
+                args.json.as_deref(),
+                cfg,
+                adapter.as_ref(),
+            )?;
         }
         _ => {
             anyhow::bail!("--in2 and --out2 must both be set, or both unset");
