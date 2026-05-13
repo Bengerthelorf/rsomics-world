@@ -107,6 +107,27 @@ fn process_se_classifies_each_failure_mode() {
     assert_eq!(parsed["summary"]["before_filtering"]["total_reads"], 4);
     assert_eq!(parsed["summary"]["after_filtering"]["total_reads"], 1);
 
+    // Per-mate block with curves is present for R1 only (single-end).
+    let r1_before = &parsed["read1_before_filtering"];
+    assert_eq!(r1_before["total_reads"], 4);
+    let cycles = r1_before["total_cycles"].as_u64().expect("total_cycles");
+    assert!(cycles > 0, "total_cycles should be > 0");
+    assert_eq!(
+        r1_before["quality_curves"]["mean"]
+            .as_array()
+            .expect("mean curve is array")
+            .len(),
+        cycles as usize
+    );
+    assert_eq!(
+        r1_before["content_curves"]["GC"]
+            .as_array()
+            .expect("GC curve is array")
+            .len(),
+        cycles as usize
+    );
+    assert!(parsed["read2_before_filtering"].is_null());
+
     // Only the passing read should appear in the output FASTQ.
     let out_text = fs::read_to_string(out.path()).expect("read output");
     assert!(out_text.contains("@pass_high_q"));

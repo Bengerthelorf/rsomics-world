@@ -70,4 +70,19 @@ fn process_pe_rejects_pair_when_either_mate_fails() {
     assert_eq!(parsed["summary"]["before_filtering"]["total_reads"], 8);
     assert_eq!(parsed["summary"]["after_filtering"]["total_reads"], 4);
     assert_eq!(parsed["filtering_result"]["passed_filter_reads"], 2);
+
+    // Both mate blocks are present and carry curve arrays.
+    let r1 = &parsed["read1_before_filtering"];
+    let r2 = &parsed["read2_before_filtering"];
+    assert_eq!(r1["total_reads"], 4);
+    assert_eq!(r2["total_reads"], 4);
+    let r1_cycles = r1["total_cycles"].as_u64().expect("r1 cycles");
+    assert_eq!(
+        r1["quality_curves"]["mean"]
+            .as_array()
+            .expect("r1 mean curve")
+            .len(),
+        r1_cycles as usize
+    );
+    assert!(r2["content_curves"]["GC"].is_array());
 }

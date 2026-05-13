@@ -11,6 +11,27 @@ pub struct ReadStats {
     pub q30_bases: u64,
     pub gc_bases: u64,
     pub n_bases: u64,
+    pub cycles: Vec<CycleStat>,
+}
+
+/// Per-cycle counts. Index = 0-based position along the read. `qual_sum` is
+/// the sum of Phred values at that cycle across all reads that reached it;
+/// divide by the per-cycle total to get the mean quality.
+#[derive(Debug, Clone, Default)]
+pub struct CycleStat {
+    pub count_a: u64,
+    pub count_c: u64,
+    pub count_g: u64,
+    pub count_t: u64,
+    pub count_n: u64,
+    pub qual_sum: u64,
+}
+
+impl CycleStat {
+    #[must_use]
+    pub fn total(&self) -> u64 {
+        self.count_a + self.count_c + self.count_g + self.count_t + self.count_n
+    }
 }
 
 impl ReadStats {
@@ -19,17 +40,35 @@ impl ReadStats {
         self.total_reads += 1;
         self.total_bases += seq.len() as u64;
 
-        for &b in seq {
+        if self.cycles.len() < seq.len() {
+            self.cycles.resize(seq.len(), CycleStat::default());
+        }
+
+        for (i, &b) in seq.iter().enumerate() {
+            let c = &mut self.cycles[i];
             match b {
-                b'G' | b'g' | b'C' | b'c' => self.gc_bases += 1,
-                b'N' | b'n' => self.n_bases += 1,
+                b'A' | b'a' => c.count_a += 1,
+                b'C' | b'c' => {
+                    c.count_c += 1;
+                    self.gc_bases += 1;
+                }
+                b'G' | b'g' => {
+                    c.count_g += 1;
+                    self.gc_bases += 1;
+                }
+                b'T' | b't' => c.count_t += 1,
+                b'N' | b'n' => {
+                    c.count_n += 1;
+                    self.n_bases += 1;
+                }
                 _ => {}
             }
         }
 
-        for &q in qual {
+        for (i, &q) in qual.iter().enumerate() {
             // Sanger encoding: q = Phred + 33.
             let phred = q.saturating_sub(33);
+            self.cycles[i].qual_sum += u64::from(phred);
             if phred >= 20 {
                 self.q20_bases += 1;
                 if phred >= 30 {

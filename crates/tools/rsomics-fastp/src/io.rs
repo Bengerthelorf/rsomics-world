@@ -177,7 +177,7 @@ pub fn process_se(
     writer.finalize()?;
 
     if let Some(path) = json_path {
-        let report = FastpJsonReport::from_stats(
+        let report = FastpJsonReport::from_se(
             &pre,
             &post,
             FilteringResult {
@@ -187,13 +187,7 @@ pub fn process_se(
                 too_short_reads: filtering.too_short_reads,
             },
         );
-        let mut json_writer = BufWriter::new(
-            File::create(path)
-                .with_context(|| format!("creating JSON report {}", path.display()))?,
-        );
-        serde_json::to_writer_pretty(&mut json_writer, &report)
-            .context("serializing JSON report")?;
-        json_writer.flush().context("flushing JSON writer")?;
+        write_json_report(&report, path)?;
     }
 
     Ok(SeOutcome {
@@ -201,6 +195,15 @@ pub fn process_se(
         post_filter: post,
         filtering,
     })
+}
+
+fn write_json_report(report: &FastpJsonReport, path: &Path) -> Result<()> {
+    let mut json_writer = BufWriter::new(
+        File::create(path).with_context(|| format!("creating JSON report {}", path.display()))?,
+    );
+    serde_json::to_writer_pretty(&mut json_writer, report).context("serializing JSON report")?;
+    json_writer.flush().context("flushing JSON writer")?;
+    Ok(())
 }
 
 /// Stream a paired-end FASTQ through the same filter / stats / report pipeline
@@ -292,13 +295,11 @@ pub fn process_pe(
     w2.finalize()?;
 
     if let Some(path) = json_path {
-        let mut pre_agg = pre_r1.clone();
-        merge_stats(&mut pre_agg, &pre_r2);
-        let mut post_agg = post_r1.clone();
-        merge_stats(&mut post_agg, &post_r2);
-        let report = FastpJsonReport::from_stats(
-            &pre_agg,
-            &post_agg,
+        let report = FastpJsonReport::from_pe(
+            &pre_r1,
+            &post_r1,
+            &pre_r2,
+            &post_r2,
             FilteringResult {
                 passed_filter_reads: filtering.passed_filter_reads,
                 low_quality_reads: filtering.low_quality_reads,
@@ -306,13 +307,7 @@ pub fn process_pe(
                 too_short_reads: filtering.too_short_reads,
             },
         );
-        let mut json_writer = BufWriter::new(
-            File::create(path)
-                .with_context(|| format!("creating JSON report {}", path.display()))?,
-        );
-        serde_json::to_writer_pretty(&mut json_writer, &report)
-            .context("serializing JSON report")?;
-        json_writer.flush().context("flushing JSON writer")?;
+        write_json_report(&report, path)?;
     }
 
     Ok(PeOutcome {
@@ -334,16 +329,4 @@ fn pair_filter_result(v1: FilterResult, v2: FilterResult) -> FilterResult {
     } else {
         v1
     }
-}
-
-/// Fold the contents of `other` into `into`, summing counts. Used to build
-/// the aggregate pre/post stats for the JSON `summary` section from per-mate
-/// stats.
-fn merge_stats(into: &mut ReadStats, other: &ReadStats) {
-    into.total_reads += other.total_reads;
-    into.total_bases += other.total_bases;
-    into.q20_bases += other.q20_bases;
-    into.q30_bases += other.q30_bases;
-    into.gc_bases += other.gc_bases;
-    into.n_bases += other.n_bases;
 }
