@@ -19,6 +19,8 @@ fn fastp_on_path() -> bool {
 #[test]
 fn fastp_binary_available() {
     if !fastp_on_path() {
-        eprintln!("skip: upstream fastp not on PATH; install via bioconda or skip the test-support feature");
+        eprintln!(
+            "skip: upstream fastp not on PATH; install via bioconda or skip the test-support feature"
+        );
     }
 }
