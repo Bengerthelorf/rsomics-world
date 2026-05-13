@@ -38,90 +38,120 @@ in [`assembly-isoform.md`](assembly-isoform.md).
 
 - [ ] **`Salmon`** — selective-alignment-based transcript quantification.
   - Reference impl: `C++` · [COMBINE-lab/salmon](https://github.com/COMBINE-lab/salmon) · `GPL-3.0`
-  - Existing Rust: none directly; the successor `piscem` is a Rust binary
-    around a C++ core, see below. `alevin-fry` (Rust) consumes salmon /
-    piscem RAD output.
-  - Existing non-C alternatives: `piscem` (Rust+C++ hybrid).
+  - Existing Rust: none directly; the successor `piscem` is a Rust binary around a C++ core, see below. `alevin-fry` (Rust) consumes salmon / piscem RAD output.
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: `piscem` (Rust+C++ hybrid)
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE
+  - Quadrant: —
+  - GPU-amenable: maybe — EM iteration is dense linear algebra; selective-alignment scoring is SW-like
+  - Upstream license: `GPL-3.0`
   - Priority: `P0`
-  - Notes: Bulk-quant feature parity with `salmon quant` is the single
-    most impactful Rust deliverable in transcriptomics. The maths
-    (selective-alignment scoring + range-factor EM) is well-documented;
-    the engineering pain is the compact suffix-array index. Coordinate
-    with COMBINE-lab on whether `piscem` becomes the canonical path.
+  - Layer: `B` (tool — `rsomics-salmon`)
+  - Consumes primitives: `rsomics-kmer`, `rsomics-fm-index`, `block-aligner`, `noodles-fastq`, `noodles-fasta`, `noodles-gff`, `noodles-bam`, future `rsomics-stats` (EM)
+  - Notes: Bulk-quant feature parity with `salmon quant` is the single most impactful Rust deliverable in transcriptomics. The maths (selective-alignment scoring + range-factor EM) is well-documented; the engineering pain is the compact suffix-array index. Coordinate with COMBINE-lab on whether `piscem` becomes the canonical path.
 
-- [~] **`kallisto`** — pseudoalignment-based transcript quantification
-  using the T-DBG.
+- [~] **`kallisto`** — pseudoalignment-based transcript quantification using the T-DBG.
   - Reference impl: `C++` · [pachterlab/kallisto](https://github.com/pachterlab/kallisto) · `BSD-2-Clause`
-  - Existing Rust: partial — [`rust-pseudoaligner`](https://github.com/10XGenomics/rust-pseudoaligner)
-    from 10x Genomics implements the T-DBG pseudoalignment primitive in
-    Rust, used inside Cell Ranger but not packaged as a kallisto drop-in.
-  - Existing non-C alternatives: `BUStools` (companion, C++).
+  - Existing Rust: partial — [`debruijn_mapping`](https://crates.io/crates/debruijn_mapping) `0.6.0` (a.k.a. [`10XGenomics/rust-pseudoaligner`](https://github.com/10XGenomics/rust-pseudoaligner)) implements the T-DBG pseudoalignment primitive in Rust, used inside Cell Ranger but not packaged as a kallisto drop-in
+  - Existing Rust kind: `partial-port`
+  - Existing non-C alternatives: `BUStools` (companion, C++)
+  - Parallelism: rayon
+  - SIMD: auto-vectorize
+  - Quadrant: ①
+  - GPU-amenable: maybe — T-DBG traversal is irregular, EM is GPU-friendly
+  - Upstream license: `BSD-2-Clause`
   - Priority: `P0`
-  - Notes: `rust-pseudoaligner` plus a EM-quantification layer would give
-    most of `kallisto quant`. Output formats (BUS, h5) need `noodles` /
-    custom HDF5 layers (`hdf5-rust`).
+  - Layer: `B` (tool — `rsomics-kallisto`)
+  - Consumes primitives: `debruijn` (`rust-debruijn` ecosystem), `rsomics-kmer`, `noodles-fastq`, future `rsomics-stats` (EM), future `rsomics-bus` for BUS-format IO
+  - Notes: `debruijn_mapping` plus an EM-quantification layer would give most of `kallisto quant`. Output formats (BUS, h5) need `noodles` / custom HDF5 layers (`hdf5-metno`). The crates.io name `rust-pseudoaligner` is **unpublished**; the actual published name is `debruijn_mapping`.
 
-- [ ] **`RSEM`** — EM-based transcript expression estimation from
-  transcriptome alignments.
+- [ ] **`RSEM`** — EM-based transcript expression estimation from transcriptome alignments.
   - Reference impl: `C++ / Perl` · [deweylab/RSEM](https://github.com/deweylab/RSEM) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: `salmon --alignment-mode` covers most
-    use cases.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: `salmon --alignment-mode` covers most use cases
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: maybe — EM iteration is dense linear algebra
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: Still mandatory for some isoform-DE pipelines that expect
-    `.isoforms.results`. A Rust port would be a relatively small project
-    once `noodles` + `nalgebra`/`ndarray` are in place. Match RSEM's
-    log-likelihood model exactly so DESeq2 / tximport downstream is
-    unaffected.
+  - Layer: `B` (tool — `rsomics-rsem`)
+  - Consumes primitives: `noodles-bam`, `noodles-fasta`, future `rsomics-stats` (EM), `ndarray`
+  - Notes: Still mandatory for some isoform-DE pipelines that expect `.isoforms.results`. A Rust port would be a relatively small project once `noodles` + `nalgebra`/`ndarray` are in place. Match RSEM's log-likelihood model exactly so DESeq2 / tximport downstream is unaffected.
 
-- [ ] **`featureCounts`** (Subread) — interval-based read summarization
-  over a GFF.
+- [ ] **`featureCounts`** (Subread) — interval-based read summarization over a GFF.
   - Reference impl: `C` · [Subread/featureCounts](https://subread.sourceforge.net/featureCounts.html) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: `htseq-count` (Python).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: `htseq-count` (Python)
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: no — interval-tree querying is memory-latency-bound
+  - Upstream license: `GPL-3.0`
   - Priority: `P0`
-  - Notes: Most commonly-used gene-level counter in bulk RNA-seq.
-    Small, focused tool — implement as a `noodles-bam` + interval-tree
-    binary `rsomics-featurecounts`. Match output column-for-column with
-    `Rsubread::featureCounts` so existing DESeq2 / edgeR scripts work
-    unchanged.
+  - Layer: `B` (tool — `rsomics-featurecounts`)
+  - Consumes primitives: `noodles-bam`, `noodles-gff`, `rsomics-intervals` (foundation)
+  - Notes: Most commonly-used gene-level counter in bulk RNA-seq. Small, focused tool — implement as a `noodles-bam` + interval-tree binary. Match output column-for-column with `Rsubread::featureCounts` so existing DESeq2 / edgeR scripts work unchanged.
 
-- [ ] **`HTSeq-count`** — Python read-feature counter, reference for
-  intersection-strict semantics.
+- [ ] **`HTSeq-count`** — Python read-feature counter, reference for intersection-strict semantics.
   - Reference impl: `Python / Cython` · [htseq/htseq](https://github.com/htseq/htseq) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: `featureCounts` (faster, different
-    semantics), `featurecounts-rs` would inherit.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: `featureCounts` (faster, different semantics)
+  - Parallelism: Python serial / multiprocessing
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: no — same constraint as featureCounts
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: Slow; pipelines tolerate it for strict-mode semantics. A
-    Rust drop-in matching `--mode intersection-strict` + `--mode union`
-    bit-for-bit is a useful Phase-2 deliverable.
+  - Layer: `subcommand-of-rsomics-featurecounts` (a `--mode htseq-strict` flag inside the same binary)
+  - Consumes primitives: `noodles-bam`, `noodles-gff`, `rsomics-intervals`
+  - Notes: Slow; pipelines tolerate it for strict-mode semantics. A Rust drop-in matching `--mode intersection-strict` + `--mode union` bit-for-bit is a useful Phase-2 deliverable. Folds into `rsomics-featurecounts` as a counting-semantics flag.
 
-- [ ] **`StringTie`** (quantification mode) — transcript abundance over
-  spliced BAMs.
+- [ ] **`StringTie`** (quantification mode) — transcript abundance over spliced BAMs.
   - Reference impl: `C++` · [gpertea/stringtie](https://github.com/gpertea/stringtie) · `MIT`
-  - Existing Rust: none.
-  - Existing non-C alternatives: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: maybe — splice-graph EM is dense linear algebra
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: See `assembly-isoform.md` for the assembly side; the
-    `-e` (estimate only, given GTF) mode is just quantification. Same
-    rewrite covers both.
+  - Layer: `subcommand-of-rsomics-stringtie` (same binary covers assembly + quant; see [`assembly-isoform.md`](assembly-isoform.md))
+  - Consumes primitives: `noodles-bam`, `noodles-gff`, `rsomics-intervals`, future `rsomics-stats`
+  - Notes: See `assembly-isoform.md` for the assembly side; the `-e` (estimate only, given GTF) mode is just quantification. Same rewrite covers both.
 
 - [x] **`oarfish`** — long-read transcript quantification with coverage-aware EM.
   - Reference impl: `Rust` · [COMBINE-lab/oarfish](https://github.com/COMBINE-lab/oarfish) · `BSD-3-Clause`
-  - Existing Rust: oarfish (this row).
-  - Existing non-C alternatives: `IsoQuant` (Python), `bambu` (R).
+  - Existing Rust: [`oarfish`](https://crates.io/crates/oarfish) `0.9.2`
+  - Existing Rust kind: `rust-native`
+  - Existing non-C alternatives: `IsoQuant` (Python), `bambu` (R)
+  - Parallelism: rayon
+  - SIMD: auto-vectorize on EM iteration
+  - Quadrant: ② (uses `minimap2-rs` for alignment in its hot path; the EM layer is pure-Rust ①, but the alignment dep is FFI)
+  - GPU-amenable: maybe — EM iteration is dense linear algebra; alignment is the minimap2 question
+  - Upstream license: `BSD-3-Clause`
   - Priority: `P0`
-  - Notes: Adopt as-is. COMBINE-lab uses `minimap2-rs` underneath. We
-    package it in the rsomics ecosystem and contribute upstream when
-    needed.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Adopt as-is. COMBINE-lab uses `minimap2-rs` underneath. We package it in the rsomics ecosystem and contribute upstream when needed. The Quadrant ② reflects the FFI alignment dep; when the future pure-Rust minimap2 ports land, oarfish's effective quadrant becomes ①.
 
-- [~] **`piscem`** — next-gen Rust-wrapped selective-alignment + index for
-  Salmon / alevin-fry.
+- [~] **`piscem`** — next-gen Rust-wrapped selective-alignment + index for Salmon / alevin-fry.
   - Reference impl: `Rust + C++` · [COMBINE-lab/piscem](https://github.com/COMBINE-lab/piscem) · `BSD-3-Clause`
-  - Existing Rust: piscem (front-end Rust, internals still C++).
-  - Existing non-C alternatives: salmon, kallisto.
+  - Existing Rust: [`piscem`](https://crates.io/crates/piscem) `0.20.0` (Rust front-end, internals still C++ via `piscem-rs` and `cf1-rs` deps)
+  - Existing Rust kind: `FFI-wrapper`
+  - Existing non-C alternatives: salmon, kallisto
+  - Parallelism: rayon + the C++ core's own threading
+  - SIMD: inherits the C++ core's SIMD
+  - Quadrant: ②
+  - GPU-amenable: maybe — same EM-iteration story as Salmon
+  - Upstream license: `BSD-3-Clause`
   - Priority: `P0`
-  - Notes: Adopt and track. Eventually the C++ core (compacted dBG
-    index, mapping kernel) becomes the obvious port target for a fully
-    pure-Rust salmon-class quantifier.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Adopt and track. Eventually the C++ core (compacted dBG index, mapping kernel) becomes the obvious port target for a fully pure-Rust salmon-class quantifier. piscem 0.20.0 is edition 2024 with a build.rs that compiles the C++ component.
