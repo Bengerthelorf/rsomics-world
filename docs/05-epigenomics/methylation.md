@@ -40,66 +40,105 @@ methylation lives in module 04.
 
 - [ ] **`Bismark`** — Perl-orchestrated bisulfite aligner over Bowtie2.
   - Reference impl: `Perl` · [FelixKrueger/Bismark](https://github.com/FelixKrueger/Bismark) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: BWA-meth (Python+BWA), bwa-meth-rs has
-    not appeared.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: BWA-meth (Python+BWA)
+  - Parallelism: upstream Perl wrapping Bowtie2 pthreads
+  - SIMD: inherited from bowtie2
+  - Quadrant: —
+  - GPU-amenable: maybe — same SW kernel rationale as short-read aligners
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: Pure-Rust short-read bisulfite aligner is a credible target
-    once `02-genomics` ships a Rust short-read aligner. Strategy:
-    in-silico convert both reference and reads (C→T forward, G→A
-    reverse), align with `rsomics-align`, restore base identities and
-    emit a Bismark-compatible BAM.
+  - Layer: `subcommand-of-rsomics-bisulfite` (alignment mode flag)
+  - Consumes primitives: `rsomics-fm-index`, `block-aligner`, `noodles-bam`, `noodles-fasta`
+  - Notes: Pure-Rust short-read bisulfite aligner is a credible target once `02-genomics` ships a Rust short-read aligner. Strategy: in-silico convert both reference and reads (C→T forward, G→A reverse), align with `rsomics-align`, restore base identities and emit a Bismark-compatible BAM.
 
 - [ ] **`BWA-meth`** — Python wrapper around BWA for bisulfite alignment.
   - Reference impl: `Python + C` · [brentp/bwa-meth](https://github.com/brentp/bwa-meth) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
   - Existing non-C alternatives: —
+  - Parallelism: upstream BWA pthreads
+  - SIMD: inherited from BWA
+  - Quadrant: —
+  - GPU-amenable: maybe — same as Bismark
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Lighter than Bismark and faster in benchmarks. Rust port
-    rides on the same `rsomics-align` foundation. Brent Pedersen's
-    other tools (`echtvar`, `vcfexpress`) are already Rust — natural
-    upstream contact.
+  - Layer: `subcommand-of-rsomics-bisulfite` (default alignment mode)
+  - Consumes primitives: `rsomics-bwa`, `block-aligner`, `noodles-bam`, `noodles-fasta`
+  - Notes: Lighter than Bismark and faster in benchmarks. Rust port rides on the same `rsomics-align` foundation. Brent Pedersen's other tools (`echtvar`, `vcfexpress`) are already Rust — natural upstream contact.
 
 - [ ] **`methylKit`** — R/Bioconductor methylation analysis (DMR / DML).
   - Reference impl: `R / C++` · [Bioconductor methylKit](https://bioconductor.org/packages/release/bioc/html/methylKit.html) · `Artistic-2.0`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: R BiocParallel + C++ inner loops
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: maybe — DMR testing is per-region parallel
+  - Upstream license: `Artistic-2.0`
   - Priority: `P1`
-  - Notes: Bridge via `extendr`. The few inner loops (logistic-regression
-    DMR testing, smoothing) port well to `rsomics-methyl` if benchmarks
-    show a bottleneck.
+  - Layer: `subcommand-of-rsomics-bisulfite` (DMR/DML mode + extendr bridge)
+  - Consumes primitives: `extendr`-bridge, `noodles-bed`, future `rsomics-stats` (logistic-regression, smoothing)
+  - Notes: Bridge via `extendr`. The few inner loops (logistic-regression DMR testing, smoothing) port well to `rsomics-bisulfite` if benchmarks show a bottleneck.
 
 - [ ] **`methylpy`** — Python methylation extractor + DMR finder.
   - Reference impl: `Python / C++` · [yupenghe/methylpy](https://github.com/yupenghe/methylpy) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: Python multiprocessing
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: no — Python orchestration over per-region work
+  - Upstream license: `MIT`
   - Priority: `P2`
-  - Notes: Niche; mostly used in Ecker-lab pipelines. Wrap via PyO3 if
-    needed; rewrite is low priority.
+  - Layer: `subcommand-of-rsomics-bisulfite`
+  - Consumes primitives: `noodles-bam`, future `rsomics-stats`
+  - Notes: Niche; mostly used in Ecker-lab pipelines. Wrap via PyO3 if needed; rewrite is low priority.
 
-- [ ] **`MethylDackel`** — universal methylation extractor for
-  bisulfite BAMs.
+- [ ] **`MethylDackel`** — universal methylation extractor for bisulfite BAMs.
   - Reference impl: `C` · [dpryan79/MethylDackel](https://github.com/dpryan79/MethylDackel) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: no — per-position binomial counting, memory-latency-bound
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: Small (< 5 kLoC), focused, MIT-licensed, and called by every
-    nf-core methylseq pipeline. Excellent Rust port target —
-    `noodles-bam` covers IO, the per-position binomial logic is tiny.
-    Output format (CpG bedGraph + methylKit) is well-specified.
+  - Layer: `subcommand-of-rsomics-bisulfite` (extraction mode — primary user-facing subcommand)
+  - Consumes primitives: `noodles-bam`, `noodles-bed`, `statrs` (binomial)
+  - Notes: Small (< 5 kLoC), focused, MIT-licensed, and called by every nf-core methylseq pipeline. Excellent Rust port target — `noodles-bam` covers IO, the per-position binomial logic is tiny. Output format (CpG bedGraph + methylKit) is well-specified.
 
 - [x] **`modkit`** — Oxford Nanopore modified-base toolkit (modBAM-based).
   - Reference impl: `Rust` · [nanoporetech/modkit](https://github.com/nanoporetech/modkit) · `MPL-2.0`
-  - Existing Rust: modkit (this row).
+  - Existing Rust: [`modkit`](https://github.com/nanoporetech/modkit) (binary tool, install from source — not on crates.io under that name; `cf-modkit-macros` on crates.io is unrelated)
+  - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: —
+  - Parallelism: rayon
+  - SIMD: auto-vectorize
+  - Quadrant: ①
+  - GPU-amenable: no — bedMethyl summarisation is memory-bandwidth-bound
+  - Upstream license: `MPL-2.0`
   - Priority: `P0`
-  - Notes: Adopt as-is. Canonical tool for nanopore modBAM →
-    bedMethyl and DMR/DML analysis on long reads. Already uses
-    `noodles-bam`; rsomics packages it and contributes when needed.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Adopt as-is. Canonical tool for nanopore modBAM → bedMethyl and DMR/DML analysis on long reads. Already uses `noodles-bam`; rsomics packages it and contributes when needed. crates.io name not published — install from source (squat catalog updated).
 
-- [ ] **`nanopolish`** (call-methylation) — legacy HMM modified-base
-  caller from signal-level data.
+- [ ] **`nanopolish`** (call-methylation) — legacy HMM modified-base caller from signal-level data.
   - Reference impl: `C++` · [jts/nanopolish](https://github.com/jts/nanopolish) · `MIT`
-  - Existing Rust: none.
-  - Existing non-C alternatives: modkit (modBAM-based, supersedes
-    signal-level calling for current basecallers).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: modkit (modBAM-based, supersedes signal-level calling for current basecallers)
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE
+  - Quadrant: —
+  - GPU-amenable: no — HMM signal-level, legacy
+  - Upstream license: `MIT`
   - Priority: `P2`
-  - Notes: Mostly superseded by Dorado + modkit. Keep only for legacy
-    R9 nanopore data analysis. Not a porting target.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Mostly superseded by Dorado + modkit. Keep only for legacy R9 nanopore data analysis. Not a porting target.
