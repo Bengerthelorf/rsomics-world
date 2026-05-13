@@ -33,60 +33,105 @@ TF footprinting is in [`footprinting.md`](footprinting.md).
 
 - [ ] **`ENCODE ATAC-seq pipeline`** — reference ATAC-seq pipeline.
   - Reference impl: `WDL / Python / Shell` · [ENCODE-DCC/atac-seq-pipeline](https://github.com/ENCODE-DCC/atac-seq-pipeline) · `MIT`
-  - Existing Rust: none.
-  - Existing non-C alternatives: nf-core/atacseq (Nextflow).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: nf-core/atacseq (Nextflow)
+  - Parallelism: WDL workflow engine (Cromwell)
+  - SIMD: inherited from invoked binaries
+  - Quadrant: —
+  - GPU-amenable: no — orchestration layer
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Orchestration only — rewriting the pipeline is out of scope
-    for rsomics. The contribution we make is providing Rust components
-    (trimmer, aligner, MACS-rs) that ENCODE can adopt.
+  - Layer: —
+  - Consumes primitives: future rsomics-* binaries
+  - Notes: Orchestration only — rewriting the pipeline is out of scope for rsomics. The contribution we make is providing Rust components (trimmer, aligner, MACS-rs) that ENCODE can adopt.
 
 - [ ] **`nf-core/atacseq`** — community Nextflow ATAC-seq pipeline.
   - Reference impl: `Nextflow / Python` · [nf-core/atacseq](https://github.com/nf-core/atacseq) · `MIT`
-  - Existing Rust: none of the pipeline itself; many tools it invokes
-    have potential Rust replacements.
-  - Existing non-C alternatives: ENCODE ATAC pipeline.
+  - Existing Rust: none of the pipeline itself; many tools it invokes have potential Rust replacements
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: ENCODE ATAC pipeline
+  - Parallelism: Nextflow workflow engine
+  - SIMD: inherited from invoked binaries
+  - Quadrant: —
+  - GPU-amenable: no — orchestration layer
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Track which Rust binaries (rsomics-macs, rsomics-bwa) can be
-    swapped in. Pipeline orchestration is out of scope here; see
-    module 09.
+  - Layer: —
+  - Consumes primitives: future rsomics-* binaries (rsomics-macs, rsomics-bwa, rsomics-fastp etc.)
+  - Notes: Track which Rust binaries can be swapped in. Pipeline orchestration is out of scope here; see module 09.
 
 - [ ] **`nf-core/chipseq`** — community Nextflow ChIP-seq pipeline.
   - Reference impl: `Nextflow / Python` · [nf-core/chipseq](https://github.com/nf-core/chipseq) · `MIT`
-  - Existing Rust: as above.
+  - Existing Rust: as above
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: Nextflow workflow engine
+  - SIMD: inherited
+  - Quadrant: —
+  - GPU-amenable: no — orchestration layer
+  - Upstream license: `MIT`
   - Priority: `P1`
+  - Layer: —
+  - Consumes primitives: future rsomics-* binaries
   - Notes: Same notes as `nf-core/atacseq`.
 
 - [ ] **`AIAP`** — ATAC-seq Integrative Analysis Pipeline.
   - Reference impl: `Python / Shell` · [Zhang-lab/ATAC-seq_QC_analysis](https://github.com/Zhang-lab/ATAC-seq_QC_analysis) · `MIT`
-  - Existing Rust: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: shell orchestration
+  - SIMD: inherited
+  - Quadrant: —
+  - GPU-amenable: no — orchestration layer
+  - Upstream license: `MIT`
   - Priority: `P2`
-  - Notes: Smaller user base than nf-core/atacseq. Listed for
-    completeness.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Smaller user base than nf-core/atacseq. Listed for completeness.
 
 - [ ] **`Genrich`** — pure-C peak caller bundled in ATAC pipelines.
   - Reference impl: `C` · [jsh58/Genrich](https://github.com/jsh58/Genrich) · `MIT`
-  - Existing Rust: none.
-  - Existing non-C alternatives: MACS3 ATAC mode.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: MACS3 ATAC mode
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: maybe — pileup + replicate p-value combination
+  - Upstream license: `MIT`
   - Priority: `P1`
-  - Notes: Cleanly written C, ~5 kLoC, replicate-aware p-value
-    combination is its distinguishing feature. Small, clean Rust port
-    target; reuse the `rsomics-coverage` primitive.
+  - Layer: `subcommand-of-rsomics-macs` (ATAC replicate-aware mode)
+  - Consumes primitives: `noodles-bam`, `rsomics-coverage`, `statrs`, `rsomics-intervals`
+  - Notes: Cleanly written C, ~5 kLoC, replicate-aware p-value combination is its distinguishing feature. Small, clean Rust port target; reuse the `rsomics-coverage` primitive.
 
 - [ ] **`ChromHMM`** — multivariate HMM chromatin-state segmentation.
-  - Reference impl: `Java` · [ernstlab/ChromHMM](https://github.com/ernstlab/ChromHMM) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: ChromHMM itself (Java).
+  - Reference impl: `Java` · [jernst98/ChromHMM](https://github.com/jernst98/ChromHMM) · `GPL-3.0`
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: ChromHMM itself (Java)
+  - Parallelism: JVM threading
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: maybe — Baum-Welch can run on GPU at scale
+  - Upstream license: `GPL-3.0`
   - Priority: `P1`
-  - Notes: Pure HMM with Bernoulli emissions on binarised marks. Small
-    algorithmic core (Baum-Welch). `ndarray-stats` covers the math.
-    A Rust ChromHMM would be a clean focused crate and could share
-    the HMM machinery with future short-read aligners (HISAT-style
-    splice models).
+  - Layer: `B` (tool — `rsomics-chromhmm`)
+  - Consumes primitives: `ndarray-stats`, `statrs`, future `rsomics-stats` (HMM machinery)
+  - Notes: Pure HMM with Bernoulli emissions on binarised marks. Small algorithmic core (Baum-Welch). `ndarray-stats` covers the math. A Rust ChromHMM would be a clean focused crate and could share the HMM machinery with future short-read aligners (HISAT-style splice models). Reference URL in the original entry was wrong (`ernstlab/ChromHMM` → 404); corrected to `jernst98/ChromHMM` (Jason Ernst's personal repo) after a GitHub search.
 
 - [ ] **`Segway`** — DBN-based chromatin-state segmentation.
   - Reference impl: `Python / C++ (GMTK)` · [hoffmangroup/segway](https://github.com/hoffmangroup/segway) · `GPL-2.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: ChromHMM (less expressive but simpler).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: ChromHMM (less expressive but simpler)
+  - Parallelism: upstream Python + GMTK
+  - SIMD: GMTK's hand SIMD
+  - Quadrant: —
+  - GPU-amenable: maybe — DBN inference has GPU variants
+  - Upstream license: `GPL-2.0`
   - Priority: `P2`
-  - Notes: Dependency on the GMTK dynamic Bayesian network library makes
-    a Rust port large. Lower priority than ChromHMM.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Dependency on the GMTK dynamic Bayesian network library makes a Rust port large. Lower priority than ChromHMM.
