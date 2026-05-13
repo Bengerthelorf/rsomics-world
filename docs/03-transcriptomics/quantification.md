@@ -53,7 +53,7 @@ in [`assembly-isoform.md`](assembly-isoform.md).
 
 - [~] **`kallisto`** — pseudoalignment-based transcript quantification using the T-DBG.
   - Reference impl: `C++` · [pachterlab/kallisto](https://github.com/pachterlab/kallisto) · `BSD-2-Clause`
-  - Existing Rust: partial — [`debruijn_mapping`](https://crates.io/crates/debruijn_mapping) `0.6.0` (a.k.a. [`10XGenomics/rust-pseudoaligner`](https://github.com/10XGenomics/rust-pseudoaligner)) implements the T-DBG pseudoalignment primitive in Rust, used inside Cell Ranger but not packaged as a kallisto drop-in
+  - Existing Rust: partial — [`debruijn_mapping`](https://github.com/10XGenomics/rust-pseudoaligner) `0.6.0` (10x's repo; binary tool, install from source — not on crates.io despite the package name in its Cargo.toml) implements the T-DBG pseudoalignment primitive in Rust, used inside Cell Ranger but not packaged as a kallisto drop-in
   - Existing Rust kind: `partial-port`
   - Existing non-C alternatives: `BUStools` (companion, C++)
   - Parallelism: rayon
@@ -64,7 +64,7 @@ in [`assembly-isoform.md`](assembly-isoform.md).
   - Priority: `P0`
   - Layer: `B` (tool — `rsomics-kallisto`)
   - Consumes primitives: `debruijn` (`rust-debruijn` ecosystem), `rsomics-kmer`, `noodles-fastq`, future `rsomics-stats` (EM), future `rsomics-bus` for BUS-format IO
-  - Notes: `debruijn_mapping` plus an EM-quantification layer would give most of `kallisto quant`. Output formats (BUS, h5) need `noodles` / custom HDF5 layers (`hdf5-metno`). The crates.io name `rust-pseudoaligner` is **unpublished**; the actual published name is `debruijn_mapping`.
+  - Notes: `debruijn_mapping` plus an EM-quantification layer would give most of `kallisto quant`. Output formats (BUS, h5) need `noodles` / custom HDF5 layers (`hdf5-metno`). Both names `rust-pseudoaligner` (the repo) and `debruijn_mapping` (the Cargo package name) are **unpublished on crates.io** — install from `10XGenomics/rust-pseudoaligner` source.
 
 - [ ] **`RSEM`** — EM-based transcript expression estimation from transcriptome alignments.
   - Reference impl: `C++ / Perl` · [deweylab/RSEM](https://github.com/deweylab/RSEM) · `GPL-3.0`
@@ -141,17 +141,17 @@ in [`assembly-isoform.md`](assembly-isoform.md).
   - Consumes primitives: —
   - Notes: Adopt as-is. COMBINE-lab uses `minimap2-rs` underneath. We package it in the rsomics ecosystem and contribute upstream when needed. The Quadrant ② reflects the FFI alignment dep; when the future pure-Rust minimap2 ports land, oarfish's effective quadrant becomes ①.
 
-- [~] **`piscem`** — next-gen Rust-wrapped selective-alignment + index for Salmon / alevin-fry.
-  - Reference impl: `Rust + C++` · [COMBINE-lab/piscem](https://github.com/COMBINE-lab/piscem) · `BSD-3-Clause`
-  - Existing Rust: [`piscem`](https://crates.io/crates/piscem) `0.20.0` (Rust front-end, internals still C++ via `piscem-rs` and `cf1-rs` deps)
-  - Existing Rust kind: `FFI-wrapper`
+- [x] **`piscem`** — next-gen pure-Rust selective-alignment + index for Salmon / alevin-fry.
+  - Reference impl: `Rust` (originally `Rust + C++` upstream; the C++ core has been replaced by pure-Rust `piscem-rs` + `cf1-rs`) · [COMBINE-lab/piscem](https://github.com/COMBINE-lab/piscem) · `BSD-3-Clause`
+  - Existing Rust: [`piscem`](https://crates.io/crates/piscem) `0.20.0` (Rust CLI front-end); [`piscem-rs`](https://crates.io/crates/piscem-rs) `0.5.0` (mapping engine, pure-Rust reimplementation of the original C++ piscem); [`cf1-rs`](https://crates.io/crates/cf1-rs) `0.4.0` (compacted reference dBG index, pure-Rust)
+  - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: salmon, kallisto
-  - Parallelism: rayon + the C++ core's own threading
-  - SIMD: inherits the C++ core's SIMD
-  - Quadrant: ②
-  - GPU-amenable: maybe — same EM-iteration story as Salmon
+  - Parallelism: rayon throughout
+  - SIMD: auto-vectorize; no FFI codec dep
+  - Quadrant: ①
+  - GPU-amenable: maybe — selective-alignment scoring is SW-like, EM is dense
   - Upstream license: `BSD-3-Clause`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Adopt and track. Eventually the C++ core (compacted dBG index, mapping kernel) becomes the obvious port target for a fully pure-Rust salmon-class quantifier. piscem 0.20.0 is edition 2024 with a build.rs that compiles the C++ component.
+  - Notes: Adopt. The piscem 0.20.0 era is fully pure-Rust — `piscem-rs` is the pure-Rust reimplementation of the original C++ mapping engine, `cf1-rs` is the pure-Rust compacted reference-dBG index. The `build.rs` in the front-end binary only reads `Cargo.lock` to embed `cf1-rs`'s version into the output; it does **not** compile C++. This is the closest existing analogue to a future `rsomics-salmon` and the strongest pure-Rust quantification stack today.
