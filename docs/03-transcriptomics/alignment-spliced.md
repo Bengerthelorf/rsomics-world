@@ -31,52 +31,77 @@ core minimap2 entry is in module 02.
 
 ## TODO
 
-- [ ] **`STAR`** — splice-aware short-read aligner with built-in chimeric
-  read detection.
+- [ ] **`STAR`** — splice-aware short-read aligner with built-in chimeric read detection.
   - Reference impl: `C++` · [alexdobin/STAR](https://github.com/alexdobin/STAR) · `MIT`
-  - Existing Rust: none pure-Rust. STAR-Fusion bindings exist only as
-    pipeline wrappers.
-  - Existing non-C alternatives: STARsolo (extension, same codebase, C++).
+  - Existing Rust: none pure-Rust. STAR-Fusion bindings exist only as pipeline wrappers.
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: STARsolo (extension, same codebase, C++)
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE / AVX in extension kernel
+  - Quadrant: —
+  - GPU-amenable: maybe — seed extension is SW (SIMT-amenable); the on-disk suffix array probe is memory-bandwidth-bound
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: Memory-hungry but the de-facto pipeline standard
-    (ENCODE, GTEx, TCGA). Pure-Rust rewrite is a Phase-2+ project; an FFI
-    binding is the realistic first step. Output is a CellRanger-compatible
-    BAM + SJ.out.tab — both already covered by `noodles`.
+  - Layer: `B` (tool — `rsomics-star`)
+  - Consumes primitives: `rsomics-fm-index`, `block-aligner`, `noodles-bam`, `noodles-fasta`, `noodles-gff` (for the `--sjdbGTFfile` splice-junction guide), future `rsomics-stats` for SJ.out.tab
+  - Notes: Memory-hungry but the de-facto pipeline standard (ENCODE, GTEx, TCGA). Pure-Rust rewrite is a Phase-2+ project; an FFI binding is the realistic first step. Output is a CellRanger-compatible BAM + SJ.out.tab — both already covered by `noodles`.
 
 - [ ] **`HISAT2`** — hierarchical FM-index spliced aligner.
   - Reference impl: `C++` · [DaehwanKimLab/hisat2](https://github.com/DaehwanKimLab/hisat2) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: HISAT-genotype (same authors, same code).
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: HISAT-genotype (same authors, same code)
+  - Parallelism: upstream pthreads
+  - SIMD: upstream SSE
+  - Quadrant: —
+  - GPU-amenable: maybe — same SW kernel rationale as bwa-mem; index probing is memory-bound
+  - Upstream license: `GPL-3.0`
   - Priority: `P0`
-  - Notes: GPL constrains derivative crates — a clean-room Rust port can
-    be MIT/Apache. FM-index primitives in `rust-bio` and `awry`-style
-    sampled suffix arrays are a credible foundation. Probably the most
-    realistic full short-read splice aligner to attempt.
+  - Layer: `B` (tool — `rsomics-hisat`)
+  - Consumes primitives: `rsomics-fm-index` (hierarchical FM-index extension lives here), `block-aligner`, `noodles-bam`, `noodles-fasta`, `noodles-gff`
+  - Notes: GPL constrains derivative crates — a clean-room Rust port can be MIT/Apache via the `## Origin` template (see CONVENTIONS.md). FM-index primitives in `rust-bio` and `fm-index` are a credible foundation. Probably the most realistic full short-read splice aligner to attempt.
 
-- [ ] **`TopHat2`** — first widely-used RNA-seq spliced aligner; built on
-  bowtie2.
-  - Reference impl: `C++` · [DaehwanKimLab/tophat](https://github.com/DaehwanKimLab/tophat) · `Artistic-2.0 / BSL-style`
-  - Existing Rust: none.
-  - Existing non-C alternatives: HISAT2 is the official successor.
+- [ ] **`TopHat2`** — first widely-used RNA-seq spliced aligner; built on bowtie2.
+  - Reference impl: `C++` · [DaehwanKimLab/tophat](https://github.com/DaehwanKimLab/tophat) · `Artistic-2.0`
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: HISAT2 is the official successor
+  - Parallelism: upstream pthreads (limited)
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: no — legacy, not worth restructuring
+  - Upstream license: `Artistic-2.0`
   - Priority: `P2`
-  - Notes: Officially deprecated by its authors (Kim, Pertea, Salzberg)
-    in favour of HISAT2. Listed only because legacy GEO / SRA submissions
-    still reference TopHat2 BAMs; no port needed.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Officially deprecated by its authors (Kim, Pertea, Salzberg) in favour of HISAT2. Listed only because legacy GEO / SRA submissions still reference TopHat2 BAMs; no port needed.
 
 - [ ] **`Subjunc`** — junction-aware aligner from the Subread package.
   - Reference impl: `C` · [Subread / Rsubread](https://subread.sourceforge.net/) · `GPL-3.0`
-  - Existing Rust: none.
-  - Existing non-C alternatives: none.
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads
+  - SIMD: limited
+  - Quadrant: —
+  - GPU-amenable: no — limited use base, not worth the engineering
+  - Upstream license: `GPL-3.0`
   - Priority: `P2`
-  - Notes: Used mostly by R users via Rsubread; standalone usage is rare.
-    Worth at least an `extendr` wrapper rather than a rewrite — the C
-    code is small and stable.
+  - Layer: `subcommand-of-rsomics-subread` (within the Subread/featureCounts umbrella)
+  - Consumes primitives: `rsomics-fm-index`, `noodles-bam`, `noodles-fasta`
+  - Notes: Used mostly by R users via Rsubread; standalone usage is rare. Worth at least an `extendr` wrapper rather than a rewrite — the C code is small and stable.
 
-- [ ] **`MapSplice`** — junction-aware aligner used heavily by TCGA legacy
-  pipelines.
-  - Reference impl: `C++ / Perl` · [MapSplice2 mirror](https://github.com/davidroberson/MapSplice2) · `unspecified open source`
-  - Existing Rust: none.
-  - Existing non-C alternatives: none.
+- [ ] **`MapSplice`** — junction-aware aligner used heavily by TCGA legacy pipelines.
+  - Reference impl: `C++ / Perl` · [MapSplice2 mirror](https://github.com/davidroberson/MapSplice2) · `unspecified open source` — **mirror is dead (last update 2017-10)**
+  - Existing Rust: none verified
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: —
+  - Parallelism: upstream pthreads + Perl glue
+  - SIMD: none
+  - Quadrant: —
+  - GPU-amenable: no — legacy tool, no upside
+  - Upstream license: unspecified open source
   - Priority: `P2`
-  - Notes: Largely superseded by STAR + HISAT2. Keep for TCGA replication
-    work; not a porting target.
+  - Layer: —
+  - Consumes primitives: —
+  - Notes: Largely superseded by STAR + HISAT2. Keep for TCGA replication work; not a porting target. The mirror at `davidroberson/MapSplice2` is the only public copy and has not been updated since 2017 (well past the 18-month aliveness threshold); logged in `.autopilot/needs-review/external-2026-05-14.md`.
