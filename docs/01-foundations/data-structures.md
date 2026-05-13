@@ -40,110 +40,140 @@ compression lives in [`compression.md`](compression.md).
 
 - [~] **FM-index** — succinct full-text index for backward search.
   - Reference impl: `C++` · [Ferragina & Manzini original; bwa internal](https://github.com/lh3/bwa) · various
-  - Existing Rust: [`rust-bio::data_structures::fmindex`](https://docs.rs/bio/latest/bio/data_structures/fmindex/index.html);
-    [`fm-index`](https://docs.rs/fm-index/latest/fm_index/);
-    [`nucleic-acid`](https://lib.rs/crates/nucleic-acid)
+  - Existing Rust: [`rust-bio::data_structures::fmindex`](https://crates.io/crates/bio) (in `bio` `3.0.0`); [`fm-index`](https://crates.io/crates/fm-index) `0.3.0`; [`nucleic-acid`](https://crates.io/crates/nucleic-acid) `0.1.1`
+  - Existing Rust kind: `partial-port` (no FMD-index variant; rank-query SIMD missing)
   - Existing non-C alternatives: `sdsl-lite` (C++)
+  - Parallelism: single-threaded construction and query in all three crates today
+  - SIMD: none explicit (rank loops are auto-vectorize candidates)
+  - GPU-amenable: maybe — rank queries on a fixed index port well to GPU but the engineering cost is high
+  - Upstream license: various (BWA itself MIT)
   - Priority: `P0`
-  - Notes: rust-bio implementation works but issues
-    [#30](https://github.com/rust-bio/rust-bio/issues/30) and
-    [#495](https://github.com/rust-bio/rust-bio/issues/495) flag UX +
-    correctness corners. A modernised `rsomics-fmindex` with SIMD rank,
-    64-bit suffix arrays, and FMD support (needed for BWA-style aligners)
-    is on the critical path.
+  - Layer: `A` (foundation — `rsomics-fm-index`)
+  - Consumes primitives: —
+  - Notes: Quadrant ③ (pure Rust but single-threaded hot path). rust-bio implementation works but issues [#30](https://github.com/rust-bio/rust-bio/issues/30) and [#495](https://github.com/rust-bio/rust-bio/issues/495) flag UX + correctness corners. A modernised `rsomics-fm-index` with `std::simd` rank queries, 64-bit suffix arrays, and FMD support (needed for BWA-style aligners) is on the critical path.
 
-- [~] **BWT (Burrows-Wheeler Transform)** — string permutation underlying
-  FM-index.
+- [~] **BWT (Burrows-Wheeler Transform)** — string permutation underlying FM-index.
   - Reference impl: `C` · [bwa BWT routines](https://github.com/lh3/bwa) · `MIT`
-  - Existing Rust: `rust-bio::data_structures::bwt`; `nucleic-acid`
+  - Existing Rust: `bio::data_structures::bwt` (in `bio` `3.0.0`); `nucleic-acid`
+  - Existing Rust kind: `partial-port`
   - Existing non-C alternatives: `libdivsufsort` (C/C++)
+  - Parallelism: single-threaded SA construction (the bottleneck)
+  - SIMD: none explicit
+  - GPU-amenable: no
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: Construction performance is the bottleneck for indexing
-    multi-Gbp references. The induced-sorting (SA-IS) variant is the
-    state of the art; need a pure-Rust port that matches `libdivsufsort`
-    on GRCh38.
+  - Layer: `A` (foundation — same crate as FM-index)
+  - Consumes primitives: —
+  - Notes: Quadrant ③. Construction performance is the bottleneck for indexing multi-Gbp references. The induced-sorting (SA-IS) variant is the state of the art; need a pure-Rust port that matches `libdivsufsort` on GRCh38. Parallel SA-IS (parlay-style) is a known but unexplored Rust opportunity.
 
 - [~] **Suffix array** — sorted suffix offsets.
-  - Reference impl: `C` · [libdivsufsort](https://github.com/y-256/libdivsufsort) · `MIT`
-  - Existing Rust: [`rust-bio::data_structures::suffix_array`](https://github.com/rust-bio/rust-bio/blob/master/src/data_structures/suffix_array.rs);
-    [`suffix`](https://crates.io/crates/suffix);
-    [`divsufsort`](https://crates.io/crates/divsufsort) (Rust port of libdivsufsort)
+  - Reference impl: `C` · [y-256/libdivsufsort](https://github.com/y-256/libdivsufsort) · `MIT`
+  - Existing Rust: `bio::data_structures::suffix_array` (in `bio` `3.0.0`); [`suffix`](https://crates.io/crates/suffix) `1.3.0`; [`divsufsort`](https://crates.io/crates/divsufsort) `2.0.0` (Rust port of libdivsufsort)
+  - Existing Rust kind: `pure-port` (`divsufsort` is a faithful Rust port)
   - Existing non-C alternatives: —
+  - Parallelism: single-threaded
+  - SIMD: none explicit
+  - GPU-amenable: no
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: `divsufsort` is the right adoption target for SA construction.
-    Validate against `libdivsufsort` on real genomes.
+  - Layer: `A` (foundation — same crate as FM-index)
+  - Consumes primitives: —
+  - Notes: Quadrant ③. `divsufsort` is the right adoption target for SA construction. Validate against `libdivsufsort` on real genomes byte-for-byte.
 
 - [x] **`ntHash`** — rolling hash for DNA k-mers.
   - Reference impl: `C++` · [bcgsc/ntHash](https://github.com/bcgsc/ntHash) · `MIT`
-  - Existing Rust: [`nthash`](https://crates.io/crates/nthash);
-    [`nthash_rs`](https://docs.rs/nthash-rs/latest/nthash_rs/) (idiomatic pure-Rust port)
+  - Existing Rust: [`nthash`](https://crates.io/crates/nthash) `0.5.1` (luizirber); [`nthash-rs`](https://crates.io/crates/nthash-rs) `0.1.3` (pure-Rust port)
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: —
+  - Parallelism: per-k-mer rolling, trivially parallel over input chunks
+  - SIMD: none explicit yet (a candidate for `std::simd` rolling-hash batching)
+  - GPU-amenable: yes — rolling hash over a large sequence batch is SIMT-friendly
+  - Upstream license: `MIT`
   - Priority: `P0`
-  - Notes: Adopt. `nthash_rs` is the cleaner modern port (handles
-    non-ACGT bases, canonical k-mers). Used by sourmash, GGCAT, many
-    others.
+  - Layer: `A` (foundation — `rsomics-kmer`)
+  - Consumes primitives: —
+  - Notes: Quadrant ① (pure Rust, rayon-able by caller). `nthash-rs` is the cleaner modern port (handles non-ACGT bases, canonical k-mers). Used by sourmash, GGCAT, many others.
 
 - [x] **`MurmurHash3`** — general non-cryptographic hash.
   - Reference impl: `C++` · [aappleby/smhasher](https://github.com/aappleby/smhasher) · `Public domain`
-  - Existing Rust: [`murmurhash3`](https://crates.io/crates/murmurhash3);
-    [`mur3`](https://docs.rs/mur3);
-    [`murmur3`](https://github.com/stusmall/murmur3)
+  - Existing Rust: [`murmurhash3`](https://crates.io/crates/murmurhash3) `0.0.5`; [`mur3`](https://crates.io/crates/mur3) `0.1.0`; [`murmur3`](https://crates.io/crates/murmur3)
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: `xxHash` (faster modern alternative)
+  - Parallelism: stateless per-key
+  - SIMD: none explicit
+  - GPU-amenable: yes (trivial)
+  - Upstream license: `Public domain`
   - Priority: `P1`
-  - Notes: Adopt one (`mur3` has the cleanest Hasher API). Required for
-    compatibility with Mash/sourmash sketches; new internal hashes should
-    prefer `xxh3` or `ahash`.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Quadrant ④ (small utility). Pick one (`mur3` has the cleanest Hasher API). Required for compatibility with Mash/sourmash sketches; new internal hashes should prefer `xxh3` or `ahash`.
 
 - [x] **MinHash sketching** — locality-sensitive sketch for similarity.
   - Reference impl: `C++` · [marbl/Mash](https://github.com/marbl/Mash) · `BSD-3-Clause`
-  - Existing Rust: [`sourmash`](https://crates.io/crates/sourmash) (Rust core),
-    [`finch`](https://github.com/onecodex/finch-rs)
+  - Existing Rust: [`sourmash`](https://crates.io/crates/sourmash) `0.22.0` (Rust core); [`finch`](https://github.com/onecodex/finch-rs) `0.6.2`
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: `mash` itself (C++)
+  - Parallelism: rayon-amenable per-sketch
+  - SIMD: none explicit in sketching loops; underlying hashes auto-vectorize
+  - GPU-amenable: maybe — sketch construction is parallel but I/O bound on the FASTA read
+  - Upstream license: `BSD-3-Clause`
   - Priority: `P0`
-  - Notes: Adopt sourmash (broader feature set, scaled MinHash) or finch
-    (lighter, faster, no Python interop). Both are production-grade. New
-    work plugs in as a feature on these crates.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Quadrant ①. Adopt sourmash (broader feature set, scaled MinHash) or finch (lighter, faster, no Python interop). Both are production-grade. New work plugs in as a feature on these crates.
 
 - [x] **HyperLogLog** — approximate cardinality counter.
   - Reference impl: `C++` · [original Flajolet et al.](https://research.neustar.biz/2012/10/25/sketch-of-the-day-hyperloglog-cornerstone-of-a-big-data-pipeline/) · academic
-  - Existing Rust: [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections);
-    [`hyperloglog`](https://crates.io/crates/hyperloglog);
-    [`amadeus-streaming`](https://crates.io/crates/amadeus-streaming)
+  - Existing Rust: [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections) `0.7.0`; [`hyperloglog`](https://crates.io/crates/hyperloglog) `1.0.3`; [`amadeus-streaming`](https://crates.io/crates/amadeus-streaming) `0.4.3` (SIMD-accelerated)
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: HLL ships in Redis, ClickHouse, etc.
+  - Parallelism: per-register merge; rayon-able
+  - SIMD: explicit in `amadeus-streaming` (other crates rely on auto-vectorize)
+  - GPU-amenable: maybe — only worth doing for very large estimation streams
+  - Upstream license: academic / public domain in spirit
   - Priority: `P1`
-  - Notes: Adopt `probabilistic-collections` for one-stop import. SIMD
-    HLL is possible but rarely the bottleneck — only worth doing if
-    profiling justifies it.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Quadrant ① for `amadeus-streaming` (explicit SIMD); ④ for the others. Adopt `probabilistic-collections` for one-stop import unless profiling justifies the SIMD path.
 
 - [x] **Bloom filter** — approximate-membership probabilistic set.
   - Reference impl: `C++` · academic; many implementations · public domain
-  - Existing Rust: [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections);
-    [`bloom-filters`](https://crates.io/crates/bloom-filters);
-    [`fastbloom`](https://crates.io/crates/fastbloom) (SIMD)
+  - Existing Rust: [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections) `0.7.0`; [`bloom-filters`](https://crates.io/crates/bloom-filters) `0.1.2`; [`fastbloom`](https://github.com/tomtomwombat/fastbloom) `0.17.0` (`no_std`, concurrent)
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: —
+  - Parallelism: `fastbloom` supports full concurrency via `portable-atomic`
+  - SIMD: bit-manipulation auto-vectorizes; `fastbloom` documents this as its perf edge
+  - GPU-amenable: no (latency-bound)
+  - Upstream license: public domain in spirit; `fastbloom` is `MIT OR Apache-2.0`
   - Priority: `P0`
-  - Notes: Adopt `fastbloom` for hot paths (SIMD-accelerated), fall back
-    to `probabilistic-collections` for the feature-rich API. Used by
-    ABySS, sourmash, many metagenomics tools.
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Quadrant ① for `fastbloom` (concurrent, `no_std`-capable, foldhash-based). Adopt `fastbloom` for hot paths, fall back to `probabilistic-collections` for the feature-rich API. Used by ABySS, sourmash, many metagenomics tools.
 
 - [x] **Cuckoo filter** — Bloom alternative with deletion + better locality.
   - Reference impl: `C++` · [efficient/cuckoofilter](https://github.com/efficient/cuckoofilter) · `Apache-2.0`
-  - Existing Rust: [`cuckoofilter`](https://docs.rs/cuckoofilter);
-    [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections);
-    [`autoscale_cuckoo_filter`](https://crates.io/crates/autoscale_cuckoo_filter)
+  - Existing Rust: [`cuckoofilter`](https://crates.io/crates/cuckoofilter) `0.5.0`; [`probabilistic-collections`](https://crates.io/crates/probabilistic-collections) `0.7.0`; [`autoscale_cuckoo_filter`](https://crates.io/crates/autoscale_cuckoo_filter) `0.5.21`
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: —
+  - Parallelism: single-threaded today; concurrent variant is an open opportunity
+  - SIMD: none explicit
+  - GPU-amenable: no
+  - Upstream license: `Apache-2.0`
   - Priority: `P1`
-  - Notes: Adopt. Strong fit for k-mer deduplication where deletion is
-    needed (streaming metagenomics).
+  - Layer: `adopt`
+  - Consumes primitives: —
+  - Notes: Quadrant ① / ④. Strong fit for k-mer deduplication where deletion is needed (streaming metagenomics).
 
-- [ ] **Compacted de Bruijn graph** — adjacency structure for assembly +
-  pangenome.
+- [ ] **Compacted de Bruijn graph** — adjacency structure for assembly + pangenome.
   - Reference impl: `C++` · [GATB-bcalm](https://github.com/GATB/bcalm) · `MIT`
-  - Existing Rust: [`rust-debruijn`](https://github.com/10XGenomics/rust-debruijn);
-    [`ggcat`](https://github.com/algbio/ggcat) (compacted + coloured);
-    [`rust-mdbg`](https://github.com/ekimb/rust-mdbg) (minimizer-space)
+  - Existing Rust: [`debruijn`](https://crates.io/crates/debruijn) `0.3.4` ([`10XGenomics/rust-debruijn`](https://github.com/10XGenomics/rust-debruijn)); [`ggcat`](https://github.com/algbio/ggcat) (binary tool, not a published library on crates.io — install from source); [`rust-mdbg`](https://github.com/ekimb/rust-mdbg) (binary tool; companion library [`rust-seq2kminmers`](https://crates.io/crates/rust-seq2kminmers) `0.1.0`)
+  - Existing Rust kind: `pure-port` (compaction in `ggcat` is production-quality)
   - Existing non-C alternatives: —
+  - Parallelism: explicit rayon-equivalent (`parallel-processor` in ggcat); 10x's `debruijn` is multi-threaded build
+  - SIMD: ggcat uses `streaming-libdeflate-rs` and other SIMD-aware deps
+  - GPU-amenable: maybe — graph compaction is irregular, but k-mer counting prequel is SIMT-friendly
+  - Upstream license: `MIT` (bcalm); ggcat is `MIT OR Apache-2.0`
   - Priority: `P1`
-  - Notes: `ggcat` is production-grade and the right consolidation target.
-    `rust-debruijn` is older but used by 10x internals. Cross-references
-    [`02-genomics/assembly.md`](../02-genomics/assembly.md).
+  - Layer: `A` (foundation — the graph type) + `B` (tool — `ggcat`-equivalent assembler)
+  - Consumes primitives: `rsomics-kmer` (the ntHash crate), `rsomics-fm-index` indirectly
+  - Notes: Quadrant ①. `ggcat` is production-grade and the right consolidation target. `debruijn` (10x) is older but still maintained. Note: the crates.io name `ggcat` is squatted by an unrelated crate (`ggcat = "0.0.1"`, clipboard tool); install algbio's ggcat from source. Cross-references [`02-genomics/assembly.md`](../02-genomics/assembly.md).
