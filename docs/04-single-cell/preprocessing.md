@@ -37,13 +37,13 @@ processing (Visium / Stereo-seq / MERFISH) is in
   - Existing non-C alternatives: `STARsolo`, `alevin-fry`, `kallisto|bustools`
   - Parallelism: upstream rayon + Python orchestration
   - SIMD: auto-vectorize
-  - Quadrant: ①
+  - Quadrant: —
   - GPU-amenable: maybe — alignment kernel SIMT-friendly; barcode handling latency-bound
   - Upstream license: restricted (research use)
   - Priority: `P0`
   - Layer: `B` (tool — `rsomics-cellranger` as an output-compatible wrapper around `simpleaf` + `alevin-fry`)
   - Consumes primitives: `simpleaf`, `alevin-fry`, `piscem`, future `rsomics-anndata` for the filtered-matrix h5 output
-  - Notes: Output BAM + filtered matrix h5 is a *de facto* standard. The realistic rsomics role is to produce indistinguishable outputs via `alevin-fry` / `simpleaf` so downstream Scanpy / Seurat scripts work unchanged. `scan-rs` is not on crates.io (squatted by `entropyscan-rs`); install from 10x source.
+  - Notes: Output BAM + filtered matrix h5 is a *de facto* standard. The realistic rsomics role is to produce indistinguishable outputs via `alevin-fry` / `simpleaf` so downstream Scanpy / Seurat scripts work unchanged. `scan-rs` is not on crates.io (squatted by `entropyscan-rs`); install from 10x source. Quadrant is `—` because the restricted upstream is not adoptable as a Rust crate; the future `rsomics-cellranger` adopts `alevin-fry`'s Quadrant ① instead.
 
 - [ ] **`STARsolo`** — single-cell extension of STAR, drop-in Cell Ranger replacement.
   - Reference impl: `C++` · [alexdobin/STAR](https://github.com/alexdobin/STAR) · `MIT`

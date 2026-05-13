@@ -121,18 +121,18 @@ in [`integration.md`](integration.md). Multimodal joint analysis is in
 
 - [ ] **`Leiden` clustering** — modularity-optimising community detection.
   - Reference impl: `C++ / Python` · [vtraag/leidenalg](https://github.com/vtraag/leidenalg) · `GPL-3.0`
-  - Existing Rust: multiple early-stage crates (e.g. `leiden-rs`, `rustleiden`). None obviously canonical as of 2026-05
+  - Existing Rust: [`leiden-rs`](https://crates.io/crates/leiden-rs) `0.8.0` ("High-performance Leiden community detection algorithm for graphs in Rust", rayon as a default feature); additional early-stage crates exist (`rustleiden`, etc.) but `leiden-rs` is the clearest canonical pick
   - Existing Rust kind: `partial-port`
   - Existing non-C alternatives: —
-  - Parallelism: per-iteration partly parallel
-  - SIMD: limited
-  - Quadrant: ③ (existing pure-Rust crates are single-threaded on the hot path)
+  - Parallelism: rayon (default feature on `leiden-rs`)
+  - SIMD: auto-vectorize
+  - Quadrant: ①
   - GPU-amenable: maybe — community-detection passes have GPU variants in the literature
   - Upstream license: `GPL-3.0`
   - Priority: `P0`
-  - Layer: `A` (foundation — `rsomics-leiden` once a canonical pick emerges)
+  - Layer: `A` (foundation — `rsomics-leiden` once a canonical pick emerges; `leiden-rs` is the likely fork target)
   - Consumes primitives: `petgraph`
-  - Notes: Audit existing Rust Leiden crates against `leidenalg` on benchmark graphs; fork the best and harden, rather than starting from scratch. `petgraph` integration is the priority. Clean-room derivation needed because of GPL upstream.
+  - Notes: `leiden-rs` 0.8.0 ships rayon-parallel by default, putting the leading Rust crate in Quadrant ①. Audit it against `leidenalg` on benchmark graphs; fork and harden rather than starting from scratch. `petgraph` integration is the priority. Clean-room derivation needed because of GPL upstream.
 
 - [~] **`Louvain` clustering** — predecessor to Leiden, still widely cited.
   - Reference impl: `C++ / Python` · python-louvain · `BSD-3-Clause`
