@@ -40,12 +40,13 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: `pyfaidx` (Python)
   - Parallelism: single-threaded (index build is trivially small)
   - SIMD: none needed (linear scan)
-  - GPU-amenable: no
+  - Quadrant: ① (noodles)
+  - GPU-amenable: no — index build is sub-second, no compute upside
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ① via noodles. Add CI test that builds `.fai` for GRCh38 and diffs byte-by-byte against `samtools faidx` output.
+  - Notes: Add CI test that builds `.fai` for GRCh38 and diffs byte-by-byte against `samtools faidx` output.
 
 - [x] **`.bai` BAM index** — BAM coordinate-sort index (≤ 512 Mbp chromosomes).
   - Reference impl: `C` · [samtools/htslib](https://github.com/samtools/htslib) · `MIT`
@@ -54,12 +55,13 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: `htsjdk` (Java)
   - Parallelism: serial index build today; a rayon-parallel bin-tree builder is open work
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: ①
+  - GPU-amenable: no — irregular tree construction, latency-dominated
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ① via noodles. Watch for edge cases in placed-unmapped reads and pseudo-bin 37450 (the BAI metadata bin) — usual cause of incompatibility with older readers.
+  - Notes: Watch for edge cases in placed-unmapped reads and pseudo-bin 37450 (the BAI metadata bin) — usual cause of incompatibility with older readers.
 
 - [x] **`.csi` Coordinate Sort Index** — 64-bit-capable generalisation of BAI/TBI.
   - Reference impl: `C` · [samtools/htslib](https://github.com/samtools/htslib) · `MIT`
@@ -68,12 +70,13 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: `htsjdk`
   - Parallelism: serial build; same parallel-builder opportunity as BAI
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: ①
+  - GPU-amenable: no — irregular tree construction
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ①. Default to CSI v1 with `min_shift=14` for new outputs. Required for plant genomes (some chromosomes > 512 Mbp).
+  - Notes: Default to CSI v1 with `min_shift=14` for new outputs. Required for plant genomes (some chromosomes > 512 Mbp).
 
 - [x] **`.tbi` tabix index** — generic positional index for any tab-delimited bgzipped file (BED, GFF, VCF text).
   - Reference impl: `C` · [samtools/htslib](https://github.com/samtools/htslib) · `MIT`
@@ -82,12 +85,13 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: `htsjdk`
   - Parallelism: serial build
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: ①
+  - GPU-amenable: no — irregular tree construction
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ①. The CSI variant (`.tbi` → `.csi`) is preferred for new work; keep `.tbi` writer for backward compat.
+  - Notes: The CSI variant (`.tbi` → `.csi`) is preferred for new work; keep `.tbi` writer for backward compat.
 
 - [x] **`.gzi` BGZF virtual-offset index** — sidecar for random access into gzipped FASTA.
   - Reference impl: `C` · [samtools/htslib/bgzf.c](https://github.com/samtools/htslib) · `MIT`
@@ -96,12 +100,13 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: —
   - Parallelism: single-threaded
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: ①
+  - GPU-amenable: no — trivial offset table
   - Upstream license: `MIT`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ①. Trivial format but a frequent source of confusion. Document the "build `.gzi` *first*, then `.fai`" sequence explicitly in the `rsomics-faidx` CLI.
+  - Notes: Trivial format but a frequent source of confusion. Document the "build `.gzi` *first*, then `.fai`" sequence explicitly in the `rsomics-faidx` CLI. The companion `rsomics-zip` binary ([`compression.md`](compression.md)) needs to learn `.gzi` emission alongside BGZF output — first follow-up TODO over there.
 
 - [ ] **`tabix` (CLI)** — command-line index builder.
   - Reference impl: `C` · [samtools/htslib](https://github.com/samtools/htslib) · `MIT`
@@ -110,7 +115,8 @@ readers that *use* these indexes live in [`io-formats.md`](io-formats.md).
   - Existing non-C alternatives: —
   - Parallelism: opportunity — rayon-parallel bin-tree construction (samtools serialises this)
   - SIMD: none
-  - GPU-amenable: no
+  - Quadrant: —
+  - GPU-amenable: no — irregular tree construction
   - Upstream license: `MIT`
   - Priority: `P1`
   - Layer: `B` (tool — `rsomics-tabix`)
