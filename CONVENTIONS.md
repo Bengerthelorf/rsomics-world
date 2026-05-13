@@ -125,9 +125,11 @@ License: MIT OR Apache-2.0.
 Upstream credit: <upstream> <link> (<their license>).
 ```
 
-Crates that wrap GPL upstream via FFI inherit the GPL link-time obligations;
-those crates are flagged in the same Origin section with the explicit
-license note.
+FFI wrappers inherit whatever license obligations the upstream's linking
+model imposes — that is `htslib` (MIT/BSD-3) for `rust-htslib`, GPL-3.0 for
+a hypothetical `bowtie2-sys`, etc. Document the case-by-case license note
+in the wrapping crate's `## Origin` section. Never apply a blanket
+inheritance assumption.
 
 ## Cross-platform target
 
