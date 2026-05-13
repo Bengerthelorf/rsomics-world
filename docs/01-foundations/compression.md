@@ -37,13 +37,13 @@ BGZF (those live in [`indexing.md`](indexing.md)).
   - Existing Rust kind: `pure-port` (default `miniz_oxide` backend) / `FFI-wrapper` (`zlib-ng` backend)
   - Existing non-C alternatives: —
   - Parallelism: single-threaded codec (wrap with `gzp` for parallel)
-  - SIMD: explicit (`miniz_oxide` enables `simd` feature when flate2 uses it)
+  - SIMD: inherited via backend dep (`miniz_oxide` `simd` feature; or `zlib-ng` hand SIMD when that backend is selected). flate2 itself contains no SIMD.
   - GPU-amenable: no
   - Upstream license: `Zlib`
   - Priority: `P0`
   - Layer: `adopt`
   - Consumes primitives: —
-  - Notes: Quadrant ① with default backend (pure-Rust + explicit SIMD via `miniz_oxide`'s `simd` feature). Quadrant ② when `zlib-ng` backend is selected. Default `miniz_oxide` is portable and safe; switch to `zlib-ng` when throughput matters and ship a feature flag.
+  - Notes: Quadrant ① with default backend (pure-Rust scheduler, SIMD via `miniz_oxide`'s `simd` feature). Quadrant ② when `zlib-ng` backend is selected. Default `miniz_oxide` is portable and safe; switch to `zlib-ng` when throughput matters and ship a feature flag.
 
 - [x] **`libdeflate`** — block-oriented DEFLATE optimised for known-size inputs.
   - Reference impl: `C` · [ebiggers/libdeflate](https://github.com/ebiggers/libdeflate) · `MIT`
