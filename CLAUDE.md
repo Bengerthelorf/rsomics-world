@@ -241,6 +241,8 @@ Autopilot cannot audit its own systematic errors. Multi-model / multi-session re
 
 ### How to dispatch
 
+**Anthropic models (abundant, primary)** — use the Agent tool. Sonnet quota is unconstrained for this project (explicit user policy — prefer Sonnet for routine FreshEye work):
+
 ```
 Agent(
   subagent_type: "general-purpose",
@@ -250,7 +252,40 @@ Agent(
 )
 ```
 
-For cross-family review use `codex:codex-rescue` with effort=medium — never high/xhigh, quota-constrained. Never run FreshEye against output produced in the same context — `fresh` means fresh context.
+**Codex (OpenAI GPT-5.x, quota-constrained)** — dispatch as a subagent via the Agent tool, but put `--effort medium` on the first line of the prompt. **Never `high` / `xhigh`** — quota expensive:
+
+```
+Agent(
+  subagent_type: "codex:codex-rescue",
+  description: "FreshEye <level> (codex): <topic>",
+  prompt: "--effort medium\n\n<self-contained brief>"
+)
+```
+
+First use of the session must precede with `Skill(codex:setup)` to confirm CLI ready. Spend Codex quota on: Phase 4 killer-binary L3 reviews, L2-triggered foundation-crate API reviews, cross-family second opinions. **Phase 1 catalog work does not use Codex** — Sonnet ↔ Opus internal review is sufficient.
+
+**Gemini (Google Gemini 3.x, quota abundant)** — Gemini is a **Skill**, not a subagent. Dispatch via the Skill tool. The first line of `args` selects the model — `gemini-3.1-pro` for heavy review, flash variants for light review:
+
+```
+Skill(
+  skill: "gemini:rescue",
+  args: "Use gemini-3.1-pro. <self-contained brief>"
+)
+```
+
+First use of the session must precede with `Skill(gemini:setup)` to confirm CLI ready. **Gemini quota is fine to spend freely**, particularly well-suited for tests / fuzz / Cargo.toml audits — axes that Anthropic models tend to under-emphasise.
+
+**Cross-family selection rules**:
+
+- Same-output **never** self-audited — Sonnet ↔ Opus internal pair-review is the default.
+- Adding a non-Anthropic axis: `tests/` / non-production code / Cargo.toml → Gemini; `src/` production code fresh-eye → Codex medium.
+- All three families: Phase 4 killer-binary L3 — Sonnet + Opus + Codex medium + Gemini-pro for four-model differentiated perspectives.
+
+**Setup failure fallback**: if `codex:setup` / `gemini:setup` is unavailable in this session, FreshEye degrades to Anthropic-only (Sonnet ↔ Opus) — phase work continues but the gate report records `cross-family review unavailable this session, fallback to Anthropic-only` so review-strength downgrades surface to the user.
+
+**Quota tracking**: autopilot maintains a running tally in `.autopilot/state/freshseye-budget.toml` of `codex-runs` and `gemini-runs` for the session, so the user can judge whether Phase 4's L3 budget still has room.
+
+Never run FreshEye against output produced in the same context — `fresh` means fresh context.
 
 ### Mandatory triggers (any phase, regardless of declared level)
 
