@@ -225,6 +225,51 @@ gh run list --branch main --limit 3
 ssh 4090 "cd /data3/rsomics-fixtures && ./run-bench.sh"
 ```
 
+## FreshEye discipline (phase-conditional)
+
+Autopilot cannot audit its own systematic errors. Multi-model / multi-session review catches what self-audit misses. Apply at intensity matching each phase's blast radius.
+
+### Levels
+
+**L0 — no FreshEye** — purely mechanical work (formatting, commit hygiene). Cost > value.
+
+**L1 — sampling spot-check** — every N outputs, dispatch a fresh subagent (different model where possible) to re-audit a random ~10% sample. Mismatches → `.autopilot/needs-review/<topic>-<date>.md` for batched user review. Default for **Phase 1 catalog work** and **non-load-bearing doc edits**.
+
+**L2 — full per-output review** — every significant output (a new public API in a foundation crate, a Layer A crate's `lib.rs`, a non-trivial commit) reviewed end-to-end by a fresh subagent before commit. Used in **Phase 2-3** for foundation crates whose API is downstream-critical.
+
+**L3 — multi-axis parallel review** — dispatch 2-3 fresh subagents on different lenses (reuse / quality / efficiency / correctness) before commit. Used in **Phase 4 gate (killer binary)** and on any Layer A crate that ≥ 3 tools will depend on.
+
+### How to dispatch
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  model: "sonnet" | "opus" | "haiku",
+  description: "FreshEye <level>: <topic>",
+  prompt: "<self-contained brief: what to audit, what to check for, output format>"
+)
+```
+
+For cross-family review use `codex:codex-rescue` with effort=medium — never high/xhigh, quota-constrained. Never run FreshEye against output produced in the same context — `fresh` means fresh context.
+
+### Mandatory triggers (any phase, regardless of declared level)
+
+- About to commit a `pub` item in a foundation crate → L2 minimum.
+- About to publish to crates.io → L3.
+- Gate report drafted from > 200 individual decisions → L1-sample those decisions retroactively.
+- Real-world test contradicts unit tests (especially platform-quirky details) → dispatch debug-focused FreshEye agent.
+- The instruction `external_advice_must_question_assumption` applies recursively: a FreshEye finding is itself external advice and must be sanity-checked against deployment reality before action.
+
+### Real-world testing — FreshEye's twin
+
+Local CI + unit tests are necessary but not sufficient. For anything touching cross-platform / SSH / GPU / FS quirks, exercise on:
+
+- mini_m2 (`/Volumes/Zane's HDD/`) — macOS + local FS
+- `ssh 4090` (`/data3` fixtures, GPU) — Linux + perf + GPU
+- GitHub Actions matrix — broad targets, no GPU
+
+If a test passes on one and fails on another, the test is fragile, not the code.
+
 ## Universal stop conditions (any phase)
 
 - About to commit a claim you couldn't verify → STOP, log to needs-review.
