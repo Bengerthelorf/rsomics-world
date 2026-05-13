@@ -52,7 +52,7 @@ A flat checklist. Each entry uses the schema below.
 - [ ] **<canonical tool name>** — <one-line purpose>
   - Reference impl: <language> · <repo URL or "—"> · <license>
   - Existing Rust: <crate name + URL, or "none">
-  - Existing Rust kind: pure-port | FFI-wrapper | partial-port | rust-native | none
+  - Existing Rust kind: pure-port | FFI-wrapper | partial-port | rust-native | none ( · slash-separated if multi-backend, dominant first, e.g. `pure-port/FFI-wrapper`)
   - Existing non-C alternatives: <Zig / Go / C++ rewrites, or "—">
   - Parallelism: rayon | std::thread | tokio | async-runtime | single-threaded
   - SIMD: explicit (std::simd / packed_simd) | auto-vectorize | none
@@ -73,9 +73,17 @@ plan to (a) adopt as-is, (b) extend, or (c) leave alone.
 
 - **`pure-port`** — Rust faithfully reimplements a specific C/C++ upstream (noodles ↔ htslib, needletail ↔ readfq, divsufsort ↔ libdivsufsort, lz4_flex ↔ lz4 C). Cross-validation against the upstream binary is the acceptance test.
 - **`FFI-wrapper`** — Rust API over an existing C/C++ library (rust-htslib, libdeflater, hts-sys, cudarc, hdf5-metno-sys). Upstream C library stays the perf reference; license obligations follow the upstream's linking model on a per-crate basis.
-- **`partial-port`** — Pure-Rust port covers a subset of the upstream's behavior (ruzstd decoder vs. zstd's full codec; rust-bio FM-index without FMD variant; AnnData crates missing `.uns`).
+- **`partial-port`** — Pure-Rust port covers a subset of the upstream's behavior (ruzstd decoder vs. zstd's full codec; rust-bio FM-index without FMD variant; AnnData crates missing `.uns`). Also covers **rust-native research-grade** Rust crates whose scope is partial relative to the canonical tool (the sub-case is disambiguated in `Notes`, not in the field value).
 - **`rust-native`** — Rust-native concept with no specific upstream to port. Reference-impl field may cite an ecosystem analogue ("PyTorch", "Go runtime", "Intel TBB", "Mash") for orientation, but the Rust crate is not a code port. Examples: `rayon`, `tokio`, `candle`, `niffler`, `std::simd`, `fastbloom`, MinHash and HyperLogLog implementations of academic algorithms.
 - **`none`** — no Rust implementation exists yet.
+
+**Multi-backend convention.** When a single tool entry spans multiple backends with different kinds (e.g. flate2 with the default `miniz_oxide` is `pure-port`; with the `zlib-ng` feature is `FFI-wrapper`), write the field as a slash-separated list with the **dominant / default** backend first:
+
+```
+Existing Rust kind: pure-port/FFI-wrapper
+```
+
+The `Notes` line must state which backend is the default and which is feature-gated, so the reader can map slash-positions to backends.
 
 #### `Quadrant` — canonical field, four values
 
@@ -94,14 +102,16 @@ A single entry may compose multiple quadrants across backends (e.g. `flate2` is 
 
 The trailing sentence on the line must state the judgment basis in one sentence ("dense matmul"; "irregular graph traversal"; "I/O-bound, parsing-only").
 
-### TODO.md legend
+### TODO.md legend — four values
 
 | Mark | Meaning |
 |---|---|
 | `[ ]` | Open — no Rust implementation, on our queue |
-| `[~]` (FFI-wrapper) | Rust crate exists but wraps a C/C++ upstream via FFI |
-| `[~]` (partial-port) | Pure-Rust port exists but is incomplete (stub, missing subcommand, single-threaded hot path) |
-| `[x]` | Production-grade pure-Rust implementation exists — adopt |
+| `[~]` | A Rust crate exists, but is **incomplete in some dimension**: FFI-wrapper (wraps C/C++ via FFI), partial-port (covers a subset of upstream), OR rust-native but research-grade / partial-scope. The sub-case is named in the `Existing Rust kind` field and explained in `Notes`. |
+| `[x]` | Production-grade pure-Rust implementation exists — **adopt the Rust crate** as a direct dependency. |
+| `[A]` | **Adopt via subprocess** — the upstream is fine as-is (GPL-3 forbids linking; or hand-tuned SIMD that's not worth porting; or a stable Java binary that ships everywhere). We invoke it as a process from our pipelines but don't link or rewrite. Examples: Foldseek (GPL-3, hand-AVX), UShER (MIT but actively-maintained C++ at the scale we'd never match cheaply). |
+
+The four marks are **mutually exclusive**. The `[A]` marker pairs with `Existing Rust kind: none` (we deliberately don't have a Rust crate; we adopt the upstream binary).
 
 ## External-dependency quadrants — detection cues
 
