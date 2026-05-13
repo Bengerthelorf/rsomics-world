@@ -70,4 +70,5 @@ jobs:
           echo "TOOLCHAIN_CARGO=$CARGO" >> "$GITHUB_ENV"
           "$CARGO" --version
       - name: cargo test
-        run: "$TOOLCHAIN_CARGO" test --workspace --all-features
+        run: |
+          "$TOOLCHAIN_CARGO" test --workspace --all-features
