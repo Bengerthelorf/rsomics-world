@@ -28,6 +28,7 @@ libdeflater = { version = "1.25", optional = true }
 
 [dev-dependencies]
 anyhow.workspace = true
+tempfile = "3"
 
 [lints.rust]
 unsafe_code = "forbid"
