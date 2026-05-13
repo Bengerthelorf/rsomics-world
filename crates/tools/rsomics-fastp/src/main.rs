@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use rsomics_fastp::filter::FilterConfig;
+use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
 
 #[derive(Debug, Parser)]
@@ -57,6 +58,15 @@ struct Args {
         default_value = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
     )]
     adapter_sequence: String,
+
+    /// Trim 3' poly-G runs (2-color chemistry artifact on NextSeq/NovaSeq).
+    /// Off by default; pass `--trim_poly_g` to enable.
+    #[arg(long = "trim_poly_g", default_value_t = false)]
+    trim_poly_g: bool,
+
+    /// Minimum poly-G run length to trim.
+    #[arg(long = "poly_g_min_len", default_value_t = 10)]
+    poly_g_min_len: usize,
 }
 
 fn main() -> Result<()> {
@@ -76,6 +86,10 @@ fn main() -> Result<()> {
             max_mismatch_rate: 0.2,
         })
     };
+    let polyg = args.trim_poly_g.then_some(PolyGConfig {
+        min_len: args.poly_g_min_len,
+        max_mismatches: 0,
+    });
     match (args.in2, args.out2) {
         (Some(in2), Some(out2)) => {
             rsomics_fastp::io::process_pe(
@@ -86,6 +100,7 @@ fn main() -> Result<()> {
                 args.json.as_deref(),
                 cfg,
                 adapter.as_ref(),
+                polyg,
             )?;
         }
         (None, None) => {
@@ -95,6 +110,7 @@ fn main() -> Result<()> {
                 args.json.as_deref(),
                 cfg,
                 adapter.as_ref(),
+                polyg,
             )?;
         }
         _ => {

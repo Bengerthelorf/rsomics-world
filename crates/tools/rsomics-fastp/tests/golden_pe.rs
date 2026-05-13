@@ -37,6 +37,7 @@ fn process_pe_rejects_pair_when_either_mate_fails() {
         Some(json.path()),
         FilterConfig::default(),
         None,
+        None,
     )
     .expect("process_pe");
 

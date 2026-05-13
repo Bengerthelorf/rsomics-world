@@ -8,6 +8,7 @@ use flate2::write::GzEncoder;
 use needletail::parse_fastx_file;
 
 use crate::filter::{FilterConfig, FilterResult, classify};
+use crate::polyg::{PolyGConfig, find_polyg_3p};
 use crate::report::{FastpJsonReport, FilteringResult};
 use crate::stats::ReadStats;
 use crate::trim::{AdapterConfig, find_adapter_3p};
@@ -132,12 +133,14 @@ pub struct PeOutcome {
 /// # Errors
 ///
 /// Returns `Err` if input parsing, output writing, or JSON serialization fails.
+#[allow(clippy::too_many_arguments)]
 pub fn process_se(
     input: &Path,
     output: &Path,
     json_path: Option<&Path>,
     cfg: FilterConfig,
     adapter: Option<&AdapterConfig>,
+    polyg: Option<PolyGConfig>,
 ) -> Result<SeOutcome> {
     let mut reader = parse_fastx_file(input)
         .with_context(|| format!("opening input FASTQ {}", input.display()))?;
@@ -153,9 +156,13 @@ pub fn process_se(
         let qual = rec.qual().context("FASTQ record missing quality scores")?;
         pre.observe(&seq, qual);
 
-        let trim_at = adapter
-            .and_then(|cfg| find_adapter_3p(&seq, cfg))
+        let after_polyg = polyg
+            .and_then(|pg| find_polyg_3p(&seq, pg))
             .unwrap_or(seq.len());
+        let after_adapter = adapter
+            .and_then(|ad| find_adapter_3p(&seq[..after_polyg], ad))
+            .unwrap_or(after_polyg);
+        let trim_at = after_adapter;
         let seq_t = &seq[..trim_at];
         let qual_t = &qual[..trim_at];
 
@@ -213,6 +220,7 @@ pub fn process_pe(
     json_path: Option<&Path>,
     cfg: FilterConfig,
     adapter: Option<&AdapterConfig>,
+    polyg: Option<PolyGConfig>,
 ) -> Result<PeOutcome> {
     let mut r1_reader =
         parse_fastx_file(in1).with_context(|| format!("opening input R1 {}", in1.display()))?;
@@ -241,12 +249,18 @@ pub fn process_pe(
                 pre_r1.observe(&seq1, q1);
                 pre_r2.observe(&seq2, q2);
 
-                let t1 = adapter
-                    .and_then(|cfg| find_adapter_3p(&seq1, cfg))
+                let g1 = polyg
+                    .and_then(|pg| find_polyg_3p(&seq1, pg))
                     .unwrap_or(seq1.len());
-                let t2 = adapter
-                    .and_then(|cfg| find_adapter_3p(&seq2, cfg))
+                let g2 = polyg
+                    .and_then(|pg| find_polyg_3p(&seq2, pg))
                     .unwrap_or(seq2.len());
+                let t1 = adapter
+                    .and_then(|ad| find_adapter_3p(&seq1[..g1], ad))
+                    .unwrap_or(g1);
+                let t2 = adapter
+                    .and_then(|ad| find_adapter_3p(&seq2[..g2], ad))
+                    .unwrap_or(g2);
                 let seq1_t = &seq1[..t1];
                 let q1_t = &q1[..t1];
                 let seq2_t = &seq2[..t2];

@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use rsomics_fastp::filter::FilterConfig;
+use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
 
 fn fixture(name: &str) -> PathBuf {
@@ -86,6 +87,7 @@ fn process_se_classifies_each_failure_mode() {
         Some(json.path()),
         FilterConfig::default(),
         None,
+        None,
     )
     .expect("process_se");
 
@@ -127,6 +129,7 @@ fn process_se_trims_adapter_at_3prime() {
         None,
         FilterConfig::default(),
         Some(&AdapterConfig::illumina_truseq_r1()),
+        None,
     )
     .expect("process_se");
 
@@ -143,5 +146,38 @@ fn process_se_trims_adapter_at_3prime() {
     assert!(
         !out_text.contains("AGATCGGAAGAG"),
         "adapter bytes leaked into output"
+    );
+}
+
+#[test]
+fn process_se_trims_polyg_tail() {
+    let input = fixture("se_polyg.fastq");
+    let out = tempfile::Builder::new()
+        .suffix(".fastq")
+        .tempfile()
+        .expect("tempfile");
+
+    let outcome = rsomics_fastp::io::process_se(
+        &input,
+        out.path(),
+        None,
+        FilterConfig::default(),
+        None,
+        Some(PolyGConfig::default()),
+    )
+    .expect("process_se");
+
+    // Both reads pass; inserts are 20 + 24 = 44 bp total.
+    assert_eq!(outcome.filtering.passed_filter_reads, 2);
+    assert_eq!(outcome.post_filter.total_reads, 2);
+    assert_eq!(outcome.post_filter.total_bases, 44);
+
+    let out_text = fs::read_to_string(out.path()).expect("read output");
+    // The 20-bp insert appears verbatim on its own line.
+    assert!(out_text.contains("ACGTACGTACGTACGTACGT\n"));
+    // No G run of length 5+ should survive at the tail.
+    assert!(
+        !out_text.contains("GGGGG"),
+        "poly-G tail leaked into output"
     );
 }
