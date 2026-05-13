@@ -1,0 +1,6 @@
+/target
+/.autopilot/
+*.swp
+.DS_Store
+
+/ROADMAP.md
