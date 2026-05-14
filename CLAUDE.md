@@ -26,9 +26,15 @@ rsomics-world/
 │   │   ├── rsomics-fm-index/   (BWT, suffix array, locate)
 │   │   ├── rsomics-align-core/ (SW/NW/WFA/banded)
 │   │   └── rsomics-stats/      (GLM, FDR, p-values)
-│   └── tools/              ← Layer B: each is one installable binary
-│       ├── rsomics-fastp/
-│       ├── rsomics-bam/    (subcommands: view, sort, index, markdup, ...)
+│   └── tools/              ← Layer B: each is one installable binary,
+│       │                     ONE FUNCTION per crate — not one upstream binary
+│       │                     per crate.
+│       ├── rsomics-fastq-trim/      (3' adapter trim across fastp / cutadapt / trimmomatic)
+│       ├── rsomics-fastq-quality/   (quality + length + sliding-window filter)
+│       ├── rsomics-fastq-umi/       (UMI extract / stamp)
+│       ├── rsomics-bam-view/        (display + region/flag filter + SAM↔BAM)
+│       ├── rsomics-bam-sort/
+│       ├── rsomics-bam-index/
 │       └── ...
 └── .autopilot/             ← persistence (gitignored)
     ├── sessions/           ← per-session log
@@ -42,6 +48,55 @@ rsomics-world/
 - B → A → external. **A never depends on B. B never depends on B directly** — share via A.
 - A is **library-only** (no `[[bin]]`). A crate with a binary is by definition B.
 - Promote internal module to A only when **2+ B crates** need it (YAGNI; do not pre-abstract).
+
+### Crate partition rule (per-function, not per-upstream-binary)
+
+We are explicitly **NOT a Swiss-Army-knife project**. Each Layer B crate
+is **one function** — the operation a user / pipeline / agent would invoke
+on its own. Upstream binaries like `samtools` and `fastp` are themselves
+Swiss-Army knives (samtools = view + sort + index + merge + markdup +
+mpileup + faidx + flagstat + idxstats + depth + …); wrapping them 1:1
+inherits that anti-pattern. So we don't.
+
+**Workflow when introducing crates for a new domain** (e.g. FASTQ, BAM,
+VCF, alignment, quantification, …):
+
+1. **Survey the function set** by reading actual upstream source. Per
+   format / domain, list every function each upstream tool provides
+   (samtools' subcommands, fastp's flag groups, picard's tools, …).
+   Read the source — do not list from memory.
+2. **Aggregate across tools** in the domain. Many tools cover the same
+   operation (samtools markdup vs picard MarkDuplicates).
+3. **Dedupe**. The unit of dedup is the operation, not the binary.
+4. **Group by coherent operation** at a granularity a user would
+   recognise — "view a BAM" is one crate, "view a BAM with region filter"
+   is not its own crate (it's a flag inside view).
+5. **One crate per operation**. Binary name = `rsomics-<format>-<op>` for
+   tool crates (e.g. `rsomics-bam-sort`); library name = `rsomics-<topic>`
+   for foundation crates.
+
+For tools that DO span multiple operations functionally (rare — e.g. an
+aligner that emits sorted BAM directly), document the operation list
+explicitly in the crate's README and justify the bundling.
+
+### Implementation discipline (read source, don't reconstruct from memory)
+
+Before writing any non-trivial algorithm, **read the upstream
+reference implementation's source** (subject to clean-room rules below
+for GPL upstreams). Goals:
+
+- Catch behavioural details a paper or man page omits (off-by-one
+  semantics, exact filter-precedence ordering, exact format-tag wording).
+- Avoid reconstructing from memory and then discovering compat
+  divergences via the compat test much later.
+- Surface the source's hot-loop shape so our Rust version can match
+  or beat it deliberately, not accidentally.
+
+For **GPL** upstreams, the clean-room rule still applies — we read
+**paper + format spec + black-box behaviour**, not the GPL source. For
+**MIT / Apache / BSD** upstreams, reading and citing the source is
+allowed and expected. Document in the crate's `## Origin` README section
+which sources informed the implementation.
 
 ### External dependency 4-quadrant classification
 
@@ -119,6 +174,66 @@ Every Layer B crate that ports a C/Python/R tool MUST have:
 - README "Origin" section (license clean-room methodology — see below).
 
 No crate ships without these three. A crate with only `tests/` and no `compat.rs` is an unfinished implementation.
+
+### Performance hard rule — must outperform, not match
+
+Rust is a compiled, manual-memory, no-GC language. Wrapping a C tool and
+running *slower* than it is, by construction, an engineering failure on
+our side — the C tool's hot loop was visible source we could have
+read + matched + beaten. So:
+
+- **No crate is released (no `cargo publish`, no 0.x.0 tag) until its
+  hot-path benches show strictly `> 1.0×` throughput vs the upstream
+  reference on the same machine.** Same machine, same input, same flags
+  to the extent semantics allow.
+- **Equal-to-upstream is a failure.** "1.0×" means we offer nothing over
+  the C version that a user can't already get; release at that level is
+  ecosystem noise.
+- **Target ceiling: no upper limit.** Push as far as the algorithm
+  allows. "Good enough" is not a stopping criterion before publish.
+- **CPU is one axis.** Memory peak / RSS, allocation count, syscall
+  count, IO bandwidth, cache behaviour are all in scope. A win on
+  wall-clock with a 5× memory blowup is not a win.
+- **Single-thread and multi-thread both count.** Some upstreams don't
+  expose multi-threading; ours must be faster single-threaded against
+  those, and additionally scale multi-threaded.
+
+### Mandatory measurement discipline
+
+Every bench run that informs a publish decision must be **recorded**:
+
+- Tool versions on both sides (commit hash for us, package version for
+  upstream — `samtools --version`, `fastp --version` outputs captured).
+- Machine identity (mini_m2 / 4090 / CI runner image), thread count,
+  whether output was gzipped, etc.
+- Input fixture identity (Tier-1/2/3 name, sha256 if applicable).
+- Raw timing distribution (hyperfine output preferred — mean ± σ + range
+  + sample count).
+- Memory metric where relevant (`/usr/bin/time -v` peak RSS on Linux,
+  `/usr/bin/time -l` on macOS, or a heaptrack run for allocation count).
+
+Numbers without provenance are not evidence. The crate's `benches/`
+output or a checked-in `.autopilot/state/perf-<date>.md` is where they live.
+
+### Bench-driven optimisation hunt
+
+For every crate where the first cut is `> 1.0×` but not by a wide
+margin, run a fresh-eye optimisation pass before tagging:
+
+- Profile (Instruments / dtrace / perf / `cargo flamegraph`) on a real
+  fixture. Find the top-5 hot functions.
+- For each hot function ask: (a) zero-cost abstraction violations?
+  vtable in a loop? (b) allocator pressure? per-record `Vec` allocs?
+  (c) SIMD-amenable inner loop? (d) cache-hostile access pattern?
+  (e) syscall-bound? buffered correctly? (f) lock contention or false
+  sharing in parallel paths?
+- Dispatch one **`gpt-5.5 medium` Codex** or **`claude-opus-4-7`
+  general-purpose** fresh-eye review on the hot loop with the profile
+  output attached. Their lens is not yours.
+- Re-bench after each optimisation; document the delta.
+
+Memory + cache + syscall axes deserve the same treatment as CPU. Don't
+declare done until you've at least *asked* whether each axis has room.
 
 ## License + clean-room methodology
 
