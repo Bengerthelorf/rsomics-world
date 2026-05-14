@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use rsomics_common::{CommonFlags, Result, RsomicsError, run};
+use rsomics_common::{CommonFlags, Result, RsomicsError, StderrLog, run};
 
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
@@ -90,6 +90,7 @@ struct Args {
 }
 
 fn pipeline(args: Args) -> Result<()> {
+    let log = StderrLog::from_flags(&args.common);
     let cfg = FilterConfig {
         qualified_quality_phred: args.qualified_quality_phred,
         unqualified_percent_limit: args.unqualified_percent_limit,
@@ -128,7 +129,7 @@ fn pipeline(args: Args) -> Result<()> {
     };
     match (args.in2, args.out2) {
         (Some(in2), Some(out2)) => {
-            rsomics_fastp::io::process_pe(
+            let outcome = rsomics_fastp::io::process_pe(
                 &args.in1,
                 &in2,
                 &args.out1,
@@ -139,9 +140,17 @@ fn pipeline(args: Args) -> Result<()> {
                 polyg,
                 umi,
             )?;
+            let total = outcome.filtering.passed_filter_reads
+                + outcome.filtering.low_quality_reads
+                + outcome.filtering.too_many_n_reads
+                + outcome.filtering.too_short_reads;
+            log.info(format_args!(
+                "PE: kept {passed}/{total} pairs",
+                passed = outcome.filtering.passed_filter_reads,
+            ));
         }
         (None, None) => {
-            rsomics_fastp::io::process_se(
+            let outcome = rsomics_fastp::io::process_se(
                 &args.in1,
                 &args.out1,
                 args.json_report.as_deref(),
@@ -150,6 +159,14 @@ fn pipeline(args: Args) -> Result<()> {
                 polyg,
                 umi,
             )?;
+            let total = outcome.filtering.passed_filter_reads
+                + outcome.filtering.low_quality_reads
+                + outcome.filtering.too_many_n_reads
+                + outcome.filtering.too_short_reads;
+            log.info(format_args!(
+                "SE: kept {passed}/{total} reads",
+                passed = outcome.filtering.passed_filter_reads,
+            ));
         }
         _ => {
             return Err(RsomicsError::ConfigError(
