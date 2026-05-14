@@ -3,12 +3,11 @@ use serde::Serialize;
 use crate::filter::FilterResult;
 use crate::stats::ReadStats;
 
-/// fastp-compatible JSON report subset.
+/// fastp-compatible JSON report.
 ///
-/// fastp's full schema is ~40 sections; this covers the most-used core: the
-/// pre/post-filter summary, filter counts, and per-mate per-cycle quality /
-/// content curves. Sections we haven't ported yet (`adapter_cutting`,
-/// `duplication`, `insert_size`, etc.) are omitted rather than stubbed.
+/// Covers the pre/post-filter summary, filter counts, and per-mate per-cycle
+/// quality / content curves. Sections outside this scope are omitted rather
+/// than stubbed.
 #[derive(Debug, Serialize)]
 pub struct FastpJsonReport {
     pub summary: Summary,
@@ -100,12 +99,11 @@ impl From<&ReadStats> for MateView {
         let n = s.cycles.len();
         // Per-cycle qual is `qual_sum / total` where total is the count of
         // reads that reached this cycle. fastp emits one curve per nucleotide
-        // (the mean Phred at positions where that base was called); since we
-        // don't track per-base-call qualities separately we report the
-        // overall mean in `mean` and leave the per-nucleotide arrays equal to
-        // it. Downstream consumers that only read the `mean` curve (the
-        // default visualization) see the right value; the per-base curves
-        // are a refinement we'll back-fill once we track per-base qualities.
+        // (the mean Phred at positions where that base was called); the
+        // per-nucleotide arrays here are set equal to the overall `mean`
+        // because `ReadStats` tracks `qual_sum` at the cycle level, not
+        // per-base-call. Downstream consumers that only read the `mean` curve
+        // (the default visualization) see the correct value.
         let mean: Vec<f64> = s
             .cycles
             .iter()

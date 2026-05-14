@@ -2,10 +2,10 @@
 //!
 //! Takes the first `len` bases of a read as the UMI, appends them to the
 //! read id (fastp's convention: `:` separator), and returns the trimmed
-//! seq + qual ready for the downstream filter pipeline. This is the
-//! `umi_loc=read1` / `umi_loc=read2` subset of fastp's behavior — the
-//! `per_index` case (UMI in a separate index file) lives at the I/O level
-//! and isn't supported yet.
+//! seq + qual ready for the downstream filter pipeline. The subset we expose
+//! is `umi_loc=read1` / `umi_loc=read2` (UMI embedded in a sequenced mate);
+//! the `per_index` case (UMI in a separate index file) is not part of this
+//! module's scope.
 
 /// Where to pull the UMI bases from. `Read1` extracts from R1; `Read2` from
 /// R2. For SE only `Read1` is valid.

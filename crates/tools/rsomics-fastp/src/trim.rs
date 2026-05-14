@@ -1,9 +1,10 @@
 //! Adapter trimming.
 //!
-//! For single-end reads we use sequence-based 3' adapter matching: scan each
-//! offset in the read, compare against the adapter prefix within a mismatch
-//! budget, and trim at the earliest qualifying match. Paired-end overlap-based
-//! adapter detection (fastp's higher-quality default) is a follow-up.
+//! Uses sequence-based 3' adapter matching: scan each offset in the read,
+//! compare against the adapter prefix within a mismatch budget, and trim at
+//! the earliest qualifying match. This algorithm applies to both single-end
+//! and paired-end reads; paired-end overlap-based adapter detection is handled
+//! separately at the I/O level.
 
 /// Adapter-trimming configuration. Defaults match fastp's defaults: `TruSeq`
 /// adapter, 0.2 mismatch rate, 5 bp minimum match.

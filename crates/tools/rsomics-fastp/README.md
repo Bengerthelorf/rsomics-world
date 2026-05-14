@@ -44,8 +44,8 @@ enough that downstream tooling (MultiQC, custom dashboards) keeps working.
 and asserts identical surviving-read and surviving-base counts; CI runs this
 on every push.
 
-The CLI flag set is a subset of fastp's — flags we haven't ported yet are
-simply absent rather than silently ignored. Run with `--help` for the
+The CLI flag set is a subset of fastp's — flags outside this subset are
+absent rather than silently ignored. Run with `--help` for the
 authoritative list.
 
 ## Origin
