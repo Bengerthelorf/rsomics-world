@@ -4,11 +4,13 @@ use std::io::{self, Write};
 use crate::flags::CommonFlags;
 
 /// Stderr sink that respects `CommonFlags::quiet`. Error-level messages
-/// (`error!`) always print; info/debug fall under quiet.
+/// always print; info/debug honour `--quiet` / `--verbose`.
 ///
-/// Deliberately minimal — a per-call function pair plus matching macros.
-/// No `log` / `tracing` indirection; tools that want structured logging
-/// can adopt that on their own terms once it's clear they need it.
+/// Deliberately minimal — no `log` / `tracing` indirection at this layer.
+/// Callers write `log.info(format_args!("..."))` directly; that's cheap
+/// enough to not deserve a macro wrapper, and avoids dropping `info!` /
+/// `error!` / `debug!` into every dependent crate's prelude where they'd
+/// collide with the well-known `log` crate macros.
 #[derive(Debug, Clone, Copy)]
 pub struct StderrLog {
     pub quiet: bool,
@@ -19,8 +21,8 @@ impl StderrLog {
     #[must_use]
     pub fn from_flags(common: &CommonFlags) -> Self {
         Self {
-            quiet: common.is_quiet(),
-            verbose: common.is_verbose(),
+            quiet: common.quiet,
+            verbose: common.verbose,
         }
     }
 
@@ -45,24 +47,6 @@ impl StderrLog {
         }
         let _ = writeln!(io::stderr().lock(), "debug: {args}");
     }
-}
-
-/// `info!(log, "fmt {}", arg)` → `log.info(format_args!(...))`.
-#[macro_export]
-macro_rules! info {
-    ($log:expr, $($arg:tt)*) => { $log.info(::std::format_args!($($arg)*)) };
-}
-
-/// `error!(log, "fmt {}", arg)` → `log.error(format_args!(...))`.
-#[macro_export]
-macro_rules! error {
-    ($log:expr, $($arg:tt)*) => { $log.error(::std::format_args!($($arg)*)) };
-}
-
-/// `debug!(log, "fmt {}", arg)` → `log.debug(format_args!(...))`.
-#[macro_export]
-macro_rules! debug {
-    ($log:expr, $($arg:tt)*) => { $log.debug(::std::format_args!($($arg)*)) };
 }
 
 #[cfg(test)]

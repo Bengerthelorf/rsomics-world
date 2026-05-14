@@ -44,35 +44,41 @@ impl CommonFlags {
     }
 
     /// Configure the global rayon pool to match `thread_count()`. Idempotent
-    /// inside a single process: calling twice returns `Ok(())` the second
-    /// time because rayon won't let us replace an already-installed pool.
+    /// when the existing pool already matches; loud when a pre-existing pool
+    /// has a different thread count and our `--threads` request would
+    /// silently be ignored.
     ///
     /// # Errors
     ///
-    /// Returns `ConfigError` if rayon refused the build for a reason other
-    /// than "pool already initialised".
+    /// Returns `ConfigError` when `build_global` failed AND the resulting
+    /// active pool size doesn't match the requested thread count — i.e. the
+    /// user asked for N threads but the process is locked into M ≠ N.
     pub fn install_rayon_pool(&self) -> Result<()> {
-        match ThreadPoolBuilder::new()
-            .num_threads(self.thread_count())
+        let want = self.thread_count();
+        if ThreadPoolBuilder::new()
+            .num_threads(want)
             .build_global()
+            .is_err()
         {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("already") {
-                    Ok(())
-                } else {
-                    Err(RsomicsError::ConfigError(format!(
-                        "rayon pool init failed: {msg}"
-                    )))
-                }
+            let active = rayon::current_num_threads();
+            if active != want {
+                return Err(RsomicsError::ConfigError(format!(
+                    "rayon pool already initialised with {active} threads; \
+                     cannot reconfigure to {want}"
+                )));
             }
         }
+        Ok(())
     }
 
-    /// Seed value for downstream RNGs. If `--seed` was supplied, that
-    /// value; otherwise a high-entropy value drawn from the OS once per
-    /// process (memoised so repeated calls within one run agree).
+    /// Seed value for downstream RNGs. If `--seed` was supplied that value
+    /// wins (including `--seed 0`); otherwise a high-entropy value drawn
+    /// from the OS once per process, memoised so repeated calls within one
+    /// run agree.
+    ///
+    /// INVARIANT: the static `FRESH_SEED` uses `0` as "not yet set"
+    /// sentinel; [`fresh_os_seed`] guarantees a non-zero return so the
+    /// sentinel can't collide with a legitimate generated seed.
     #[must_use]
     pub fn seed_rng(&self) -> u64 {
         static FRESH_SEED: AtomicU64 = AtomicU64::new(0);
@@ -87,21 +93,6 @@ impl CommonFlags {
         FRESH_SEED
             .compare_exchange(0, s, Ordering::Relaxed, Ordering::Relaxed)
             .map_or_else(|existing| existing, |_| s)
-    }
-
-    #[must_use]
-    pub fn is_quiet(&self) -> bool {
-        self.quiet
-    }
-
-    #[must_use]
-    pub fn is_json(&self) -> bool {
-        self.json
-    }
-
-    #[must_use]
-    pub fn is_verbose(&self) -> bool {
-        self.verbose
     }
 }
 
@@ -169,6 +160,6 @@ mod tests {
     #[test]
     fn long_forms_parse_json_flag() {
         let cli = Cli::parse_from(["test", "--json"]);
-        assert!(cli.common.is_json());
+        assert!(cli.common.json);
     }
 }

@@ -9,6 +9,11 @@ use thiserror::Error;
 /// [`crate::ExitCode`] mapping stays exhaustive without ceremony.
 #[derive(Debug, Error)]
 pub enum RsomicsError {
+    /// Any failure surfaced through `std::io::Error`. Note this also catches
+    /// "user gave a non-existent path" cases — at this layer we can't tell
+    /// a hardware fault from a typo, so both route here. Integrators that
+    /// need finer granularity should bracket their boundary code with an
+    /// explicit `Path::exists()` check and map to `InvalidInput`.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
 
