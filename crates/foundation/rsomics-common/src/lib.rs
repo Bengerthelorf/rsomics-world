@@ -56,9 +56,13 @@ pub mod exit;
 pub mod flags;
 pub mod log;
 pub mod runner;
+#[cfg(feature = "test-support")]
+pub mod test_support;
+pub mod writers;
 
 pub use error::{Context, Result, RsomicsError};
 pub use exit::ExitCode;
 pub use flags::CommonFlags;
 pub use log::StderrLog;
 pub use runner::run;
+pub use writers::open_output;
