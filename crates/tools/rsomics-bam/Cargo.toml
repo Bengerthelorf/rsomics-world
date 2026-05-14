@@ -32,14 +32,11 @@ tempfile = "3"
 rsomics-common = { path = "../../foundation/rsomics-common", version = "0.1.1", features = ["test-support"] }
 criterion = { version = "0.7", default-features = false, features = ["html_reports"] }
 
-[lints.rust]
-# Forbids unsafe in OUR Rust; rust-htslib's internal unsafe FFI is in its
-# crate, not ours. Keep the lint — Quadrant ② FFI tools still write safe
-# Rust on their side of the boundary.
-unsafe_code = "forbid"
-
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
+[lints]
+# Inherits unsafe_code=forbid + clippy::pedantic=warn from workspace.
+# Quadrant ② note: rust-htslib's internal unsafe FFI lives in its own
+# crate, not ours — the workspace lint correctly governs our Rust only.
+workspace = true
 
 [[bin]]
 name = "rsomics-bam"

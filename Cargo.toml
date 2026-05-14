@@ -24,6 +24,22 @@ flate2 = "1"
 
 noodles = "0.110"
 
+# Shared lint posture across every crate in the workspace. Crates inherit
+# via `[lints] workspace = true`. The rationale lives in the per-rule
+# comment so a future cloner doesn't blindly relax them.
+[workspace.lints.rust]
+# Forbid unsafe in OUR Rust. FFI-wrapper crates (Quadrant ②, e.g. rsomics-bam)
+# pull in unsafe transitively through their *-sys deps; that's the upstream
+# crate's surface, not ours. This lint enforces that we never write unsafe.
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# pedantic catches most of the foot-guns this workspace cares about; warn
+# rather than deny so contributors aren't blocked by stylistic preferences.
+# The lower priority makes individual #[allow(...)] overrides take effect
+# without raising the whole-crate level.
+pedantic = { level = "warn", priority = -1 }
+
 [profile.release]
 codegen-units = 1
 lto = true
