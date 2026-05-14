@@ -1,7 +1,8 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use clap::Parser;
-use rsomics_common::{Result, RsomicsError};
+use rsomics_common::{CommonFlags, Result, RsomicsError, run};
 
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
@@ -32,9 +33,12 @@ struct Args {
     #[arg(short = 'O', long = "out2")]
     out2: Option<PathBuf>,
 
-    /// JSON report path (fastp-compatible schema subset).
-    #[arg(short = 'j', long = "json")]
-    json: Option<PathBuf>,
+    /// JSON report output path (fastp-compatible schema subset). Long
+    /// form is `--json_report` to leave the workspace-wide `--json` flag
+    /// in [`CommonFlags`] free as the standard machine-readable-output
+    /// switch.
+    #[arg(short = 'j', long = "json_report")]
+    json_report: Option<PathBuf>,
 
     /// Per-base quality threshold (Phred); bases below this count as unqualified.
     #[arg(long = "qualified_quality_phred", default_value_t = 15)]
@@ -80,10 +84,12 @@ struct Args {
     /// UMI length (bases to take from the 5' end of the donor mate).
     #[arg(long = "umi_len", default_value_t = 8)]
     umi_len: usize,
+
+    #[command(flatten)]
+    common: CommonFlags,
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
+fn pipeline(args: Args) -> Result<()> {
     let cfg = FilterConfig {
         qualified_quality_phred: args.qualified_quality_phred,
         unqualified_percent_limit: args.unqualified_percent_limit,
@@ -127,7 +133,7 @@ fn main() -> Result<()> {
                 &in2,
                 &args.out1,
                 &out2,
-                args.json.as_deref(),
+                args.json_report.as_deref(),
                 cfg,
                 adapter.as_ref(),
                 polyg,
@@ -138,7 +144,7 @@ fn main() -> Result<()> {
             rsomics_fastp::io::process_se(
                 &args.in1,
                 &args.out1,
-                args.json.as_deref(),
+                args.json_report.as_deref(),
                 cfg,
                 adapter.as_ref(),
                 polyg,
@@ -152,4 +158,10 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn main() -> ExitCode {
+    let args = Args::parse();
+    let common = args.common.clone();
+    run(&common, || pipeline(args))
 }
