@@ -45,9 +45,11 @@ TODO checklists using the entry schema in [`CONVENTIONS.md`](CONVENTIONS.md).
 
 ## Status
 
-Monorepo workspace, **scaffolding in place**. Foundation crates land under
-`crates/foundation/`, tool binaries under `crates/tools/`. The first tool
-will be installable via `cargo install rsomics-<name>` once published.
+Public monorepo workspace, **Phase 2 in progress**. The first tool
+(`rsomics-fastp`) lives at [`crates/tools/rsomics-fastp/`](crates/tools/rsomics-fastp/);
+foundation primitives live under `crates/foundation/`. Once `rsomics-common`
+and `rsomics-fastp` are published, both will install via
+`cargo install rsomics-<name>`.
 
 ## Why Rust?
 
