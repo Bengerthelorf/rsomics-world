@@ -13,6 +13,9 @@ use crate::error::{Result, RsomicsError};
 #[derive(Debug, Clone, Args)]
 pub struct CommonFlags {
     /// Number of worker threads to use. Defaults to available parallelism.
+    /// Sets the global rayon pool size; whether a tool actually parallelises
+    /// over it depends on the tool — check its `--help` for which paths
+    /// consume the pool.
     #[arg(short = 't', long = "threads", global = true)]
     pub threads: Option<usize>,
 

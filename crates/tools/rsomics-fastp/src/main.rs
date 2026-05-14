@@ -91,6 +91,14 @@ struct Args {
 
 fn pipeline(args: Args) -> Result<()> {
     let log = StderrLog::from_flags(&args.common);
+    if args.common.threads.is_some_and(|n| n > 1) {
+        log.info(format_args!(
+            "note: rsomics-fastp's SE/PE pipeline is single-threaded; \
+             --threads={} sizes the global rayon pool but does not \
+             accelerate this run",
+            args.common.threads.unwrap()
+        ));
+    }
     let cfg = FilterConfig {
         qualified_quality_phred: args.qualified_quality_phred,
         unqualified_percent_limit: args.unqualified_percent_limit,
