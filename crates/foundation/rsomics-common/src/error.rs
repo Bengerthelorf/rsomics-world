@@ -50,6 +50,50 @@ impl From<std::str::Utf8Error> for RsomicsError {
     }
 }
 
+/// Attach a description to a `Result` that turns into the prefix of the
+/// resulting `RsomicsError` message. Lets tools write
+/// `File::create(p).rs_context(|| format!("opening {}", p.display()))?` and
+/// get a contextual error without an `anyhow` dependency.
+pub trait Context<T> {
+    /// Eager-evaluated context. Use when the message is a literal or
+    /// already-computed string.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original `Err` wrapped as [`RsomicsError`] with the
+    /// supplied prefix prepended.
+    fn rs_context(self, msg: impl Into<String>) -> Result<T>;
+
+    /// Lazy-evaluated context. The closure runs only when the result is
+    /// `Err`, so `format!` work is avoided on the success path.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::rs_context`].
+    fn rs_with_context<F>(self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> String;
+}
+
+impl<T> Context<T> for std::result::Result<T, io::Error> {
+    fn rs_context(self, msg: impl Into<String>) -> Result<T> {
+        self.map_err(|e| {
+            let kind = e.kind();
+            RsomicsError::Io(io::Error::new(kind, format!("{}: {e}", msg.into())))
+        })
+    }
+
+    fn rs_with_context<F>(self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> String,
+    {
+        self.map_err(|e| {
+            let kind = e.kind();
+            RsomicsError::Io(io::Error::new(kind, format!("{}: {e}", f())))
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,5 +118,24 @@ mod tests {
     fn parse_int_routes_to_invalid_input() {
         let e: RsomicsError = "abc".parse::<u32>().unwrap_err().into();
         assert!(matches!(e, RsomicsError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn rs_context_prefixes_error_message() {
+        let res: std::result::Result<(), io::Error> =
+            Err(io::Error::new(io::ErrorKind::NotFound, "missing.fastq"));
+        let err = res.rs_context("opening input").unwrap_err();
+        assert_eq!(err.to_string(), "I/O error: opening input: missing.fastq");
+    }
+
+    #[test]
+    fn rs_with_context_is_lazy_on_ok() {
+        let mut called = false;
+        let res: std::result::Result<u32, io::Error> = Ok(7);
+        let _ = res.rs_with_context(|| {
+            called = true;
+            "should not be evaluated".into()
+        });
+        assert!(!called, "closure must not run on Ok");
     }
 }
