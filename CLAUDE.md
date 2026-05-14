@@ -381,22 +381,26 @@ Agent(
 
 First use of the session must precede with `Skill(codex:setup)` to confirm CLI ready. Spend Codex quota on: Phase 4 killer-binary L3 reviews, L2-triggered foundation-crate API reviews, cross-family second opinions. **Phase 1 catalog work does not use Codex** — Sonnet ↔ Opus internal review is sufficient.
 
-**Gemini (Google Gemini 3.x, quota abundant)** — Gemini is a **Skill**, not a subagent. Dispatch via the Skill tool. The first line of `args` selects the model — `gemini-3.1-pro` for heavy review, flash variants for light review:
+**Gemini (Google Gemini 3.x, quota abundant)** — Gemini is a **Skill**, not a subagent. Dispatch via the Skill tool. The first line of `args` selects the model — `gemini-3.1-pro-preview` for heavy review, the flash-preview / 2.5-flash variants for light review. **Use the verified model IDs** (CLAUDE.md history had bare `gemini-3.1-pro` / `gemini-3.1-flash` which 404; the API requires the `-preview` suffix on the 3.x tier):
+
+- Heavy: `gemini-3.1-pro-preview`
+- Light: `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+- Default (no `-m`): `gemini-2.0-flash-thinking-exp`
 
 ```
 Skill(
   skill: "gemini:rescue",
-  args: "Use gemini-3.1-pro. <self-contained brief>"
+  args: "Use gemini-3.1-pro-preview. <self-contained brief>"
 )
 ```
 
-First use of the session must precede with `Skill(gemini:setup)` to confirm CLI ready. **Gemini quota is fine to spend freely**, particularly well-suited for tests / fuzz / Cargo.toml audits — axes that Anthropic models tend to under-emphasise.
+First use of the session must precede with `Skill(gemini:setup)` to confirm CLI ready. **Gemini is third-party plugin so dispatch always with `run_in_background: true` and use Monitor / `/loop` to check completion**; do **not** sit on a synchronous Skill call and block when it hangs. If background dispatch never produces output, fall back to direct `Bash(run_in_background: true, command: "gemini -m <id> -p '<brief>'")` — that's the same CLI underneath. Quota is generous; spend freely on tests / fuzz / Cargo.toml audits and as the non-Codex non-Anthropic perspective.
 
 **Cross-family selection rules**:
 
 - Same-output **never** self-audited — Sonnet ↔ Opus internal pair-review is the default.
 - Adding a non-Anthropic axis: `tests/` / non-production code / Cargo.toml → Gemini; `src/` production code fresh-eye → Codex medium.
-- All three families: Phase 4 killer-binary L3 — Sonnet + Opus + Codex medium + Gemini-pro for four-model differentiated perspectives.
+- All three families: Phase 4 killer-binary L3 — Sonnet + Opus + Codex medium + Gemini-pro-preview for four-model differentiated perspectives. Gemini agent runs background; Anthropic + Codex finish first and Gemini's output joins when ready.
 
 **Setup failure fallback**: if `codex:setup` / `gemini:setup` is unavailable in this session, FreshEye degrades to Anthropic-only (Sonnet ↔ Opus) — phase work continues but the gate report records `cross-family review unavailable this session, fallback to Anthropic-only` so review-strength downgrades surface to the user.
 
