@@ -67,7 +67,7 @@ License: MIT OR Apache-2.0. Upstream credit: [seqkit] (MIT).
 {
   "schema_version": "1.0",
   "tool": "rsomics-fasta-stats",
-  "tool_version": "0.1.0",
+  "tool_version": "0.3.0",
   "status": "ok",
   "result": [                      // one element per input file
     {
@@ -102,7 +102,7 @@ Failure envelope routes to stderr (stdout stays parseable):
 {
   "schema_version": "1.0",
   "tool": "rsomics-fasta-stats",
-  "tool_version": "0.1.0",
+  "tool_version": "0.3.0",
   "status": "error",
   "error": { "kind": "InvalidInput", "message": "..." },
   "exit_code": 1

@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-fasta-stats"
-version = "0.2.0"
+version = "0.3.0"
 description = "Per-record statistics for FASTA files (num_seqs, sum_len, GC%, N50, …) — Rust port of `seqkit stats` (FASTA-only subset)."
 edition.workspace = true
 rust-version.workspace = true
