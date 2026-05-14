@@ -18,7 +18,6 @@ use needletail::parse_fastx_file;
 use rsomics_common::{Result, RsomicsError};
 use serde::Serialize;
 
-/// Per-FASTA aggregation knobs.
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Emit the extended-statistics block (`Q1` / `Q2` / `Q3`, `N50`,
@@ -65,8 +64,8 @@ impl SeqType {
     }
 }
 
-/// Final aggregated stats for a single FASTA input. Mirrors the FASTA-only
-/// column set of `seqkit stats`. Field names are the JSON-envelope keys.
+/// Aggregated stats for a single FASTA input. Mirrors the FASTA-only
+/// column set of `seqkit stats`.
 #[derive(Debug, Clone, Serialize)]
 pub struct FastaStats {
     pub file: String,
@@ -102,8 +101,6 @@ pub struct ExtendedStats {
 
 const ALPHABET_GUESS_LIMIT: usize = 10_000;
 
-/// Read `path` and produce its stats.
-///
 /// # Errors
 ///
 /// Returns `InvalidInput` if the file can't be opened, contains a malformed
@@ -243,20 +240,9 @@ fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
     total
 }
 
-/// Length-stat aggregate, byte-faithful port of `bio/util/length-stats.go`.
-///
-/// The Go implementation keeps a `map<length, count>` and sorts the *unique*
-/// lengths ascending into `counts: [(length, cumulative_count)]`. Q1/Q2/Q3
-/// are computed via a single sweep with `iMedianL`/`iMedianR` indices
-/// telling us which 0-based ordered positions we're after; when those two
-/// positions straddle a length boundary the result is the midpoint of the
-/// two adjacent lengths. N50/L50 walks lengths descending and accumulates
-/// `length * count` until reaching `sum/2`.
-///
-/// We reproduce this exactly so `--tabular --all` agrees with `seqkit stats
-/// --tabular --all` on N50/L50 and the three quartiles, including the
-/// duplicate-length boundary case where seqkit's L50 counts unique-length
-/// buckets rather than records (verbatim seqkit behaviour, not a fix).
+/// Byte-faithful port of `bio/util/length-stats.go`. seqkit's L50 counts
+/// unique-length buckets rather than records — reproduced verbatim so
+/// `--tabular --all` agrees with `seqkit stats --tabular --all`.
 struct LengthStats {
     /// `(length, cumulative_count)` sorted ascending by length, deduplicated.
     counts: Vec<(u64, u64)>,

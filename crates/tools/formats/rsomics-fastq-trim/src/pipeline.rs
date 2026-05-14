@@ -46,8 +46,6 @@ struct OwnedPair {
     r2: OwnedRecord,
 }
 
-/// Trim configuration assembled from CLI args, shared across rayon
-/// workers via reference.
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub fixed1: FixedTrimConfig,
@@ -114,8 +112,6 @@ impl TrimReport {
     }
 }
 
-/// Pipeline shape: owns the `PipelineConfig`, exposes `run_se` and
-/// `run_pe` as the two operational entry points.
 pub struct Pipeline<'cfg> {
     pub cfg: &'cfg PipelineConfig,
 }
@@ -353,7 +349,7 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
     let mut seq2 = r2.seq;
     let mut qual2 = r2.qual;
 
-    // 2. PolyG trim per mate (fastp does this BEFORE overlap analysis).
+    // PolyG must run BEFORE overlap analysis (fastp PE order).
     if let Some(pg) = cfg.poly_g {
         if let Some(cut) = find_polyx_3p(&seq1, pg) {
             delta.poly_g_trimmed_reads += 1;
@@ -369,7 +365,6 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
         }
     }
 
-    // 3. PE overlap analysis. RC of R2 is built once per pair.
     let mut overlap_fired = false;
     if let Some(ov_cfg) = cfg.overlap {
         let r2_rc = reverse_complement(&seq2);
@@ -385,7 +380,6 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
         }
     }
 
-    // 4. Static-sequence adapter trim (fallback when overlap didn't fire).
     if !overlap_fired {
         if let Some(a1) = cfg.adapter1.as_ref()
             && let Some(cut) = find_adapter_3p(&seq1, a1)

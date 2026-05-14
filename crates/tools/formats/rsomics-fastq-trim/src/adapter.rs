@@ -2,12 +2,11 @@
 //!
 //! Scan each offset in the read, compare the suffix against the adapter
 //! prefix within a mismatch budget, trim at the earliest qualifying match.
-//! The same algorithm covers SE and the R1-only fallback path of PE; the
-//! PE overlap-detection variant lives in [`crate::overlap`].
+//! Covers SE and the R1-only PE fallback path; the PE overlap-detection
+//! variant lives in [`crate::overlap`].
 //!
-//! Compared to fastp's `adaptertrimmer.cpp`, the 0.1.0 implementation is
-//! the Hamming-distance scan only — one-insertion and one-deletion
-//! phases that fastp falls through to are deferred to a later minor.
+//! Algorithm: Hamming-distance only — fastp's one-insertion and
+//! one-deletion fallback phases are not implemented.
 
 /// Adapter-trim configuration. Defaults match fastp's: `TruSeq` adapter
 /// (R1 sense-strand prefix), 5 bp minimum compared length, 20% mismatch
@@ -39,8 +38,7 @@ impl AdapterConfig {
     }
 }
 
-/// Side-effect-free record of one record's trim outcome — what the
-/// pipeline consumes to update its counters.
+/// Trim outcome for one record.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AdapterResult {
     /// Number of bases trimmed off the 3' end (0 if no adapter found).
@@ -49,8 +47,7 @@ pub struct AdapterResult {
 
 /// Return the 0-based offset where the read should be trimmed to remove
 /// the adapter, or `None` if no signature found at the 3' end. The
-/// earliest qualifying match wins so we trim as aggressively as the
-/// mismatch budget allows.
+/// earliest qualifying match wins.
 ///
 /// "Qualifying match" = at least `min_match_len` bases compared and the
 /// mismatch fraction across the compared region ≤ `max_mismatch_rate`.
@@ -72,7 +69,6 @@ pub fn find_adapter_3p(seq: &[u8], cfg: &AdapterConfig) -> Option<usize> {
             .zip(&adapter[..cmp_len])
             .filter(|(a, b)| !a.eq_ignore_ascii_case(b))
             .count();
-        // cmp_len fits in u32 trivially (read length).
         #[allow(clippy::cast_precision_loss)]
         let rate = mismatches as f32 / cmp_len as f32;
         if rate <= cfg.max_mismatch_rate {

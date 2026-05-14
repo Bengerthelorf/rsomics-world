@@ -1,16 +1,13 @@
 //! Poly-X tail trimming. Two scan modes:
 //!
-//! - [`find_polyx_3p`] — forced-base scan (poly-G is the common case for
-//!   2-color-chemistry instruments where dark cycles read as G).
-//! - [`find_dominant_polyx_3p`] — fastp's generalised poly-X: count A/C/G/T
-//!   simultaneously, pick the dominant base post-scan, return its trim
-//!   position.
+//! - [`find_polyx_3p`] — forced-base scan (default poly-G).
+//! - [`find_dominant_polyx_3p`] — A/C/G/T simultaneous count, dominant
+//!   base post-scan.
 //!
-//! Both are ports of `PolyX::trimPolyG` and `PolyX::trimPolyX` from
-//! `polyx.cpp`. The rate-based mismatch budget (`floor(scanned /
-//! mismatch_per_bases)`) absorbs interspersed non-target bases inside
-//! a long run, so an isolated G at the 5'-most edge of a poly-G stretch
-//! still shifts the trim point left.
+//! Ports of `PolyX::trimPolyG` and `PolyX::trimPolyX` from fastp's
+//! `polyx.cpp`. The rate-based mismatch budget absorbs interspersed
+//! non-target bases inside a long run — an isolated G at the 5'-most
+//! edge of a poly-G stretch still shifts the trim point left.
 
 use std::num::NonZeroUsize;
 

@@ -29,8 +29,7 @@ use flate2::write::GzEncoder;
 use crate::error::{Context, Result};
 
 /// Gzip-aware FASTQ output writer. Auto-selects gzipped output when the
-/// path ends in `.gz`; plain otherwise. Both arms wrap a `BufWriter` so
-/// needletail's small per-record writes batch into larger I/O.
+/// path ends in `.gz`; plain otherwise.
 pub enum Writer {
     Plain(BufWriter<File>),
     // Boxed so the enum's variant-size disparity (a GzEncoder is much
@@ -97,8 +96,8 @@ impl Write for Writer {
     }
 }
 
-/// Write one FASTQ record to `w` in canonical `@id\nseq\n+\nqual\n` form.
-/// `id` must NOT include the leading `@`; this fn adds it.
+/// Write a record in canonical `@id\nseq\n+\nqual\n` form. `id` must
+/// not carry the leading `@` — this fn adds it.
 ///
 /// # Errors
 ///

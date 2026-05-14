@@ -108,11 +108,10 @@ impl ChunkedWriter {
         })
     }
 
-    /// Append a complete plain-byte record `@id\nseq\n+\nqual\n` to the
-    /// buffer. Splits off a chunk and queues it for compression when the
-    /// buffer crosses [`GZ_CHUNK_BYTES`]; if more than
-    /// [`MAX_PENDING_CHUNKS`] chunks are waiting, flushes the queue so
-    /// the writer's footprint stays bounded regardless of input size.
+    /// Splits off a chunk and queues it for compression when the buffer
+    /// crosses [`GZ_CHUNK_BYTES`]; if more than [`MAX_PENDING_CHUNKS`]
+    /// chunks are waiting, flushes the queue so the writer's footprint
+    /// stays bounded regardless of input size.
     ///
     /// # Errors
     ///
@@ -173,8 +172,6 @@ impl ChunkedWriter {
         Ok(())
     }
 
-    /// Final flush + close. Drops the writer.
-    ///
     /// # Errors
     ///
     /// Same as [`Self::flush_pending`].

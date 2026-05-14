@@ -6,29 +6,15 @@
 //! mismatch budget; the first match wins and the trim point falls out
 //! of the geometry.
 //!
-//! ## Scope
+//! Hamming-distance scan only — fastp's
+//! `--allow_gap_overlap_trimming` path is not implemented.
 //!
-//! 0.1.0 implements the no-gap Hamming-distance scan only. fastp's
-//! `--allow_gap_overlap_trimming` path (one insertion or deletion in
-//! the overlap) is deferred to a future minor — it changes the trim
-//! point on &lt; 0.1% of records in tests and lifts complexity for an
-//! orthogonal axis.
-//!
-//! ## Algorithm
-//!
-//! For mate lengths `len1`/`len2` and reverse-complemented R2 (`rcr2`):
-//!
-//! - Forward scan: for `offset` in `0..=len1-overlap_require`, compare
-//!   `r1[offset..]` against `rcr2[..]` over `min(len1-offset, len2)`
-//!   bases. First offset whose mismatch count fits in the per-overlap
-//!   budget is taken.
-//! - Reverse scan: for `offset` in `-1..-(len2-overlap_require)`,
-//!   compare `r1[..]` against `rcr2[-offset..]`.
-//!
-//! Per-overlap mismatch budget: `min(diff_limit, floor(overlap_len * pct))`.
-//! Negative offset means R2-RC starts before R1 begins, i.e. the insert
-//! exceeds R1 — no trim needed in that case (the overlap is fully inside
-//! the insert and both reads are clean).
+//! Forward scan tries `offset` in `0..=len1-overlap_require` (R2-RC
+//! starts inside R1); reverse scan tries `offset` down to
+//! `-(len2-overlap_require)` (R2-RC starts before R1). Per-overlap
+//! mismatch budget: `min(diff_limit, floor(overlap_len * pct))`. Trim
+//! geometry: negative offset = adapter present at the 3' end of both
+//! mates; non-negative offset = no adapter trim needed.
 
 /// Knobs for the overlap scan. Defaults match fastp's defaults.
 /// `diff_percent_limit` must be a fraction in `[0.0, 1.0]`; values
@@ -74,9 +60,8 @@ impl Default for OverlapConfig {
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapResult {
     pub overlapped: bool,
-    /// Forward-scan offset is positive (R2-RC starts inside R1); reverse-
-    /// scan offset is negative (R2-RC begins before R1). Negative offset =
-    /// adapter-present geometry.
+    /// Positive = R2-RC starts inside R1; negative = R2-RC starts before
+    /// R1 (adapter-present geometry).
     pub offset: i64,
     pub overlap_len: usize,
     pub diff: usize,
@@ -118,9 +103,8 @@ fn complement(b: u8) -> u8 {
     }
 }
 
-/// Run the overlap scan. `r1` and `r2_rc` are the R1 sequence and the
-/// already-reverse-complemented R2 sequence. The caller owns the
-/// reverse-complement buffer so it can be reused across records.
+/// Scan `r1` against pre-RC'd `r2_rc` and return the best-fit overlap
+/// geometry.
 #[must_use]
 pub fn analyze(r1: &[u8], r2_rc: &[u8], cfg: OverlapConfig) -> OverlapResult {
     let len1 = r1.len();
@@ -183,8 +167,6 @@ fn budget_for(overlap_len: usize, cfg: OverlapConfig) -> usize {
     cfg.diff_limit.min(by_pct)
 }
 
-/// Count byte mismatches between two slices, early-exit once `limit` is
-/// exceeded. Both slices must be the same length.
 #[inline]
 fn count_mismatches_bounded(a: &[u8], b: &[u8], limit: usize) -> usize {
     debug_assert_eq!(a.len(), b.len());
@@ -200,12 +182,7 @@ fn count_mismatches_bounded(a: &[u8], b: &[u8], limit: usize) -> usize {
     diff
 }
 
-/// Apply the overlap trim. Returns `(new_len1, new_len2)` — the
-/// truncated lengths for R1 and R2. Caller does the actual slice
-/// truncation. Only fires when `ov.offset < 0` (adapter-present
-/// geometry); otherwise the caller should fall back to single-end
-/// adapter trim on each mate.
-///
+/// Only fires when `ov.offset < 0` (adapter-present geometry).
 /// `front_trimmed1` / `front_trimmed2` are the per-mate fixed-front
 /// trim counts already applied — needed so the overlap-derived trim
 /// lengths stay consistent with the original read frame.
