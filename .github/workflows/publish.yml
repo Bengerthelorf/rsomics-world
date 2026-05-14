@@ -43,6 +43,25 @@ jobs:
             exit 1
           fi
 
+      - name: Install upstream binaries for compat tests
+        run: |
+          # The compat tests assert these are on PATH (fail-loud if missing).
+          # See ci.yml for the same install step.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fastp samtools
+          arch=$(uname -m)
+          case "$arch" in
+            x86_64)  seqkit_arch=amd64 ;;
+            aarch64) seqkit_arch=arm64 ;;
+            *) echo "unsupported arch $arch for seqkit fetch" >&2 ; exit 1 ;;
+          esac
+          curl -fsSL -o /tmp/seqkit.tar.gz \
+            "https://github.com/shenwei356/seqkit/releases/download/v2.10.0/seqkit_linux_${seqkit_arch}.tar.gz"
+          tar -xzf /tmp/seqkit.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
+          fastp --version
+          seqkit version
+
       - name: cargo test
         run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features
 
