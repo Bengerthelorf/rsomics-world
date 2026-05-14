@@ -99,12 +99,12 @@ struct Args {
 
 fn pipeline(args: Args) -> Result<()> {
     let log = StderrLog::from_flags(&args.common);
-    if args.common.threads.is_some_and(|n| n > 1) {
+    let requested_threads = args.common.thread_count();
+    if requested_threads > 1 {
         log.info(format_args!(
             "note: rsomics-fastp's SE/PE pipeline is single-threaded; \
-             --threads={} sizes the global rayon pool but does not \
-             accelerate this run",
-            args.common.threads.unwrap()
+             --threads={requested_threads} sizes the global rayon pool but \
+             does not accelerate this run"
         ));
     }
     let cfg = FilterConfig {
