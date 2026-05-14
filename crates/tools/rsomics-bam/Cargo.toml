@@ -1,0 +1,50 @@
+[package]
+name = "rsomics-bam"
+version = "0.1.0"
+description = "Pure-Rust CLI over rust-htslib for BAM operations (view, sort, …). FFI-wrapper, output-compatible with samtools."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+keywords = ["bioinformatics", "bam", "samtools", "htslib", "ngs"]
+categories = ["command-line-utilities", "science::bioinformatics"]
+
+[features]
+default = []
+
+[dependencies]
+rsomics-common = { path = "../../foundation/rsomics-common", version = "0.1.1" }
+clap.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# FFI wrapper over htslib's C library. default-features disabled to skip
+# bzip2/lzma/curl system deps we don't use at v0.1.0; zlib (via libz-sys)
+# remains required for BGZF.
+rust-htslib = { version = "1.0", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"
+rsomics-common = { path = "../../foundation/rsomics-common", version = "0.1.1", features = ["test-support"] }
+criterion = { version = "0.7", default-features = false, features = ["html_reports"] }
+
+[lints.rust]
+# Forbids unsafe in OUR Rust; rust-htslib's internal unsafe FFI is in its
+# crate, not ours. Keep the lint — Quadrant ② FFI tools still write safe
+# Rust on their side of the boundary.
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+
+[[bin]]
+name = "rsomics-bam"
+path = "src/main.rs"
+
+[[bench]]
+name = "bam"
+harness = false
