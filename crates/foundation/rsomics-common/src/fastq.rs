@@ -54,7 +54,10 @@ impl Writer {
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("gz"))
         {
-            Ok(Self::Gzip(Box::new(GzEncoder::new(buf, Compression::default()))))
+            Ok(Self::Gzip(Box::new(GzEncoder::new(
+                buf,
+                Compression::default(),
+            ))))
         } else {
             Ok(Self::Plain(buf))
         }

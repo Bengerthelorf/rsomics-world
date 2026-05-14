@@ -72,19 +72,23 @@ struct Cli {
     poly_x_min_len: usize,
 
     /// Bases trimmed from R1 5'. Per-mate.
+    /// Short alias matches fastp's `-f`.
     #[arg(short = 'f', long = "trim_front1", default_value_t = 0)]
     trim_front1: usize,
 
-    /// Bases trimmed from R1 3'. Per-mate.
-    #[arg(short = 't', long = "trim_tail1", default_value_t = 0)]
+    /// Bases trimmed from R1 3'. Per-mate. No short alias because fastp's
+    /// `-t` clashes with this crate family's reserved `-t/--threads`.
+    #[arg(long = "trim_tail1", default_value_t = 0)]
     trim_tail1: usize,
 
     /// Bases trimmed from R2 5'. PE only.
+    /// Short alias matches fastp's `-F`.
     #[arg(short = 'F', long = "trim_front2", default_value_t = 0)]
     trim_front2: usize,
 
     /// Bases trimmed from R2 3'. PE only.
-    #[arg(short = 'T', long = "trim_tail2", default_value_t = 0)]
+    /// No short alias (T is too easily confused with t).
+    #[arg(long = "trim_tail2", default_value_t = 0)]
     trim_tail2: usize,
 
     /// Enable PE overlap-based adapter detection. Defaults off — caller

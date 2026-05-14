@@ -159,7 +159,7 @@ fn se_fixed_trim_matches_fastp() {
             "-A",
             "-f",
             "4",
-            "-t",
+            "--trim_tail1",
             "2",
             "-L",
         ],
