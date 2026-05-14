@@ -5,9 +5,9 @@ use clap::Args;
 #[cfg(feature = "rayon")]
 use rayon::ThreadPoolBuilder;
 
+use crate::error::Result;
 #[cfg(feature = "rayon")]
 use crate::error::RsomicsError;
-use crate::error::Result;
 
 /// Flag block every `rsomics-*` tool flattens into its own `clap::Parser`
 /// struct via `#[command(flatten)]`. Holding these in one place keeps short

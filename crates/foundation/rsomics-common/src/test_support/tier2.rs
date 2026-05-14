@@ -114,12 +114,9 @@ pub fn load_manifest(path: &Path) -> Result<Vec<Fixture>> {
 /// mismatches, or filesystem ops fail.
 pub fn fetch(manifest_path: &Path, name: &str) -> Result<PathBuf> {
     let fixtures = load_manifest(manifest_path)?;
-    let fx = fixtures
-        .iter()
-        .find(|f| f.name == name)
-        .ok_or_else(|| {
-            RsomicsError::InvalidInput(format!("fixture {name:?} not found in manifest"))
-        })?;
+    let fx = fixtures.iter().find(|f| f.name == name).ok_or_else(|| {
+        RsomicsError::InvalidInput(format!("fixture {name:?} not found in manifest"))
+    })?;
     let dest = cache_dir()?.join(&fx.name);
 
     if dest.exists()
@@ -237,8 +234,12 @@ source = "GIAB"
     fn resolve_uses_explicit_override_first() {
         let dir = tempfile::tempdir().expect("tempdir");
         let override_path = dir.path().to_string_lossy().into_owned();
-        let got = resolve_cache_dir(Some(&override_path), Some("/no/such/target"), Some("/no/home"))
-            .expect("resolve");
+        let got = resolve_cache_dir(
+            Some(&override_path),
+            Some("/no/such/target"),
+            Some("/no/home"),
+        )
+        .expect("resolve");
         assert_eq!(got, dir.path());
         assert!(got.is_dir());
     }

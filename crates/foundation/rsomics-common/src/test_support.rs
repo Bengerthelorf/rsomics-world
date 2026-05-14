@@ -30,6 +30,27 @@ macro_rules! fixture_path {
     }};
 }
 
+/// Resolve the path to the workspace-root Tier-2 fixture manifest from
+/// any `rsomics-*` crate. Assumes the workspace layout
+/// `<root>/crates/{foundation,tools}/<crate>/` and that the manifest
+/// lives at `<root>/tests/fixtures-manifest.toml`.
+///
+/// Lives as a macro so `env!("CARGO_MANIFEST_DIR")` resolves at the
+/// caller's compile site.
+#[macro_export]
+macro_rules! tier2_manifest_path {
+    () => {{
+        let mut p = ::std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        // CARGO_MANIFEST_DIR = <root>/crates/{foundation,tools}/<crate>
+        p.pop(); // <root>/crates/{foundation,tools}
+        p.pop(); // <root>/crates
+        p.pop(); // <root>
+        p.push("tests");
+        p.push("fixtures-manifest.toml");
+        p
+    }};
+}
+
 /// True if `<name>` is on `PATH` and `<name> --version` exits zero. Used by
 /// compat tests to skip gracefully when the upstream binary isn't installed.
 #[must_use]

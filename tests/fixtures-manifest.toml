@@ -13,12 +13,45 @@
 #   size_mb   approximate size in megabytes (for disk-quota planning)
 #   license   SPDX or short tag for the source's redistribution terms
 #   source    human-readable origin (consortium, paper, accession)
+#
+# Reproducibility note for fixtures-v0.1: 50k paired-end reads simulated by
+# wgsim -S 42 -N 50000 -1 150 -2 150 -e 0.005 -d 350 from GRCh38 chr22
+# (UCSC), then aligned via minimap2 -ax sr | samtools sort | samtools index.
+# Seed = 42; output is byte-for-byte deterministic. Generation script lives
+# in the fixtures-v0.1 release description.
 
-# [[fixture]]
-# name = "hg002-chr22-fastq"
-# tier = 2
-# url = "https://..."
-# sha256 = "..."
-# size_mb = 1800
-# license = "CC0-1.0"
-# source = "Genome in a Bottle (HG002, chr22 subset)"
+[[fixture]]
+name = "chr22_sub_r1.fastq.gz"
+tier = 2
+url = "https://github.com/Bengerthelorf/rsomics-world/releases/download/fixtures-v0.1/chr22_sub_r1.fastq.gz"
+sha256 = "d2352e5bf78797c2a1bd68c60316519678b9eb30b10d195b634b48ac70725ab9"
+size_mb = 4
+license = "CC0-1.0"
+source = "wgsim-simulated PE reads from GRCh38 chr22 (UCSC); seed 42"
+
+[[fixture]]
+name = "chr22_sub_r2.fastq.gz"
+tier = 2
+url = "https://github.com/Bengerthelorf/rsomics-world/releases/download/fixtures-v0.1/chr22_sub_r2.fastq.gz"
+sha256 = "db31ed28466fda3b9e77a86b61217c508255b603f790ac65a048737cdb20a6ef"
+size_mb = 4
+license = "CC0-1.0"
+source = "wgsim-simulated PE reads from GRCh38 chr22 (UCSC); seed 42"
+
+[[fixture]]
+name = "chr22_sub.bam"
+tier = 2
+url = "https://github.com/Bengerthelorf/rsomics-world/releases/download/fixtures-v0.1/chr22_sub.bam"
+sha256 = "eed2feb377fc8a0d4a0ff4704f7ab4ad334a605cc657ce2c3653eff3984d33a2"
+size_mb = 8
+license = "CC0-1.0"
+source = "minimap2-sr alignments of chr22_sub_r*.fastq.gz to GRCh38 chr22"
+
+[[fixture]]
+name = "chr22_sub.bam.bai"
+tier = 2
+url = "https://github.com/Bengerthelorf/rsomics-world/releases/download/fixtures-v0.1/chr22_sub.bam.bai"
+sha256 = "938b7bda2557640735946b6ab8ba4f894116262de4533aab8955a1312a973561"
+size_mb = 1
+license = "CC0-1.0"
+source = "samtools index of chr22_sub.bam"
