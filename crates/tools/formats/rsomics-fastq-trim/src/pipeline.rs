@@ -79,6 +79,16 @@ impl Default for PipelineConfig {
 /// Serialised inside the `--json` envelope's `result`.
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct TrimReport {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_r1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_r2: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_r1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_r2: Option<String>,
     pub reads_in: u64,
     pub reads_out: u64,
     pub bases_in: u64,
@@ -95,8 +105,8 @@ pub struct TrimReport {
     pub reads_too_short_after_trim: u64,
 }
 
-impl TrimReport {
-    fn merge(&mut self, other: &Self) {
+impl std::ops::AddAssign<&TrimReport> for TrimReport {
+    fn add_assign(&mut self, other: &TrimReport) {
         self.reads_in += other.reads_in;
         self.reads_out += other.reads_out;
         self.bases_in += other.bases_in;
@@ -134,7 +144,12 @@ impl<'cfg> Pipeline<'cfg> {
             .map_err(|e| parse_err(&format!("opening input {}", input.display()), e))?;
         let mut writer = ChunkedWriter::create(output, self.cfg.compression)?;
 
-        let mut report = TrimReport::default();
+        let mut report = TrimReport {
+            mode: Some("SE"),
+            input_r1: Some(input.display().to_string()),
+            output_r1: Some(output.display().to_string()),
+            ..TrimReport::default()
+        };
         let mut chunk: Vec<OwnedRecord> = Vec::with_capacity(CHUNK_RECORDS);
 
         loop {
@@ -161,7 +176,7 @@ impl<'cfg> Pipeline<'cfg> {
                 .collect();
 
             for p in processed {
-                report.merge(&p.delta);
+                report += &p.delta;
                 if let Some((id, seq, qual)) = p.write {
                     writer.write_record(&id, &seq, &qual)?;
                 }
@@ -185,7 +200,14 @@ impl<'cfg> Pipeline<'cfg> {
         let mut w1 = ChunkedWriter::create(out1, self.cfg.compression)?;
         let mut w2 = ChunkedWriter::create(out2, self.cfg.compression)?;
 
-        let mut report = TrimReport::default();
+        let mut report = TrimReport {
+            mode: Some("PE"),
+            input_r1: Some(in1.display().to_string()),
+            input_r2: Some(in2.display().to_string()),
+            output_r1: Some(out1.display().to_string()),
+            output_r2: Some(out2.display().to_string()),
+            ..TrimReport::default()
+        };
         let mut chunk: Vec<OwnedPair> = Vec::with_capacity(CHUNK_RECORDS);
 
         let mut done = false;
@@ -220,7 +242,7 @@ impl<'cfg> Pipeline<'cfg> {
                 .collect();
 
             for p in processed {
-                report.merge(&p.delta);
+                report += &p.delta;
                 if let Some((rec1, rec2)) = p.write {
                     w1.write_record(&rec1.0, &rec1.1, &rec1.2)?;
                     w2.write_record(&rec2.0, &rec2.1, &rec2.2)?;

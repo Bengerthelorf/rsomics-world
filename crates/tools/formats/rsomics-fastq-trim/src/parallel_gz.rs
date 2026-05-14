@@ -34,7 +34,8 @@ pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 /// Default libdeflate compression level (fastp matches at 4). 1 =
 /// fastest / largest output, 12 = slowest / smallest. Override per
 /// `ChunkedWriter::create`.
-pub const GZ_DEFAULT_LEVEL: i32 = 4;
+#[cfg(test)]
+pub(crate) const GZ_DEFAULT_LEVEL: i32 = 4;
 
 /// Maximum number of pending plain-byte chunks the writer holds before
 /// it forces a parallel-compress + write of the queued batch. Keeps the

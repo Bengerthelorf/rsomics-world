@@ -92,8 +92,12 @@ pub struct ExtendedStats {
     pub sum_gap: u64,
     #[serde(rename = "N50")]
     pub n50: u64,
-    #[serde(rename = "N50_num")]
-    pub n50_num: u64,
+    // seqkit calls this `N50_num`; the value is L50 (the number of
+    // unique-length buckets that cover ≥ 50% of total length), so the
+    // field is named after what it actually is. The `--tabular` output
+    // still renders the seqkit column name for byte-equality compat.
+    #[serde(rename = "L50")]
+    pub l50: u64,
     #[serde(rename = "GC(%)")]
     pub gc_percent: f64,
     pub sum_n: u64,
@@ -209,7 +213,7 @@ fn extend(
 ) -> ExtendedStats {
     let ls = LengthStats::new(std::mem::take(lengths));
     let (q1, q2, q3) = (ls.q1(), ls.q2(), ls.q3());
-    let (n50, n50_num) = ls.n50_l50();
+    let (n50, l50) = ls.n50_l50();
     let gc_percent = if matches!(seq_type, SeqType::Protein) || sum_len == 0 {
         0.0
     } else {
@@ -221,7 +225,7 @@ fn extend(
         q3,
         sum_gap,
         n50,
-        n50_num,
+        l50,
         gc_percent,
         sum_n,
     }
@@ -473,7 +477,7 @@ mod tests {
         let s = compute_stats(f.path(), &cfg).unwrap();
         let e = s.extended.expect("--all");
         assert_eq!(e.n50, 6);
-        assert_eq!(e.n50_num, 2);
+        assert_eq!(e.l50, 2);
     }
 
     #[test]

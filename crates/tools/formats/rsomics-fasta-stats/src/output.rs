@@ -70,7 +70,7 @@ fn write_extended_row(out: &mut String, e: &ExtendedStats) {
     let _ = write!(
         out,
         "\t{:.0}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{:.2}\t{}",
-        e.q1, e.q2, e.q3, e.sum_gap, e.n50, e.n50_num, e.gc_percent, e.sum_n,
+        e.q1, e.q2, e.q3, e.sum_gap, e.n50, e.l50, e.gc_percent, e.sum_n,
     );
 }
 
@@ -99,7 +99,7 @@ pub fn render_pretty(s: &FastaStats) -> String {
         data.push(format!("{:.0}", e.q3));
         data.push(humanize_u64(e.sum_gap));
         data.push(humanize_u64(e.n50));
-        data.push(humanize_u64(e.n50_num));
+        data.push(humanize_u64(e.l50));
         data.push(format!("{:.2}", e.gc_percent));
         data.push(humanize_u64(e.sum_n));
     }
@@ -132,19 +132,16 @@ fn render_columns(rows: &[Vec<String>]) -> String {
 
 fn humanize_u64(n: u64) -> String {
     let s = n.to_string();
-    let bytes = s.as_bytes();
     let mut out = String::with_capacity(s.len() + s.len() / 3);
-    let first_chunk = bytes.len() % 3;
-    if first_chunk > 0 {
-        out.push_str(std::str::from_utf8(&bytes[..first_chunk]).unwrap_or(""));
-    }
-    let mut i = first_chunk;
-    while i < bytes.len() {
+    let first_chunk = s.len() % 3;
+    let (head, tail) = s.split_at(first_chunk);
+    out.push_str(head);
+    for triplet in tail.as_bytes().chunks(3) {
         if !out.is_empty() {
             out.push(',');
         }
-        out.push_str(std::str::from_utf8(&bytes[i..i + 3]).unwrap_or(""));
-        i += 3;
+        // `to_string` of a u64 is decimal ASCII — non-UTF-8 impossible.
+        out.push_str(std::str::from_utf8(triplet).expect("decimal digits are ASCII"));
     }
     out
 }
@@ -206,7 +203,7 @@ mod tests {
             q3: 6.0,
             sum_gap: 0,
             n50: 6,
-            n50_num: 1,
+            l50: 1,
             gc_percent: 50.0,
             sum_n: 2,
         });

@@ -43,10 +43,10 @@ fn run_to_path(bin: &std::path::Path, args: &[&str]) {
 
 #[test]
 fn se_adapter_trim_matches_fastp() {
-    if !fastp_available() {
-        eprintln!("SKIP: fastp not on PATH");
-        return;
-    }
+    assert!(
+        fastp_available(),
+        "compat test requires fastp on PATH (install via `brew install fastp` / `apt install fastp`)"
+    );
     let tmp = tempfile::tempdir().unwrap();
     let ours_out = tmp.path().join("ours.fq");
     let theirs_out = tmp.path().join("theirs.fq");
@@ -91,10 +91,10 @@ fn se_adapter_trim_matches_fastp() {
 
 #[test]
 fn se_polyg_trim_matches_fastp() {
-    if !fastp_available() {
-        eprintln!("SKIP: fastp not on PATH");
-        return;
-    }
+    assert!(
+        fastp_available(),
+        "compat test requires fastp on PATH (install via `brew install fastp` / `apt install fastp`)"
+    );
     let tmp = tempfile::tempdir().unwrap();
     let ours_out = tmp.path().join("ours.fq");
     let theirs_out = tmp.path().join("theirs.fq");
@@ -138,10 +138,10 @@ fn se_polyg_trim_matches_fastp() {
 
 #[test]
 fn se_fixed_trim_matches_fastp() {
-    if !fastp_available() {
-        eprintln!("SKIP: fastp not on PATH");
-        return;
-    }
+    assert!(
+        fastp_available(),
+        "compat test requires fastp on PATH (install via `brew install fastp` / `apt install fastp`)"
+    );
     let tmp = tempfile::tempdir().unwrap();
     let ours_out = tmp.path().join("ours.fq");
     let theirs_out = tmp.path().join("theirs.fq");

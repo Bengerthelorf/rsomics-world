@@ -20,8 +20,9 @@ fn rsomics_bin() -> PathBuf {
 }
 
 fn seqkit_available() -> bool {
+    // seqkit uses `version` (subcommand), not `--version` (flag).
     Command::new("seqkit")
-        .arg("--version")
+        .arg("version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -64,42 +65,54 @@ struct ExtRow {
 }
 
 fn parse_tabular(out: &str) -> Row {
+    // Header-driven parsing: seqkit's `--all` output for a FASTA input
+    // includes the FASTQ-only columns Q20(%) / Q30(%) / AvgQual (all
+    // zero), giving 19 cells instead of our 16. Index by name rather
+    // than position so both layouts decode the same way.
     let mut lines = out.lines();
-    let _header = lines.next().expect("header line");
+    let header = lines.next().expect("header line");
     let data = lines.next().expect("data line");
+    let headers: Vec<&str> = header.split('\t').collect();
     let cells: Vec<&str> = data.split('\t').collect();
-    assert!(cells.len() == 8 || cells.len() == 16, "{cells:?}");
-    let extended = if cells.len() == 16 {
+    let col = |name: &str| -> &str {
+        let idx = headers
+            .iter()
+            .position(|h| *h == name)
+            .unwrap_or_else(|| panic!("missing column {name} in {header:?}"));
+        cells[idx]
+    };
+    let has_extended = headers.contains(&"Q1");
+    let extended = if has_extended {
         Some(ExtRow {
-            q1: cells[8].parse().unwrap(),
-            q2: cells[9].parse().unwrap(),
-            q3: cells[10].parse().unwrap(),
-            sum_gap: cells[11].parse().unwrap(),
-            n50: cells[12].parse().unwrap(),
-            n50_num: cells[13].parse().unwrap(),
-            gc_percent: cells[14].parse().unwrap(),
-            sum_n: cells[15].parse().unwrap(),
+            q1: col("Q1").parse().unwrap(),
+            q2: col("Q2").parse().unwrap(),
+            q3: col("Q3").parse().unwrap(),
+            sum_gap: col("sum_gap").parse().unwrap(),
+            n50: col("N50").parse().unwrap(),
+            n50_num: col("N50_num").parse().unwrap(),
+            gc_percent: col("GC(%)").parse().unwrap(),
+            sum_n: col("sum_n").parse().unwrap(),
         })
     } else {
         None
     };
     Row {
-        seq_type: cells[2].to_string(),
-        num_seqs: cells[3].parse().unwrap(),
-        sum_len: cells[4].parse().unwrap(),
-        min_len: cells[5].parse().unwrap(),
-        avg_len: cells[6].parse().unwrap(),
-        max_len: cells[7].parse().unwrap(),
+        seq_type: col("type").to_string(),
+        num_seqs: col("num_seqs").parse().unwrap(),
+        sum_len: col("sum_len").parse().unwrap(),
+        min_len: col("min_len").parse().unwrap(),
+        avg_len: col("avg_len").parse().unwrap(),
+        max_len: col("max_len").parse().unwrap(),
         extended,
     }
 }
 
 #[test]
 fn tabular_basic_matches_seqkit() {
-    if !seqkit_available() {
-        eprintln!("SKIP: seqkit not on PATH; install via brew/conda for compat testing");
-        return;
-    }
+    assert!(
+        seqkit_available(),
+        "compat test requires seqkit on PATH (install via `brew install seqkit` / `apt install seqkit`)"
+    );
     let fixture = fixture_path();
     let ours = parse_tabular(&run_tabular(
         &rsomics_bin(),
@@ -119,10 +132,10 @@ fn tabular_basic_matches_seqkit() {
 
 #[test]
 fn tabular_all_matches_seqkit() {
-    if !seqkit_available() {
-        eprintln!("SKIP: seqkit not on PATH");
-        return;
-    }
+    assert!(
+        seqkit_available(),
+        "compat test requires seqkit on PATH (install via `brew install seqkit` / `apt install seqkit`)"
+    );
     let fixture = fixture_path();
     let ours = parse_tabular(&run_tabular(
         &rsomics_bin(),

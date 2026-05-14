@@ -85,7 +85,9 @@ License: MIT OR Apache-2.0. Upstream credit: [seqkit] (MIT).
         "Q3": 50818468.0,
         "sum_gap": 0,              // bases matching --gap-letters
         "N50": 50818468,           // verbatim seqkit semantics
-        "N50_num": 1,              // L50 — unique-length bucket count
+        "L50": 1,                  // unique-length bucket count (seqkit
+                                   // tabular header still reads `N50_num`
+                                   // for byte-equality compat)
         "GC(%)": 36.22,            // f64, %.2f when printed
         "sum_n": 11658691          // N (nucleotide) or X (protein) count
       }

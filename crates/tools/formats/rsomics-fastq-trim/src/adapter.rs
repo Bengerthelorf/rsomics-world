@@ -38,13 +38,6 @@ impl AdapterConfig {
     }
 }
 
-/// Trim outcome for one record.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct AdapterResult {
-    /// Number of bases trimmed off the 3' end (0 if no adapter found).
-    pub trimmed: usize,
-}
-
 /// Return the 0-based offset where the read should be trimmed to remove
 /// the adapter, or `None` if no signature found at the 3' end. The
 /// earliest qualifying match wins.
