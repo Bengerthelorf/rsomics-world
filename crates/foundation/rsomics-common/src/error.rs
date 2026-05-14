@@ -23,6 +23,18 @@ pub enum RsomicsError {
     #[error("configuration error: {0}")]
     ConfigError(String),
 
+    /// Failure surfaced from an external dependency. Covers two distinct
+    /// shapes that share an exit-code mapping but differ at the operator-
+    /// debug level:
+    ///
+    /// - **FFI return**: a `rust-htslib` or similar wrapped C library
+    ///   returned an error code or threw across the FFI boundary.
+    /// - **Subprocess non-zero**: a child process invoked for compat tests
+    ///   (e.g., `samtools view -c`) exited with a non-zero status.
+    ///
+    /// Both route to [`crate::ExitCode::UpstreamError`]. Callers that need
+    /// to distinguish should match on the embedded message prefix or
+    /// promote to a dedicated variant in a future minor bump.
     #[error("upstream tool error: {0}")]
     UpstreamError(String),
 }
