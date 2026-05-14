@@ -53,6 +53,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+      - name: Verify toolchain install is not poisoned
+        run: |
+          # Catches the rustup-init-masquerade case where `rustc` actually
+          # prints rustup-init's version string. Fail loud, not silent —
+          # the previous mode was a cryptic "unexpected argument" error
+          # mid-test; this surfaces it during setup with a diagnostic.
+          if rustc -vV 2>&1 | grep -qi rustup-init; then
+            echo "::error::rustc is rustup-init in disguise — runner image is poisoned"
+            ls -la "$HOME/.cargo/bin/" "$HOME/.rustup/toolchains/" 2>&1 || true
+            exit 1
+          fi
+          rustc --version
       - uses: Swatinem/rust-cache@v2
       - name: Install upstream fastp for compat tests
         if: runner.os == 'Linux'
