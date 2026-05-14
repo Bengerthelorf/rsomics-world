@@ -37,9 +37,16 @@ fn process_pe_rejects_pair_when_either_mate_fails() {
 
     // pair_001: both pass. pair_002: R1 too short. pair_003: R2 low quality.
     // pair_004: both pass. → 2 pass, 1 too short, 1 low quality.
-    assert_eq!(outcome.filtering.passed_filter_reads, 2);
-    assert_eq!(outcome.filtering.too_short_reads, 1);
-    assert_eq!(outcome.filtering.low_quality_reads, 1);
+    // PE filtering counts are in INDIVIDUAL READS (fastp convention),
+    // not pairs — each pair contributes 2 to whichever bucket the
+    // pair-level verdict resolves to. Fixture has 4 pairs:
+    //   pair_001 pass    → +2 passed
+    //   pair_002 R1 too short → +2 too_short
+    //   pair_003 R2 low quality → +2 low_quality
+    //   pair_004 pass    → +2 passed
+    assert_eq!(outcome.filtering.passed_filter_reads, 4);
+    assert_eq!(outcome.filtering.too_short_reads, 2);
+    assert_eq!(outcome.filtering.low_quality_reads, 2);
     assert_eq!(outcome.filtering.too_many_n_reads, 0);
     assert_eq!(outcome.pre_filter_r1.total_reads, 4);
     assert_eq!(outcome.pre_filter_r2.total_reads, 4);
@@ -63,7 +70,7 @@ fn process_pe_rejects_pair_when_either_mate_fails() {
     let parsed: serde_json::Value = serde_json::from_str(&json_text).expect("json parse");
     assert_eq!(parsed["summary"]["before_filtering"]["total_reads"], 8);
     assert_eq!(parsed["summary"]["after_filtering"]["total_reads"], 4);
-    assert_eq!(parsed["filtering_result"]["passed_filter_reads"], 2);
+    assert_eq!(parsed["filtering_result"]["passed_filter_reads"], 4);
 
     // Both mate blocks are present and carry curve arrays.
     let r1 = &parsed["read1_before_filtering"];

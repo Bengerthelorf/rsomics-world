@@ -331,6 +331,12 @@ pub fn process_pe(
                 let v1 = classify(seq1_t, q1_t, cfg);
                 let v2 = classify(seq2_t, q2_t, cfg);
                 let pair_verdict = pair_filter_result(v1, v2);
+                // fastp's JSON `passed_filter_reads` etc. count individual
+                // reads, not pairs — so a PE pair contributes 2 to whichever
+                // bucket the pair-level verdict resolves to. Without this
+                // doubling, our PE counts are exactly 2× too small vs fastp
+                // for the same input.
+                filtering.record(pair_verdict);
                 filtering.record(pair_verdict);
                 if matches!(pair_verdict, FilterResult::Pass) {
                     post_r1.observe(seq1_t, q1_t);
