@@ -13,6 +13,13 @@ use crate::error::Result;
 /// struct via `#[command(flatten)]`. Holding these in one place keeps short
 /// names, help text, and semantics consistent across the family — a user
 /// running `rsomics-bam`'s `--threads` learns nothing new vs. `rsomics-fastp`.
+///
+/// **Placement rule**: flatten into the **top-level** `Parser` struct, not
+/// into a subcommand `Args` struct. Each flag has `global = true` so clap
+/// propagates it down to every subcommand; defining the flags inside a
+/// subcommand-level struct would either (a) duplicate the surface across
+/// every subcommand or (b) cause `global = true` to attach to the wrong
+/// scope and surface a clap parse error at runtime.
 #[derive(Debug, Clone, Args)]
 pub struct CommonFlags {
     /// Number of worker threads to use. Defaults to available parallelism.
