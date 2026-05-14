@@ -75,7 +75,10 @@ mod tests {
         // intentionally aimed at tools that follow the `--version`
         // convention (samtools, fastp, bcftools, …); using a shell that
         // doesn't would falsely report it absent.
-        assert!(tool_on_path("cargo"), "cargo must be on PATH for cargo test");
+        assert!(
+            tool_on_path("cargo"),
+            "cargo must be on PATH for cargo test"
+        );
     }
 
     #[test]
