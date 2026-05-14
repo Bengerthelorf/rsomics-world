@@ -109,6 +109,31 @@ impl ReadStats {
             self.gc_bases as f64 / self.total_bases as f64
         }
     }
+
+    /// Associative+identity merge: fold `other`'s counts into `self`.
+    /// Required for parallel reduction — each worker accumulates a local
+    /// `ReadStats`, then the main thread merges all locals at the end of
+    /// a chunk. Cycle vecs are length-aligned by extending the shorter
+    /// side with zeroed [`CycleStat`]s before pairwise summing.
+    pub fn merge(&mut self, other: &Self) {
+        self.total_reads += other.total_reads;
+        self.total_bases += other.total_bases;
+        self.q20_bases += other.q20_bases;
+        self.q30_bases += other.q30_bases;
+        self.gc_bases += other.gc_bases;
+        self.n_bases += other.n_bases;
+        if self.cycles.len() < other.cycles.len() {
+            self.cycles.resize(other.cycles.len(), CycleStat::default());
+        }
+        for (dst, src) in self.cycles.iter_mut().zip(other.cycles.iter()) {
+            dst.count_a += src.count_a;
+            dst.count_c += src.count_c;
+            dst.count_g += src.count_g;
+            dst.count_t += src.count_t;
+            dst.count_n += src.count_n;
+            dst.qual_sum += src.qual_sum;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -154,5 +179,50 @@ mod tests {
         s.observe(b"NCGN", b"IIII");
         assert_eq!(s.n_bases, 2);
         assert_eq!(s.gc_bases, 2);
+    }
+
+    #[test]
+    fn merge_is_associative_and_has_identity() {
+        let mut a = ReadStats::default();
+        a.observe(b"ACGT", b"IIII");
+        let mut b = ReadStats::default();
+        b.observe(b"GCTA", b"IIII");
+        let mut c = ReadStats::default();
+        c.observe(b"NNNN", b"!!!!");
+
+        let mut left = ReadStats::default();
+        left.merge(&a);
+        left.merge(&b);
+        left.merge(&c);
+
+        // Same observations folded into a single accumulator should match.
+        let mut serial = ReadStats::default();
+        serial.observe(b"ACGT", b"IIII");
+        serial.observe(b"GCTA", b"IIII");
+        serial.observe(b"NNNN", b"!!!!");
+
+        assert_eq!(left.total_reads, serial.total_reads);
+        assert_eq!(left.total_bases, serial.total_bases);
+        assert_eq!(left.q20_bases, serial.q20_bases);
+        assert_eq!(left.q30_bases, serial.q30_bases);
+        assert_eq!(left.gc_bases, serial.gc_bases);
+        assert_eq!(left.n_bases, serial.n_bases);
+        assert_eq!(left.cycles.len(), serial.cycles.len());
+        for (lc, sc) in left.cycles.iter().zip(serial.cycles.iter()) {
+            assert_eq!(lc.count_a, sc.count_a);
+            assert_eq!(lc.count_c, sc.count_c);
+            assert_eq!(lc.count_g, sc.count_g);
+            assert_eq!(lc.count_t, sc.count_t);
+            assert_eq!(lc.count_n, sc.count_n);
+            assert_eq!(lc.qual_sum, sc.qual_sum);
+        }
+
+        // Identity: merging an empty into self leaves self unchanged.
+        let empty = ReadStats::default();
+        let cloned = left.clone();
+        let mut x = left;
+        x.merge(&empty);
+        assert_eq!(x.total_reads, cloned.total_reads);
+        assert_eq!(x.total_bases, cloned.total_bases);
     }
 }

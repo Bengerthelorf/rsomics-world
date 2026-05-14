@@ -128,9 +128,8 @@ fn pipeline(args: Args) -> Result<RunSummary> {
     let requested_threads = args.common.thread_count();
     if requested_threads > 1 {
         log.info(format_args!(
-            "note: rsomics-fastp's SE/PE pipeline is single-threaded; \
-             --threads={requested_threads} sizes the global rayon pool but \
-             does not accelerate this run"
+            "using {requested_threads} rayon workers for the per-chunk \
+             scatter/gather pipeline"
         ));
     }
     let cfg = FilterConfig {
