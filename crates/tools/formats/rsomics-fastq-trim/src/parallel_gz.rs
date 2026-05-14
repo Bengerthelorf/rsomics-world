@@ -35,6 +35,13 @@ pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 /// for a good ratio/speed trade-off. We match.
 pub const GZ_LEVEL: i32 = 4;
 
+/// Maximum number of pending plain-byte chunks the writer holds before
+/// it forces a parallel-compress + write of the queued batch. Keeps the
+/// in-memory footprint bounded regardless of input size: at any moment
+/// at most `MAX_PENDING_CHUNKS * GZ_CHUNK_BYTES` plain bytes are held.
+/// 16 × 256 KB = 4 MB cap, enough work per rayon dispatch.
+pub const MAX_PENDING_CHUNKS: usize = 16;
+
 /// Compress one buffer to a self-contained gzip member.
 fn compress_member(plain: &[u8]) -> Result<Vec<u8>> {
     let level = CompressionLvl::new(GZ_LEVEL).map_err(|e| {
@@ -103,11 +110,14 @@ impl ChunkedWriter {
 
     /// Append a complete plain-byte record `@id\nseq\n+\nqual\n` to the
     /// buffer. Splits off a chunk and queues it for compression when the
-    /// buffer crosses [`GZ_CHUNK_BYTES`].
+    /// buffer crosses [`GZ_CHUNK_BYTES`]; if more than
+    /// [`MAX_PENDING_CHUNKS`] chunks are waiting, flushes the queue so
+    /// the writer's footprint stays bounded regardless of input size.
     ///
     /// # Errors
     ///
-    /// `Io` if a plain-text write fails.
+    /// `Io` if a plain-text write fails; `UpstreamError` if libdeflate
+    /// compression fails while the pending queue is being drained.
     pub fn write_record(&mut self, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
         if self.gzipped {
             self.buffer.push(b'@');
@@ -121,17 +131,26 @@ impl ChunkedWriter {
                 let full = std::mem::take(&mut self.buffer);
                 self.buffer.reserve(GZ_CHUNK_BYTES + 16 * 1024);
                 self.pending_chunks.push(full);
+                if self.pending_chunks.len() >= MAX_PENDING_CHUNKS {
+                    self.drain_pending()?;
+                }
             }
         } else {
-            self.inner.write_all(b"@").rs_context("write")?;
-            self.inner.write_all(id).rs_context("write")?;
-            self.inner.write_all(b"\n").rs_context("write")?;
-            self.inner.write_all(seq).rs_context("write")?;
-            self.inner.write_all(b"\n+\n").rs_context("write")?;
-            self.inner.write_all(qual).rs_context("write")?;
-            self.inner.write_all(b"\n").rs_context("write")?;
+            rsomics_common::fastq::write_record(&mut self.inner, id, seq, qual)
+                .rs_context("writing plain FASTQ record")?;
         }
         Ok(())
+    }
+
+    /// Compress the currently queued chunks in parallel and write them
+    /// to disk, leaving the in-progress `buffer` untouched. Called both
+    /// during a run (to bound memory) and from `finalize` for the tail.
+    fn drain_pending(&mut self) -> Result<()> {
+        if self.pending_chunks.is_empty() {
+            return Ok(());
+        }
+        let chunks = std::mem::take(&mut self.pending_chunks);
+        write_chunks_gz(&mut self.inner, chunks)
     }
 
     /// Compress all pending chunks and flush to disk. Idempotent on
@@ -149,8 +168,7 @@ impl ChunkedWriter {
             let full = std::mem::take(&mut self.buffer);
             self.pending_chunks.push(full);
         }
-        let chunks = std::mem::take(&mut self.pending_chunks);
-        write_chunks_gz(&mut self.inner, chunks)?;
+        self.drain_pending()?;
         self.inner.flush().rs_context("flushing gz writer")?;
         Ok(())
     }

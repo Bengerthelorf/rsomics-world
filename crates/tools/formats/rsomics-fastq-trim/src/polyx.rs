@@ -82,7 +82,11 @@ pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
         }
         i += 1;
     }
-    if i >= cfg.min_len { last_target_pos } else { None }
+    if i >= cfg.min_len {
+        last_target_pos
+    } else {
+        None
+    }
 }
 
 /// Dominant-base scan. Counts A/C/G/T simultaneously walking from the 3'

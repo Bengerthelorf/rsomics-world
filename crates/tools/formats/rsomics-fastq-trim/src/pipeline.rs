@@ -257,62 +257,61 @@ fn trim_se_record(rec: OwnedRecord, cfg: &PipelineConfig) -> ProcessedSe {
 
     let original_len = rec.seq.len();
 
-    // 1. Fixed-length trim.
     let Some((start, end)) = apply_fixed(rec.seq.len(), cfg.fixed1) else {
         delta.reads_too_short_after_trim = 1;
         return ProcessedSe { delta, write: None };
     };
-    let fixed_bases = (start + (original_len - end)) as u64;
-    delta.fixed_trimmed_bases = fixed_bases;
+    delta.fixed_trimmed_bases = (start + (original_len - end)) as u64;
 
-    let seq = &rec.seq[start..end];
-    let qual = &rec.qual[start..end];
+    let mut rec = rec;
+    rec.seq.truncate(end);
+    rec.qual.truncate(end);
+    if start > 0 {
+        rec.seq.drain(..start);
+        rec.qual.drain(..start);
+    }
 
-    // 2. 3' adapter trim (static sequence, if configured).
     let after_adapter = cfg
         .adapter1
         .as_ref()
-        .and_then(|a| find_adapter_3p(seq, a))
-        .unwrap_or(seq.len());
-    if after_adapter < seq.len() {
+        .and_then(|a| find_adapter_3p(&rec.seq, a))
+        .unwrap_or(rec.seq.len());
+    if after_adapter < rec.seq.len() {
         delta.adapter_trimmed_reads = 1;
-        delta.adapter_trimmed_bases = (seq.len() - after_adapter) as u64;
+        delta.adapter_trimmed_bases = (rec.seq.len() - after_adapter) as u64;
+        rec.seq.truncate(after_adapter);
+        rec.qual.truncate(after_adapter);
     }
 
-    // 3. PolyG trim.
-    let after_polyg = cfg
-        .poly_g
-        .and_then(|pg| find_polyx_3p(&seq[..after_adapter], pg))
-        .unwrap_or(after_adapter);
-    if after_polyg < after_adapter {
+    if let Some(pg) = cfg.poly_g
+        && let Some(cut) = find_polyx_3p(&rec.seq, pg)
+    {
         delta.poly_g_trimmed_reads = 1;
-        delta.poly_g_trimmed_bases = (after_adapter - after_polyg) as u64;
+        delta.poly_g_trimmed_bases = (rec.seq.len() - cut) as u64;
+        rec.seq.truncate(cut);
+        rec.qual.truncate(cut);
     }
 
-    // 4. PolyX trim.
-    let after_px = cfg
-        .poly_x
-        .and_then(|px| find_dominant_polyx_3p(&seq[..after_polyg], px))
-        .map_or(after_polyg, |r| r.trim_at);
-    if after_px < after_polyg {
+    if let Some(px) = cfg.poly_x
+        && let Some(r) = find_dominant_polyx_3p(&rec.seq, px)
+    {
         delta.poly_x_trimmed_reads = 1;
-        delta.poly_x_trimmed_bases = (after_polyg - after_px) as u64;
+        delta.poly_x_trimmed_bases = (rec.seq.len() - r.trim_at) as u64;
+        rec.seq.truncate(r.trim_at);
+        rec.qual.truncate(r.trim_at);
     }
 
-    let trim_at = after_px;
-    if trim_at < cfg.min_length_required {
+    if rec.seq.len() < cfg.min_length_required {
         delta.reads_too_short_after_trim = 1;
         return ProcessedSe { delta, write: None };
     }
 
-    let seq_out = seq[..trim_at].to_vec();
-    let qual_out = qual[..trim_at].to_vec();
     delta.reads_out = 1;
-    delta.bases_out = seq_out.len() as u64;
+    delta.bases_out = rec.seq.len() as u64;
 
     ProcessedSe {
         delta,
-        write: Some((rec.id, seq_out, qual_out)),
+        write: Some((rec.id, rec.seq, rec.qual)),
     }
 }
 
@@ -325,7 +324,6 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
         ..Default::default()
     };
 
-    // 1. Fixed-length trim for each mate independently.
     let Some((s1, e1)) = apply_fixed(r1.seq.len(), cfg.fixed1) else {
         delta.reads_too_short_after_trim = 2;
         return ProcessedPe { delta, write: None };
@@ -336,10 +334,24 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
     };
     delta.fixed_trimmed_bases = (s1 + (r1.seq.len() - e1) + s2 + (r2.seq.len() - e2)) as u64;
 
-    let mut seq1: Vec<u8> = r1.seq[s1..e1].to_vec();
-    let mut qual1: Vec<u8> = r1.qual[s1..e1].to_vec();
-    let mut seq2: Vec<u8> = r2.seq[s2..e2].to_vec();
-    let mut qual2: Vec<u8> = r2.qual[s2..e2].to_vec();
+    let mut r1 = r1;
+    let mut r2 = r2;
+    r1.seq.truncate(e1);
+    r1.qual.truncate(e1);
+    if s1 > 0 {
+        r1.seq.drain(..s1);
+        r1.qual.drain(..s1);
+    }
+    r2.seq.truncate(e2);
+    r2.qual.truncate(e2);
+    if s2 > 0 {
+        r2.seq.drain(..s2);
+        r2.qual.drain(..s2);
+    }
+    let mut seq1 = r1.seq;
+    let mut qual1 = r1.qual;
+    let mut seq2 = r2.seq;
+    let mut qual2 = r2.qual;
 
     // 2. PolyG trim per mate (fastp does this BEFORE overlap analysis).
     if let Some(pg) = cfg.poly_g {
