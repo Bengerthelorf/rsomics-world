@@ -6,6 +6,9 @@
 //! `env!("CARGO_MANIFEST_DIR")` resolves at the *call site* — we need each
 //! consuming crate to read its OWN manifest dir, not rsomics-common's.
 
+#[cfg(feature = "tier2")]
+pub mod tier2;
+
 use std::process::{Command, Output, Stdio};
 
 /// Build a `PathBuf` pointing to `tests/golden/<rel>` under the **caller's**

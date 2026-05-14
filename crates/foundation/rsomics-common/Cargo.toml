@@ -15,12 +15,20 @@ authors.workspace = true
 # transitive deps and binary-size impact.
 default = ["rayon"]
 rayon = ["dep:rayon"]
+# test-support: fixture-path macro, tool_on_path predicate, run_tool wrapper.
+# tier2 implies test-support and pulls in toml + sha2 + ureq for the on-demand
+# fixture download/verify path (used only by integration tests + benches).
 test-support = []
+tier2 = ["test-support", "dep:toml", "dep:sha2", "dep:ureq", "dep:serde"]
 
 [dependencies]
 thiserror.workspace = true
 clap = { workspace = true, features = ["derive"] }
 rayon = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+toml = { version = "0.9", optional = true }
+sha2 = { version = "0.10", optional = true }
+ureq = { version = "3", default-features = false, features = ["rustls"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
