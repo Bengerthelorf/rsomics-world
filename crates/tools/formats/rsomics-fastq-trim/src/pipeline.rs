@@ -56,6 +56,7 @@ pub struct PipelineConfig {
     pub poly_x: Option<PolyXConfig>,
     pub overlap: Option<OverlapConfig>,
     pub min_length_required: usize,
+    pub compression: i32,
 }
 
 impl Default for PipelineConfig {
@@ -69,6 +70,7 @@ impl Default for PipelineConfig {
             poly_x: None,
             overlap: None,
             min_length_required: 15,
+            compression: 4,
         }
     }
 }
@@ -130,7 +132,7 @@ impl<'cfg> Pipeline<'cfg> {
     pub fn run_se(&self, input: &Path, output: &Path) -> Result<TrimReport> {
         let mut reader = parse_fastx_file(input)
             .map_err(|e| parse_err(&format!("opening input {}", input.display()), e))?;
-        let mut writer = ChunkedWriter::create(output)?;
+        let mut writer = ChunkedWriter::create(output, self.cfg.compression)?;
 
         let mut report = TrimReport::default();
         let mut chunk: Vec<OwnedRecord> = Vec::with_capacity(CHUNK_RECORDS);
@@ -180,8 +182,8 @@ impl<'cfg> Pipeline<'cfg> {
             .map_err(|e| parse_err(&format!("opening input {}", in1.display()), e))?;
         let mut r2 = parse_fastx_file(in2)
             .map_err(|e| parse_err(&format!("opening input {}", in2.display()), e))?;
-        let mut w1 = ChunkedWriter::create(out1)?;
-        let mut w2 = ChunkedWriter::create(out2)?;
+        let mut w1 = ChunkedWriter::create(out1, self.cfg.compression)?;
+        let mut w2 = ChunkedWriter::create(out2, self.cfg.compression)?;
 
         let mut report = TrimReport::default();
         let mut chunk: Vec<OwnedPair> = Vec::with_capacity(CHUNK_RECORDS);

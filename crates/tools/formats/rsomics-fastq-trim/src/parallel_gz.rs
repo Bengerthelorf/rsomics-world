@@ -31,9 +31,10 @@ use rsomics_common::{Context, Result, RsomicsError};
 /// enough work per rayon dispatch to amortise the per-call cost.
 pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 
-/// libdeflate compression level. fastp defaults to level 4 (out of 12)
-/// for a good ratio/speed trade-off. We match.
-pub const GZ_LEVEL: i32 = 4;
+/// Default libdeflate compression level (fastp matches at 4). 1 =
+/// fastest / largest output, 12 = slowest / smallest. Override per
+/// `ChunkedWriter::create`.
+pub const GZ_DEFAULT_LEVEL: i32 = 4;
 
 /// Maximum number of pending plain-byte chunks the writer holds before
 /// it forces a parallel-compress + write of the queued batch. Keeps the
@@ -43,9 +44,9 @@ pub const GZ_LEVEL: i32 = 4;
 pub const MAX_PENDING_CHUNKS: usize = 16;
 
 /// Compress one buffer to a self-contained gzip member.
-fn compress_member(plain: &[u8]) -> Result<Vec<u8>> {
-    let level = CompressionLvl::new(GZ_LEVEL).map_err(|e| {
-        RsomicsError::ConfigError(format!("invalid libdeflate level {GZ_LEVEL}: {e:?}"))
+fn compress_member(plain: &[u8], level: i32) -> Result<Vec<u8>> {
+    let level = CompressionLvl::new(level).map_err(|e| {
+        RsomicsError::ConfigError(format!("invalid libdeflate level {level}: {e:?}"))
     })?;
     let mut compressor = Compressor::new(level);
     let bound = compressor.gzip_compress_bound(plain.len());
@@ -64,10 +65,10 @@ fn compress_member(plain: &[u8]) -> Result<Vec<u8>> {
 ///
 /// `UpstreamError` if libdeflate compression fails; `Io` if the write to
 /// `out` fails.
-pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>) -> Result<()> {
+pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>, level: i32) -> Result<()> {
     let compressed: Vec<Result<Vec<u8>>> = chunks
         .into_par_iter()
-        .map(|c| compress_member(&c))
+        .map(|c| compress_member(&c, level))
         .collect();
     for c in compressed {
         let bytes = c?;
@@ -85,16 +86,18 @@ pub struct ChunkedWriter {
     buffer: Vec<u8>,
     gzipped: bool,
     pending_chunks: Vec<Vec<u8>>,
+    level: i32,
 }
 
 impl ChunkedWriter {
-    /// Open `path` for writing. `.gz` extension selects parallel-gz; any
-    /// other extension writes plain bytes through a `BufWriter`.
+    /// Open `path` for writing. `.gz` extension selects parallel-gz at
+    /// `level`; any other extension writes plain bytes and ignores
+    /// `level`.
     ///
     /// # Errors
     ///
     /// `Io` if the file cannot be created.
-    pub fn create(path: &Path) -> Result<Self> {
+    pub fn create(path: &Path, level: i32) -> Result<Self> {
         let f =
             File::create(path).rs_with_context(|| format!("creating output {}", path.display()))?;
         let gzipped = path
@@ -105,6 +108,7 @@ impl ChunkedWriter {
             buffer: Vec::with_capacity(GZ_CHUNK_BYTES + 16 * 1024),
             gzipped,
             pending_chunks: Vec::new(),
+            level,
         })
     }
 
@@ -149,7 +153,7 @@ impl ChunkedWriter {
             return Ok(());
         }
         let chunks = std::mem::take(&mut self.pending_chunks);
-        write_chunks_gz(&mut self.inner, chunks)
+        write_chunks_gz(&mut self.inner, chunks, self.level)
     }
 
     /// Compress all pending chunks and flush to disk. Idempotent on
@@ -194,7 +198,7 @@ mod tests {
     #[test]
     fn plain_round_trips() {
         let tmp = tempfile::Builder::new().suffix(".fq").tempfile().unwrap();
-        let mut w = ChunkedWriter::create(tmp.path()).unwrap();
+        let mut w = ChunkedWriter::create(tmp.path(), GZ_DEFAULT_LEVEL).unwrap();
         w.write_record(b"r1", b"ACGT", b"IIII").unwrap();
         w.finalize().unwrap();
         assert_eq!(read_all(tmp.path()), b"@r1\nACGT\n+\nIIII\n");
@@ -206,7 +210,7 @@ mod tests {
             .suffix(".fq.gz")
             .tempfile()
             .unwrap();
-        let mut w = ChunkedWriter::create(tmp.path()).unwrap();
+        let mut w = ChunkedWriter::create(tmp.path(), GZ_DEFAULT_LEVEL).unwrap();
         for _ in 0..1000 {
             w.write_record(b"r", b"ACGTACGTACGTACGTACGT", b"IIIIIIIIIIIIIIIIIIII")
                 .unwrap();

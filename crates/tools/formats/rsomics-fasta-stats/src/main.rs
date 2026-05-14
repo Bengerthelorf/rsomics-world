@@ -18,8 +18,8 @@ const META: ToolMeta = ToolMeta {
 #[derive(Parser, Debug)]
 #[command(name = "rsomics-fasta-stats", version, about, long_about = None)]
 struct Cli {
-    /// FASTA file(s). Use `-` for stdin. Gzip, bzip2, xz, zstd inputs are
-    /// auto-detected by extension or magic bytes.
+    /// FASTA file(s). Gzip / bzip2 / xz / zstd inputs are auto-detected
+    /// by extension or magic bytes. Stdin (`-`) is not yet supported.
     #[arg(required = true, num_args = 1..)]
     inputs: Vec<PathBuf>,
 

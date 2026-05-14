@@ -25,116 +25,249 @@ const META: ToolMeta = ToolMeta {
 #[command(name = "rsomics-fastq-trim", version, about, long_about = None)]
 #[allow(clippy::struct_excessive_bools)]
 struct Cli {
-    #[arg(short = 'i', long = "in1")]
+    /// R1 input. `.fq` / `.fq.gz` / `.fq.bz2` / `.fq.xz` / `.fq.zst` autodetected.
+    #[arg(short = 'i', long = "in1", alias = "in-1")]
     in1: PathBuf,
 
-    #[arg(short = 'o', long = "out1")]
+    /// R1 output. `.gz` suffix triggers parallel libdeflate compression.
+    #[arg(short = 'o', long = "out1", alias = "out-1")]
     out1: PathBuf,
 
-    #[arg(short = 'I', long = "in2")]
+    /// R2 input (PE mode).
+    #[arg(short = 'I', long = "in2", alias = "in-2")]
     in2: Option<PathBuf>,
 
-    #[arg(short = 'O', long = "out2")]
+    /// R2 output (PE mode).
+    #[arg(short = 'O', long = "out2", alias = "out-2")]
     out2: Option<PathBuf>,
 
-    /// R1 adapter. Defaults to Illumina `TruSeq` R1 prefix when adapter
-    /// trim is enabled and no sequence is supplied; pass an empty string
-    /// to disable adapter trim entirely.
-    #[arg(short = 'a', long = "adapter_sequence")]
+    /// R1 adapter sequence. Default = Illumina `TruSeq` R1 prefix
+    /// (`AGATCGGAAGAGCACACGTCTGAACTCCAGTCA`); matches fastp's default
+    /// and covers the majority of Illumina library kits. Pass an empty
+    /// string to disable adapter trim.
+    #[arg(short = 'a', long = "adapter_sequence", alias = "adapter-sequence")]
     adapter_sequence: Option<String>,
 
-    /// R2 adapter. Used only in PE mode; falls back to `TruSeq` R2 prefix
-    /// if unspecified.
-    #[arg(long = "adapter_sequence_r2")]
+    /// R2 adapter sequence. Default = Illumina `TruSeq` R2 prefix
+    /// (`AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT`). PE only.
+    #[arg(long = "adapter_sequence_r2", alias = "adapter-sequence-r2")]
     adapter_sequence_r2: Option<String>,
+
+    /// Minimum bases of compared adapter prefix required for a match.
+    /// Default 5 (fastp default). Raise to be stricter, lower to be
+    /// more aggressive on short reads.
+    #[arg(
+        long = "adapter_min_len",
+        alias = "adapter-min-len",
+        default_value_t = 5
+    )]
+    adapter_min_len: usize,
+
+    /// Maximum mismatch rate across the compared adapter region.
+    /// Default 0.20 (fastp default, allows 1 mismatch per 5 bases).
+    #[arg(
+        long = "adapter_max_mismatch_rate",
+        alias = "adapter-max-mismatch-rate",
+        default_value_t = 0.20
+    )]
+    adapter_max_mismatch_rate: f32,
 
     /// Disable static-sequence adapter trim. Useful when relying purely
     /// on PE overlap detection or running upstream-clean data.
-    #[arg(short = 'A', long = "disable_adapter_trimming")]
+    #[arg(
+        short = 'A',
+        long = "disable_adapter_trimming",
+        alias = "disable-adapter-trimming"
+    )]
     disable_adapter_trimming: bool,
 
-    /// Force poly-G trim (default-off; fastp auto-enables on
-    /// `NextSeq` / `NovaSeq` instruments — we don't auto-detect yet).
-    #[arg(short = 'g', long = "trim_poly_g")]
+    /// Force poly-G trim. fastp auto-enables on `NextSeq` / `NovaSeq`
+    /// 2-color-chemistry instruments where dark cycles read as G; we
+    /// don't auto-detect from FASTQ headers — pass explicitly.
+    #[arg(short = 'g', long = "trim_poly_g", alias = "trim-poly-g")]
     trim_poly_g: bool,
 
-    /// Minimum run length for poly-G detection (default 10, matches fastp).
-    #[arg(long = "poly_g_min_len", default_value_t = 10)]
+    /// Base trimmed by `--trim_poly_g`. Default `G`. Override only if
+    /// you need a poly-A / poly-T / poly-C single-base scan with the
+    /// same parameters; for auto-detect use `--trim_poly_x` instead.
+    #[arg(
+        long = "poly_g_base",
+        alias = "poly-g-base",
+        default_value = "G",
+        value_parser = parse_base
+    )]
+    poly_g_base: u8,
+
+    /// Minimum poly-G run length. Default 10 (fastp default — empirical
+    /// false-positive rate is acceptable below 1% on real `NovaSeq`
+    /// libraries; raise for short-amplicon protocols).
+    #[arg(
+        long = "poly_g_min_len",
+        alias = "poly-g-min-len",
+        default_value_t = 10
+    )]
     poly_g_min_len: usize,
 
-    /// Force poly-X trim. Detects the dominant tail base via the
-    /// generalised poly-X scan.
-    #[arg(short = 'x', long = "trim_poly_x")]
+    /// Trim the 3' poly-X tail by dominant-base detection. Counts
+    /// A/C/G/T simultaneously across the tail and trims at the last
+    /// occurrence of the most-represented base.
+    #[arg(short = 'x', long = "trim_poly_x", alias = "trim-poly-x")]
     trim_poly_x: bool,
 
-    /// Poly-X minimum run length (default 10).
-    #[arg(long = "poly_x_min_len", default_value_t = 10)]
+    /// Poly-X minimum run length. Default 10 (fastp default).
+    #[arg(
+        long = "poly_x_min_len",
+        alias = "poly-x-min-len",
+        default_value_t = 10
+    )]
     poly_x_min_len: usize,
 
-    /// Bases trimmed from R1 5'. Per-mate.
-    /// Short alias matches fastp's `-f`.
-    #[arg(short = 'f', long = "trim_front1", default_value_t = 0)]
+    /// Hard cap on mismatches inside a poly-X run regardless of length.
+    /// Default 5 (fastp default).
+    #[arg(
+        long = "polyx_max_mismatches",
+        alias = "polyx-max-mismatches",
+        default_value_t = 5
+    )]
+    polyx_max_mismatches: usize,
+
+    /// Rate cap: one allowed mismatch per N scanned bases. Default 8
+    /// (fastp default — `floor(scanned / 8)` interspersed non-target
+    /// bases tolerated). Must be non-zero.
+    #[arg(
+        long = "polyx_mismatch_per_bases",
+        alias = "polyx-mismatch-per-bases",
+        default_value_t = 8
+    )]
+    polyx_mismatch_per_bases: usize,
+
+    /// Bases trimmed from R1 5'. Short alias matches fastp's `-f`.
+    #[arg(
+        short = 'f',
+        long = "trim_front1",
+        alias = "trim-front1",
+        default_value_t = 0
+    )]
     trim_front1: usize,
 
-    /// Bases trimmed from R1 3'. Per-mate. No short alias because fastp's
-    /// `-t` clashes with this crate family's reserved `-t/--threads`.
-    #[arg(long = "trim_tail1", default_value_t = 0)]
+    /// Bases trimmed from R1 3'. No short alias because fastp's `-t`
+    /// collides with this crate family's reserved `-t/--threads`.
+    #[arg(long = "trim_tail1", alias = "trim-tail1", default_value_t = 0)]
     trim_tail1: usize,
 
     /// Bases trimmed from R2 5'. PE only.
-    /// Short alias matches fastp's `-F`.
-    #[arg(short = 'F', long = "trim_front2", default_value_t = 0)]
+    #[arg(
+        short = 'F',
+        long = "trim_front2",
+        alias = "trim-front2",
+        default_value_t = 0
+    )]
     trim_front2: usize,
 
     /// Bases trimmed from R2 3'. PE only.
-    /// No short alias (T is too easily confused with t).
-    #[arg(long = "trim_tail2", default_value_t = 0)]
+    #[arg(long = "trim_tail2", alias = "trim-tail2", default_value_t = 0)]
     trim_tail2: usize,
 
-    /// Enable PE overlap-based adapter detection. Defaults off — caller
-    /// opts in. When on, fires before the static-sequence fallback.
-    #[arg(short = '2', long = "detect_adapter_for_pe")]
+    /// Enable PE overlap-based adapter detection. Off by default — when
+    /// on, the geometry of R1 vs reverse-complemented R2 is used to
+    /// find the adapter cut-point. fastp recommends turning this on for
+    /// "ultra-clean" data; static-seq fallback still fires when overlap
+    /// is not detected.
+    #[arg(
+        short = '2',
+        long = "detect_adapter_for_pe",
+        alias = "detect-adapter-for-pe"
+    )]
     detect_adapter_for_pe: bool,
 
-    /// Minimum overlap length for the PE detector (default 30).
-    #[arg(long = "overlap_len_require", default_value_t = 30)]
+    /// Minimum overlap length for the PE detector. Default 30 (fastp
+    /// default — below this the overlap is statistically likely to be
+    /// random chance, not a real adapter).
+    #[arg(
+        long = "overlap_len_require",
+        alias = "overlap-len-require",
+        default_value_t = 30
+    )]
     overlap_len_require: usize,
 
-    /// Hard cap on mismatches in the overlap (default 5).
-    #[arg(long = "overlap_diff_limit", default_value_t = 5)]
+    /// Hard cap on mismatches inside the PE overlap. Default 5
+    /// (fastp default).
+    #[arg(
+        long = "overlap_diff_limit",
+        alias = "overlap-diff-limit",
+        default_value_t = 5
+    )]
     overlap_diff_limit: usize,
 
-    /// Per-position mismatch cap as a fraction of overlap length
-    /// (default 0.20, i.e. 20%).
-    #[arg(long = "overlap_diff_percent_limit", default_value_t = 0.20)]
+    /// Per-position mismatch cap as a fraction of overlap length.
+    /// Default 0.20 (fastp default = 20%). Clamped to `[0.0, 1.0]`.
+    #[arg(
+        long = "overlap_diff_percent_limit",
+        alias = "overlap-diff-percent-limit",
+        default_value_t = 0.20
+    )]
     overlap_diff_percent_limit: f32,
 
     /// Reads shorter than this after all trim layers are discarded.
-    /// Matches fastp's `--length_required` (default 15).
-    #[arg(short = 'l', long = "length_required", default_value_t = 15)]
+    /// Default 15 (fastp default — tuned for 150 bp WGS; amplicon /
+    /// miRNA protocols need a lower value).
+    #[arg(
+        short = 'l',
+        long = "length_required",
+        alias = "length-required",
+        default_value_t = 15
+    )]
     length_required: usize,
 
     /// Disable the length filter. Equivalent to `-l 1`: every non-empty
     /// trimmed read is emitted. Mirrors fastp's `-L`.
-    #[arg(short = 'L', long = "disable_length_filtering")]
+    #[arg(
+        short = 'L',
+        long = "disable_length_filtering",
+        alias = "disable-length-filtering"
+    )]
     disable_length_filtering: bool,
+
+    /// libdeflate gzip compression level for `.gz` output. Default 4
+    /// (fastp default — best ratio/speed trade-off). 1 = fastest /
+    /// largest, 12 = slowest / smallest.
+    #[arg(long = "compression", alias = "compression-level", default_value_t = 4)]
+    compression: i32,
 
     #[command(flatten)]
     common: CommonFlags,
 }
 
-fn build_config(cli: &Cli) -> PipelineConfig {
+fn parse_base(s: &str) -> std::result::Result<u8, String> {
+    let bytes = s.as_bytes();
+    if bytes.len() != 1 {
+        return Err(format!("expected a single character, got {s:?}"));
+    }
+    let b = bytes[0].to_ascii_uppercase();
+    if matches!(b, b'A' | b'C' | b'G' | b'T' | b'N') {
+        Ok(b)
+    } else {
+        Err(format!("expected one of A C G T N, got {s:?}"))
+    }
+}
+
+fn build_config(cli: &Cli) -> Result<PipelineConfig> {
+    let adapter_with = |s: &str| AdapterConfig {
+        sequence: s.as_bytes().to_vec(),
+        min_match_len: cli.adapter_min_len,
+        max_mismatch_rate: cli.adapter_max_mismatch_rate,
+    };
     let adapter1 = if cli.disable_adapter_trimming {
         None
     } else {
         match cli.adapter_sequence.as_deref() {
             Some("") => None,
-            Some(s) => Some(AdapterConfig {
-                sequence: s.as_bytes().to_vec(),
-                min_match_len: 5,
-                max_mismatch_rate: 0.2,
+            Some(s) => Some(adapter_with(s)),
+            None => Some(AdapterConfig {
+                min_match_len: cli.adapter_min_len,
+                max_mismatch_rate: cli.adapter_max_mismatch_rate,
+                ..AdapterConfig::illumina_truseq_r1()
             }),
-            None => Some(AdapterConfig::illumina_truseq_r1()),
         }
     };
     let adapter2 = if cli.disable_adapter_trimming {
@@ -142,20 +275,25 @@ fn build_config(cli: &Cli) -> PipelineConfig {
     } else {
         match cli.adapter_sequence_r2.as_deref() {
             Some("") => None,
-            Some(s) => Some(AdapterConfig {
-                sequence: s.as_bytes().to_vec(),
-                min_match_len: 5,
-                max_mismatch_rate: 0.2,
+            Some(s) => Some(adapter_with(s)),
+            None => Some(AdapterConfig {
+                min_match_len: cli.adapter_min_len,
+                max_mismatch_rate: cli.adapter_max_mismatch_rate,
+                ..AdapterConfig::illumina_truseq_r2()
             }),
-            None => Some(AdapterConfig::illumina_truseq_r2()),
         }
     };
 
+    let mismatch_per_bases =
+        std::num::NonZeroUsize::new(cli.polyx_mismatch_per_bases).ok_or_else(|| {
+            RsomicsError::ConfigError("--polyx_mismatch_per_bases must be > 0".into())
+        })?;
     let poly_g = if cli.trim_poly_g {
         Some(PolyXConfig {
-            base: b'G',
+            base: cli.poly_g_base,
             min_len: cli.poly_g_min_len,
-            ..PolyXConfig::default()
+            max_mismatches: cli.polyx_max_mismatches,
+            mismatch_per_bases,
         })
     } else {
         None
@@ -163,6 +301,8 @@ fn build_config(cli: &Cli) -> PipelineConfig {
     let poly_x = if cli.trim_poly_x {
         Some(PolyXConfig {
             min_len: cli.poly_x_min_len,
+            max_mismatches: cli.polyx_max_mismatches,
+            mismatch_per_bases,
             ..PolyXConfig::default()
         })
     } else {
@@ -185,7 +325,7 @@ fn build_config(cli: &Cli) -> PipelineConfig {
         cli.length_required
     };
 
-    PipelineConfig {
+    Ok(PipelineConfig {
         fixed1: FixedTrimConfig {
             trim_front: cli.trim_front1,
             trim_tail: cli.trim_tail1,
@@ -200,20 +340,32 @@ fn build_config(cli: &Cli) -> PipelineConfig {
         poly_x,
         overlap,
         min_length_required,
-    }
+        compression: cli.compression,
+    })
 }
 
 fn pipeline(args: &Cli) -> Result<TrimReport> {
-    let cfg = build_config(args);
+    let cfg = build_config(args)?;
     let p = Pipeline::new(&cfg);
 
-    match (args.in2.as_ref(), args.out2.as_ref()) {
-        (Some(in2), Some(out2)) => p.run_pe(&args.in1, in2, &args.out1, out2),
-        (None, None) => p.run_se(&args.in1, &args.out1),
-        _ => Err(RsomicsError::ConfigError(
-            "--in2 and --out2 must be supplied together for PE input".into(),
-        )),
+    let report = match (args.in2.as_ref(), args.out2.as_ref()) {
+        (Some(in2), Some(out2)) => p.run_pe(&args.in1, in2, &args.out1, out2)?,
+        (None, None) => p.run_se(&args.in1, &args.out1)?,
+        _ => {
+            return Err(RsomicsError::ConfigError(
+                "--in2 and --out2 must be supplied together for PE input".into(),
+            ));
+        }
+    };
+
+    if !args.common.json && report.reads_too_short_after_trim > 0 {
+        eprintln!(
+            "warning: {} reads dropped (too short after trim; -l adjusts the threshold, -L disables)",
+            report.reads_too_short_after_trim
+        );
     }
+
+    Ok(report)
 }
 
 fn main() -> ExitCode {
