@@ -196,6 +196,25 @@ Tier 1 lives in git. Tier 2 is downloaded on demand per
 + size + license per fixture). Tier 3 and 4 are provisioned manually; tests
 that need them read `BCMR_BENCH_DATA` and skip if unset.
 
+### Committed vs. generated Tier-1 fixtures
+
+Both patterns are acceptable; choose per fixture format:
+
+- **Committed** — small text fixtures (FASTQ, BED, VCF/text-mode SAM) whose
+  byte content is reviewable in a PR diff. Living in `tests/golden/<name>.fastq`
+  alongside other text. rsomics-fastp's fixtures are the reference. Prefer this
+  for any file < ~5 KB where a human review of the bytes adds value.
+- **Generated** — binary formats (BAM, BCF, indexed BWA, compressed BGZF
+  archives) where (a) the bytes aren't readable in a PR diff, (b) tests
+  benefit from parameter variation (record count, sort order, MD tags
+  present-or-not). Build the fixture at test setup via the crate's own
+  writer or a domain helper in `tests/synth.rs`. rsomics-bam's pattern is
+  the reference.
+
+The choice is not a license to skip Tier 1 — every Layer B crate needs at
+least one Tier-1 fixture, committed or generated. The compat test reads it,
+diffs against upstream, fails loud.
+
 ## Crate naming
 
 - Foundation crates: `rsomics-<primitive>` (e.g. `rsomics-common`,
