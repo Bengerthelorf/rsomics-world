@@ -9,13 +9,18 @@ repository.workspace = true
 authors.workspace = true
 
 [features]
-default = []
+# rayon is default-on so existing consumers (rsomics-fastp, rsomics-bam) keep
+# working unchanged. Single-threaded FFI-wrapper tools that don't touch the
+# global pool can opt out with `default-features = false` to skip rayon's
+# transitive deps and binary-size impact.
+default = ["rayon"]
+rayon = ["dep:rayon"]
 test-support = []
 
 [dependencies]
 thiserror.workspace = true
 clap = { workspace = true, features = ["derive"] }
-rayon.workspace = true
+rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3"

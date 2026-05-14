@@ -2,9 +2,12 @@ use std::sync::OnceLock;
 use std::thread;
 
 use clap::Args;
+#[cfg(feature = "rayon")]
 use rayon::ThreadPoolBuilder;
 
-use crate::error::{Result, RsomicsError};
+#[cfg(feature = "rayon")]
+use crate::error::RsomicsError;
+use crate::error::Result;
 
 /// Flag block every `rsomics-*` tool flattens into its own `clap::Parser`
 /// struct via `#[command(flatten)]`. Holding these in one place keeps short
@@ -51,11 +54,15 @@ impl CommonFlags {
     /// has a different thread count and our `--threads` request would
     /// silently be ignored.
     ///
+    /// When the `rayon` feature is disabled this is a no-op returning `Ok(())` —
+    /// the API stays stable so [`crate::run`] doesn't need conditional code.
+    ///
     /// # Errors
     ///
     /// Returns `ConfigError` when `build_global` failed AND the resulting
     /// active pool size doesn't match the requested thread count — i.e. the
     /// user asked for N threads but the process is locked into M ≠ N.
+    #[cfg(feature = "rayon")]
     pub fn install_rayon_pool(&self) -> Result<()> {
         let want = self.thread_count();
         if ThreadPoolBuilder::new()
@@ -71,6 +78,15 @@ impl CommonFlags {
                 )));
             }
         }
+        Ok(())
+    }
+
+    /// No-op variant when rayon support is disabled. Same signature as the
+    /// `#[cfg(feature = "rayon")]` arm so [`crate::run`] can call it
+    /// unconditionally.
+    #[cfg(not(feature = "rayon"))]
+    #[allow(clippy::unused_self)]
+    pub fn install_rayon_pool(&self) -> Result<()> {
         Ok(())
     }
 
