@@ -68,8 +68,14 @@ mod tests {
     }
 
     #[test]
-    fn tool_on_path_finds_sh() {
-        assert!(tool_on_path("sh"), "POSIX shell must be on PATH for CI");
+    fn tool_on_path_finds_cargo() {
+        // `cargo` is universally present during `cargo test` and supports
+        // `--version`. POSIX `sh` does not — on Debian/Ubuntu `sh` is
+        // `dash`, which exits non-zero on `--version`. The predicate is
+        // intentionally aimed at tools that follow the `--version`
+        // convention (samtools, fastp, bcftools, …); using a shell that
+        // doesn't would falsely report it absent.
+        assert!(tool_on_path("cargo"), "cargo must be on PATH for cargo test");
     }
 
     #[test]
