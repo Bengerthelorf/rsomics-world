@@ -1,10 +1,14 @@
 [workspace]
 resolver = "3"
+# Each domain subdir gets added to `members` as its first crate lands.
+# Empty subdirs cause cargo metadata to error on unmatched globs, so don't
+# pre-list domains with no crates yet.
 members = [
     "crates/foundation/*",
-    "crates/tools/*",
 ]
-exclude = []
+exclude = [
+    "archive/*",
+]
 
 [workspace.package]
 edition = "2024"
