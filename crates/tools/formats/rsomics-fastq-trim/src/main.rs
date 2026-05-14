@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use rsomics_common::{CommonFlags, Result, RsomicsError, ToolMeta, run};
+use rsomics_help::{HelpMode, intercept_help};
 
 use rsomics_fastq_trim::{
     AdapterConfig, FixedTrimConfig, OverlapConfig, Pipeline, PipelineConfig, PolyXConfig,
@@ -14,6 +15,9 @@ const META: ToolMeta = ToolMeta {
     version: env!("CARGO_PKG_VERSION"),
 };
 
+const TAGLINE: &str =
+    "FASTQ adapter / polyG / polyX / fixed-length trimming (per-function partition of fastp).";
+
 /// FASTQ adapter / `polyG` / `polyX` / fixed-length trimming.
 ///
 /// Flag names follow fastp's `snake_case` convention so existing scripts
@@ -22,7 +26,7 @@ const META: ToolMeta = ToolMeta {
 /// extraction, and per-cycle statistics live in sibling crates
 /// (`rsomics-fastq-quality`, `rsomics-fastq-umi`, `rsomics-fastq-stats`).
 #[derive(Parser, Debug)]
-#[command(name = "rsomics-fastq-trim", version, about, long_about = None)]
+#[command(name = "rsomics-fastq-trim", version, about, long_about = None, disable_help_flag = true)]
 #[allow(clippy::struct_excessive_bools)]
 struct Cli {
     /// R1 input. `.fq` / `.fq.gz` / `.fq.bz2` / `.fq.xz` / `.fq.zst` autodetected.
@@ -368,7 +372,556 @@ fn pipeline(args: &Cli) -> Result<TrimReport> {
     Ok(report)
 }
 
+fn print_rich_help() {
+    use rsomics_help::{Banner, example_line, flag_row, section_header, tagline};
+    let color = !rsomics_help::no_color_env();
+    println!();
+    println!("{}", Banner::family(META.name).render(color));
+    println!();
+    println!("  {}", tagline(META.name, META.version, TAGLINE, color));
+    println!();
+    println!("{}", section_header("USAGE", color));
+    println!("  rsomics-fastq-trim [OPTIONS] --in1 <PATH> --out1 <PATH>");
+    println!("  rsomics-fastq-trim [OPTIONS] --in1 <R1> --in2 <R2> --out1 <O1> --out2 <O2>   (PE)");
+    println!();
+    println!("{}", section_header("INPUT / OUTPUT", color));
+    println!(
+        "{}",
+        flag_row(
+            Some('i'),
+            "in1",
+            Some("<path>"),
+            "R1 input (gz/bz2/xz/zst autodetect)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('o'),
+            "out1",
+            Some("<path>"),
+            "R1 output (.gz uses parallel libdeflate)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('I'),
+            "in2",
+            Some("<path>"),
+            "R2 input (PE mode)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('O'),
+            "out2",
+            Some("<path>"),
+            "R2 output (PE mode)",
+            color,
+            26
+        )
+    );
+    println!();
+    println!("{}", section_header("ADAPTER TRIM", color));
+    println!(
+        "{}",
+        flag_row(
+            Some('a'),
+            "adapter_sequence",
+            Some("<seq>"),
+            "R1 adapter (default: Illumina TruSeq R1)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "adapter_sequence_r2",
+            Some("<seq>"),
+            "R2 adapter (PE, default: TruSeq R2)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "adapter_min_len",
+            Some("<n>"),
+            "Min match length (default 5, matches fastp)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "adapter_max_mismatch_rate",
+            Some("<f>"),
+            "Max mismatch fraction (default 0.20)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('A'),
+            "disable_adapter_trimming",
+            None,
+            "Skip static-seq adapter trim",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('2'),
+            "detect_adapter_for_pe",
+            None,
+            "PE overlap-detect (off by default)",
+            color,
+            26
+        )
+    );
+    println!();
+    println!("{}", section_header("POLY-G / POLY-X", color));
+    println!(
+        "{}",
+        flag_row(
+            Some('g'),
+            "trim_poly_g",
+            None,
+            "Force poly-G trim (NextSeq/NovaSeq 2-color)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('x'),
+            "trim_poly_x",
+            None,
+            "Dominant-base poly-X (A/T/C/G auto-detect)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "poly_g_min_len",
+            Some("<n>"),
+            "Poly-G min run length (default 10)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "polyx_max_mismatches",
+            Some("<n>"),
+            "Hard cap on run mismatches (default 5)",
+            color,
+            26
+        )
+    );
+    println!();
+    println!("{}", section_header("FIXED + OUTPUT", color));
+    println!(
+        "{}",
+        flag_row(
+            Some('f'),
+            "trim_front1",
+            Some("<n>"),
+            "Bases trimmed from R1 5' (default 0)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "trim_tail1",
+            Some("<n>"),
+            "Bases trimmed from R1 3' (default 0)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('l'),
+            "length_required",
+            Some("<n>"),
+            "Discard reads shorter (default 15, fastp default)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('L'),
+            "disable_length_filtering",
+            None,
+            "Disable length floor (= -l 1)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "compression",
+            Some("<lvl>"),
+            "gz compression level 1-12 (default 4)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            None,
+            "json",
+            None,
+            "Emit AI-friendly JSON envelope on stdout",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('t'),
+            "threads",
+            Some("<n>"),
+            "Worker threads (default: available cores)",
+            color,
+            26
+        )
+    );
+    println!(
+        "{}",
+        flag_row(
+            Some('h'),
+            "help",
+            None,
+            "Show this help (add --plain or --json for alt modes)",
+            color,
+            26
+        )
+    );
+    println!();
+    println!("{}", section_header("EXAMPLES", color));
+    println!(
+        "{}",
+        example_line(
+            "SE adapter trim, default adapter",
+            "rsomics-fastq-trim -i in.fq.gz -o out.fq.gz",
+            color
+        )
+    );
+    println!(
+        "{}",
+        example_line(
+            "PE with overlap-detect, 8 threads, JSON envelope",
+            "rsomics-fastq-trim -i r1.fq.gz -I r2.fq.gz -o o1.fq.gz -O o2.fq.gz -2 -t 8 --json | jq .result",
+            color
+        )
+    );
+    println!(
+        "{}",
+        example_line(
+            "Poly-G trim only (Illumina 2-color chemistry)",
+            "rsomics-fastq-trim -i in.fq.gz -o out.fq.gz -A -g",
+            color
+        )
+    );
+    println!();
+}
+
+fn print_json_help() {
+    use rsomics_help::{Example, FlagGroup, FlagSpec, HelpJson, Origin};
+    let help = HelpJson {
+        origin: Some(Origin {
+            upstream: "fastp",
+            upstream_license: "MIT",
+            our_license: "MIT OR Apache-2.0",
+            paper_doi: Some("10.1093/bioinformatics/bty560"),
+        }),
+        flag_groups: vec![
+            FlagGroup {
+                title: "Input / Output",
+                flags: vec![
+                    FlagSpec {
+                        short: Some('i'),
+                        long: "in1",
+                        aliases: vec!["in-1"],
+                        value: Some("<path>"),
+                        type_hint: Some("PathBuf"),
+                        required: true,
+                        default: None,
+                        description: "R1 input (gz/bz2/xz/zst autodetected)",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: Some('o'),
+                        long: "out1",
+                        aliases: vec!["out-1"],
+                        value: Some("<path>"),
+                        type_hint: Some("PathBuf"),
+                        required: true,
+                        default: None,
+                        description: "R1 output",
+                        why_default: Some(".gz suffix triggers parallel libdeflate compression"),
+                    },
+                    FlagSpec {
+                        short: Some('I'),
+                        long: "in2",
+                        aliases: vec!["in-2"],
+                        value: Some("<path>"),
+                        type_hint: Some("Option<PathBuf>"),
+                        required: false,
+                        default: None,
+                        description: "R2 input (PE mode)",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: Some('O'),
+                        long: "out2",
+                        aliases: vec!["out-2"],
+                        value: Some("<path>"),
+                        type_hint: Some("Option<PathBuf>"),
+                        required: false,
+                        default: None,
+                        description: "R2 output (PE mode)",
+                        why_default: None,
+                    },
+                ],
+            },
+            FlagGroup {
+                title: "Adapter trim",
+                flags: vec![
+                    FlagSpec {
+                        short: Some('a'),
+                        long: "adapter_sequence",
+                        aliases: vec!["adapter-sequence"],
+                        value: Some("<seq>"),
+                        type_hint: Some("Option<String>"),
+                        required: false,
+                        default: Some("AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"),
+                        description: "R1 adapter sequence",
+                        why_default: Some("Illumina TruSeq R1 prefix; matches fastp's default"),
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "adapter_min_len",
+                        aliases: vec!["adapter-min-len"],
+                        value: Some("<n>"),
+                        type_hint: Some("usize"),
+                        required: false,
+                        default: Some("5"),
+                        description: "Min adapter prefix match length",
+                        why_default: Some("matches fastp's default"),
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "adapter_max_mismatch_rate",
+                        aliases: vec!["adapter-max-mismatch-rate"],
+                        value: Some("<f>"),
+                        type_hint: Some("f32"),
+                        required: false,
+                        default: Some("0.20"),
+                        description: "Max mismatch fraction across compared region",
+                        why_default: Some("fastp default — 1 mismatch per 5 bases"),
+                    },
+                    FlagSpec {
+                        short: Some('2'),
+                        long: "detect_adapter_for_pe",
+                        aliases: vec!["detect-adapter-for-pe"],
+                        value: None,
+                        type_hint: Some("bool"),
+                        required: false,
+                        default: Some("false"),
+                        description: "Enable PE overlap-based adapter detection",
+                        why_default: Some("static-seq fallback still fires when overlap not found"),
+                    },
+                ],
+            },
+            FlagGroup {
+                title: "Poly-G / Poly-X",
+                flags: vec![
+                    FlagSpec {
+                        short: Some('g'),
+                        long: "trim_poly_g",
+                        aliases: vec!["trim-poly-g"],
+                        value: None,
+                        type_hint: Some("bool"),
+                        required: false,
+                        default: Some("false"),
+                        description: "Force poly-G trim",
+                        why_default: Some(
+                            "fastp auto-enables on NextSeq/NovaSeq; we don't auto-detect from headers",
+                        ),
+                    },
+                    FlagSpec {
+                        short: Some('x'),
+                        long: "trim_poly_x",
+                        aliases: vec!["trim-poly-x"],
+                        value: None,
+                        type_hint: Some("bool"),
+                        required: false,
+                        default: Some("false"),
+                        description: "Dominant-base poly-X scan (A/C/G/T auto-detect)",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "polyx_max_mismatches",
+                        aliases: vec!["polyx-max-mismatches"],
+                        value: Some("<n>"),
+                        type_hint: Some("usize"),
+                        required: false,
+                        default: Some("5"),
+                        description: "Hard cap on mismatches in a poly-X run",
+                        why_default: Some("fastp default"),
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "polyx_mismatch_per_bases",
+                        aliases: vec!["polyx-mismatch-per-bases"],
+                        value: Some("<n>"),
+                        type_hint: Some("NonZeroUsize"),
+                        required: false,
+                        default: Some("8"),
+                        description: "Rate cap: one mismatch per N scanned bases",
+                        why_default: Some(
+                            "fastp default — floor(scanned/8) interspersed non-target bases tolerated",
+                        ),
+                    },
+                ],
+            },
+            FlagGroup {
+                title: "Fixed-length + filter",
+                flags: vec![
+                    FlagSpec {
+                        short: Some('f'),
+                        long: "trim_front1",
+                        aliases: vec!["trim-front1"],
+                        value: Some("<n>"),
+                        type_hint: Some("usize"),
+                        required: false,
+                        default: Some("0"),
+                        description: "Bases trimmed from R1 5' end",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "trim_tail1",
+                        aliases: vec!["trim-tail1"],
+                        value: Some("<n>"),
+                        type_hint: Some("usize"),
+                        required: false,
+                        default: Some("0"),
+                        description: "Bases trimmed from R1 3' end",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: Some('l'),
+                        long: "length_required",
+                        aliases: vec!["length-required"],
+                        value: Some("<n>"),
+                        type_hint: Some("usize"),
+                        required: false,
+                        default: Some("15"),
+                        description: "Discard reads shorter after trim",
+                        why_default: Some(
+                            "fastp default — tuned for 150 bp WGS; amplicon/miRNA needs lower",
+                        ),
+                    },
+                    FlagSpec {
+                        short: Some('L'),
+                        long: "disable_length_filtering",
+                        aliases: vec!["disable-length-filtering"],
+                        value: None,
+                        type_hint: Some("bool"),
+                        required: false,
+                        default: Some("false"),
+                        description: "Disable length filter (= -l 1)",
+                        why_default: None,
+                    },
+                    FlagSpec {
+                        short: None,
+                        long: "compression",
+                        aliases: vec!["compression-level"],
+                        value: Some("<lvl>"),
+                        type_hint: Some("i32"),
+                        required: false,
+                        default: Some("4"),
+                        description: "libdeflate gz compression level 1-12",
+                        why_default: Some("fastp default — best ratio/speed trade-off"),
+                    },
+                ],
+            },
+        ],
+        examples: vec![
+            Example {
+                description: "SE adapter trim, default adapter",
+                command: "rsomics-fastq-trim -i in.fq.gz -o out.fq.gz",
+            },
+            Example {
+                description: "PE overlap-detect, JSON envelope",
+                command: "rsomics-fastq-trim -i r1.fq.gz -I r2.fq.gz -o o1.fq.gz -O o2.fq.gz -2 --json",
+            },
+            Example {
+                description: "Poly-G only",
+                command: "rsomics-fastq-trim -i in.fq.gz -o out.fq.gz -A -g",
+            },
+        ],
+        json_result_schema_doc: Some(
+            "https://docs.rs/rsomics-fastq-trim/0.3.0/#json-output-schema",
+        ),
+        ..HelpJson::new(META.name, META.version, TAGLINE)
+    };
+    let _ = serde_json::to_writer_pretty(std::io::stdout().lock(), &help);
+    println!();
+}
+
 fn main() -> ExitCode {
+    let raw_args: Vec<String> = std::env::args().collect();
+    if let Some(mode) = intercept_help(&raw_args) {
+        match mode {
+            HelpMode::Rich => print_rich_help(),
+            HelpMode::Plain => {
+                Cli::command().print_help().ok();
+                println!();
+            }
+            HelpMode::Json => print_json_help(),
+        }
+        return ExitCode::SUCCESS;
+    }
     let args = Cli::parse();
     let common = args.common.clone();
     run(&common, META, || pipeline(&args))

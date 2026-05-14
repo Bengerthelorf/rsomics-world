@@ -17,6 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.1" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

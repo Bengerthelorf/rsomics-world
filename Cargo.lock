@@ -101,6 +101,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
 
 [[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
 name = "bytes"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +275,15 @@ name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
+
+[[package]]
+name = "figlet-rs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aad4cf7e378685c1af30f41b4832c29700325524c648d47752cabd5b97e7b09b"
+dependencies = [
+ "zip",
+]
 
 [[package]]
 name = "find-msvc-tools"
@@ -581,6 +596,7 @@ dependencies = [
  "memchr",
  "needletail",
  "rsomics-common",
+ "rsomics-help",
  "serde",
  "serde_json",
  "tempfile",
@@ -599,9 +615,19 @@ dependencies = [
  "needletail",
  "rayon",
  "rsomics-common",
+ "rsomics-help",
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "rsomics-help"
+version = "0.1.0"
+dependencies = [
+ "figlet-rs",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1021,6 +1047,18 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+
+[[package]]
+name = "zip"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
+dependencies = [
+ "byteorder",
+ "crc32fast",
+ "crossbeam-utils",
+ "flate2",
+]
 
 [[package]]
 name = "zlib-rs"
