@@ -54,9 +54,12 @@ struct Row {
 }
 
 struct ExtRow {
-    q1: u64,
-    q2: u64,
-    q3: u64,
+    // seqkit's `--all` may emit fractional quartiles for small inputs
+    // (e.g. an even split), so parse as f64 even though our own output
+    // rounds to %.0f for the tabular surface.
+    q1: f64,
+    q2: f64,
+    q3: f64,
     sum_gap: u64,
     n50: u64,
     n50_num: u64,
@@ -147,9 +150,9 @@ fn tabular_all_matches_seqkit() {
     ));
     let ours_e = ours.extended.expect("our --all extended");
     let theirs_e = theirs.extended.expect("seqkit --all extended");
-    assert_eq!(ours_e.q1, theirs_e.q1, "Q1");
-    assert_eq!(ours_e.q2, theirs_e.q2, "Q2");
-    assert_eq!(ours_e.q3, theirs_e.q3, "Q3");
+    assert!((ours_e.q1 - theirs_e.q1).abs() < 0.5, "Q1");
+    assert!((ours_e.q2 - theirs_e.q2).abs() < 0.5, "Q2");
+    assert!((ours_e.q3 - theirs_e.q3).abs() < 0.5, "Q3");
     assert_eq!(ours_e.sum_gap, theirs_e.sum_gap, "sum_gap");
     assert_eq!(ours_e.n50, theirs_e.n50, "N50");
     assert_eq!(ours_e.n50_num, theirs_e.n50_num, "N50_num");

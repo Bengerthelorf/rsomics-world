@@ -16,7 +16,7 @@ name = "rsomics-fasta-stats"
 path = "src/main.rs"
 
 [dependencies]
-rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2" }
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -26,7 +26,7 @@ bytecount = { version = "0.6", features = ["runtime-dispatch-simd"] }
 memchr = "2"
 
 [dev-dependencies]
-rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2", features = ["test-support", "rayon"] }
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3", features = ["test-support", "rayon"] }
 tempfile = "3"
 
 [lints]
