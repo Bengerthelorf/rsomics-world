@@ -7,9 +7,7 @@ members = [
     "crates/foundation/*",
     "crates/tools/formats/*",
 ]
-exclude = [
-    "archive/*",
-]
+exclude = []
 
 [workspace.package]
 edition = "2024"
