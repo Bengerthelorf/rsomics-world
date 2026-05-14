@@ -1,0 +1,48 @@
+name: Publish to crates.io
+on:
+  push:
+    tags:
+      - 'rsomics-*-v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Parse tag → crate + version
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG##*-v}"
+          CRATE="${TAG%-v*}"
+          echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Cargo.toml version matches tag
+        run: |
+          MANIFEST=$(find crates -mindepth 3 -maxdepth 3 -path "*/${{ steps.parse.outputs.crate }}/Cargo.toml" | head -n 1)
+          if [ -z "$MANIFEST" ]; then
+            echo "::error::no Cargo.toml found for ${{ steps.parse.outputs.crate }}"
+            exit 1
+          fi
+          CARGO_VER=$(grep '^version' "$MANIFEST" | head -n 1 | sed -E 's/.*"(.+)".*/\1/')
+          if [ "$CARGO_VER" != "${{ steps.parse.outputs.version }}" ]; then
+            echo "::error::tag ${{ steps.parse.outputs.version }} ≠ Cargo.toml $CARGO_VER (manifest: $MANIFEST)"
+            exit 1
+          fi
+
+      - name: cargo test
+        run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features
+
+      - name: cargo publish (dry-run)
+        run: cargo publish -p ${{ steps.parse.outputs.crate }} --dry-run
+
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish -p ${{ steps.parse.outputs.crate }}
