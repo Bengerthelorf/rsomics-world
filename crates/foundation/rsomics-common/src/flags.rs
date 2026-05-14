@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::thread;
 
 use clap::Args;
@@ -72,34 +72,26 @@ impl CommonFlags {
     }
 
     /// Seed value for downstream RNGs. If `--seed` was supplied that value
-    /// wins (including `--seed 0`); otherwise a high-entropy value drawn
-    /// from the OS once per process, memoised so repeated calls within one
-    /// run agree.
-    ///
-    /// INVARIANT: the static `FRESH_SEED` uses `0` as "not yet set"
-    /// sentinel; [`fresh_os_seed`] guarantees a non-zero return so the
-    /// sentinel can't collide with a legitimate generated seed.
+    /// wins (including `--seed 0` — explicit-zero is preserved, not treated
+    /// as "no seed"). Otherwise a high-entropy value is drawn from the OS
+    /// once per process via [`OnceLock`], so repeated calls within a run
+    /// agree on a single fresh seed.
     #[must_use]
     pub fn seed_rng(&self) -> u64 {
-        static FRESH_SEED: AtomicU64 = AtomicU64::new(0);
+        static FRESH_SEED: OnceLock<u64> = OnceLock::new();
         if let Some(s) = self.seed {
             return s;
         }
-        let cached = FRESH_SEED.load(Ordering::Relaxed);
-        if cached != 0 {
-            return cached;
-        }
-        let s = fresh_os_seed();
-        FRESH_SEED
-            .compare_exchange(0, s, Ordering::Relaxed, Ordering::Relaxed)
-            .map_or_else(|existing| existing, |_| s)
+        *FRESH_SEED.get_or_init(fresh_os_seed)
     }
 }
 
 /// Fold the process id, monotonic time, and a small bit of address-space
-/// entropy into a non-zero `u64`. The output isn't cryptographic but is good
-/// enough to seed downstream RNGs without pulling in a fresh `getrandom`
-/// dependency at this layer.
+/// entropy into a `u64`. The output isn't cryptographic but is good enough
+/// to seed downstream RNGs without pulling in a fresh `getrandom`
+/// dependency at this layer. Zero is a valid output — `seed_rng` no longer
+/// uses any sentinel value to detect "unset", so the prior non-zero
+/// invariant is gone.
 #[allow(clippy::cast_possible_truncation)]
 fn fresh_os_seed() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -107,8 +99,7 @@ fn fresh_os_seed() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos() as u64);
     let pid = u64::from(std::process::id());
-    let mix = nanos.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ pid.wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    if mix == 0 { 1 } else { mix }
+    nanos.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ pid.wrapping_mul(0xBF58_476D_1CE4_E5B9)
 }
 
 #[cfg(test)]
@@ -154,7 +145,12 @@ mod tests {
         let a = cli.common.seed_rng();
         let b = cli.common.seed_rng();
         assert_eq!(a, b, "seed should be memoised inside a single process");
-        assert_ne!(a, 0, "fresh seed must be non-zero");
+    }
+
+    #[test]
+    fn explicit_seed_zero_is_preserved() {
+        let cli = Cli::parse_from(["test", "--seed", "0"]);
+        assert_eq!(cli.common.seed_rng(), 0, "--seed 0 must round-trip");
     }
 
     #[test]
