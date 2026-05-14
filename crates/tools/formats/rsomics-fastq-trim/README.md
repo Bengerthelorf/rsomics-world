@@ -69,6 +69,51 @@ License: MIT OR Apache-2.0. Upstream credit: [fastp] (MIT).
 
 [fastp]: https://github.com/OpenGene/fastp
 
+## JSON output schema (`--json`)
+
+```jsonc
+{
+  "schema_version": "1.0",
+  "tool": "rsomics-fastq-trim",
+  "tool_version": "0.1.1",
+  "status": "ok",
+  "result": {
+    "reads_in": 50000,                    // input record count (PE counts both mates)
+    "reads_out": 49852,                   // emitted record count
+    "bases_in": 7500000,
+    "bases_out": 7421300,
+    "adapter_trimmed_reads": 312,         // records where static-seq adapter fired
+    "adapter_trimmed_bases": 9_240,
+    "poly_g_trimmed_reads": 0,
+    "poly_g_trimmed_bases": 0,
+    "poly_x_trimmed_reads": 0,
+    "poly_x_trimmed_bases": 0,
+    "fixed_trimmed_bases": 0,             // bases removed by --trim_front* / --trim_tail*
+    "overlap_trimmed_pairs": 0,           // PE pairs where overlap detect fired
+    "overlap_trimmed_bases": 0,
+    "reads_too_short_after_trim": 148     // post-trim length < --length_required
+  }
+}
+```
+
+Failure envelope routes to stderr (stdout stays parseable):
+
+```jsonc
+{
+  "schema_version": "1.0",
+  "tool": "rsomics-fastq-trim",
+  "tool_version": "0.1.1",
+  "status": "error",
+  "error": { "kind": "InvalidInput", "message": "..." },
+  "exit_code": 1
+}
+```
+
+All counts are `u64`. `*_reads` counters count individual records (in PE
+mode a single record-event on either mate counts once). `_pairs`
+counters count pair-events that fired together. `schema_version` is
+`MAJOR.MINOR` — pin against MAJOR.
+
 ## Performance
 
 The per-function perf hard rule: every release must show strictly

@@ -17,7 +17,8 @@ pub struct FixedTrimConfig {
 /// to discard such records.
 #[must_use]
 pub fn apply_fixed(seq_len: usize, cfg: FixedTrimConfig) -> Option<(usize, usize)> {
-    if cfg.trim_front + cfg.trim_tail >= seq_len {
+    let total = cfg.trim_front.checked_add(cfg.trim_tail)?;
+    if total >= seq_len {
         return None;
     }
     Some((cfg.trim_front, seq_len - cfg.trim_tail))

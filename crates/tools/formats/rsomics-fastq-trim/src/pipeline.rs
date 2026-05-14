@@ -26,7 +26,7 @@ use crate::overlap::{
     trim_lengths as overlap_trim_lengths,
 };
 use crate::parallel_gz::ChunkedWriter;
-use crate::polyx::{PolyXConfig, find_polyx_3p};
+use crate::polyx::{PolyXConfig, find_dominant_polyx_3p, find_polyx_3p};
 
 /// Chunk size for the parallel scatter/gather. Larger amortises rayon
 /// dispatch overhead; smaller reduces memory peak. 8192 records ≈ 12 MB
@@ -292,8 +292,8 @@ fn trim_se_record(rec: OwnedRecord, cfg: &PipelineConfig) -> ProcessedSe {
     // 4. PolyX trim.
     let after_px = cfg
         .poly_x
-        .and_then(|px| find_polyx_3p(&seq[..after_polyg], px))
-        .unwrap_or(after_polyg);
+        .and_then(|px| find_dominant_polyx_3p(&seq[..after_polyg], px))
+        .map_or(after_polyg, |r| r.trim_at);
     if after_px < after_polyg {
         delta.poly_x_trimmed_reads = 1;
         delta.poly_x_trimmed_bases = (after_polyg - after_px) as u64;
@@ -393,19 +393,18 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
         }
     }
 
-    // 5. PolyX trim per mate (after adapter, matches fastp PE order).
     if let Some(px) = cfg.poly_x {
-        if let Some(cut) = find_polyx_3p(&seq1, px) {
+        if let Some(r) = find_dominant_polyx_3p(&seq1, px) {
             delta.poly_x_trimmed_reads += 1;
-            delta.poly_x_trimmed_bases += (seq1.len() - cut) as u64;
-            seq1.truncate(cut);
-            qual1.truncate(cut);
+            delta.poly_x_trimmed_bases += (seq1.len() - r.trim_at) as u64;
+            seq1.truncate(r.trim_at);
+            qual1.truncate(r.trim_at);
         }
-        if let Some(cut) = find_polyx_3p(&seq2, px) {
+        if let Some(r) = find_dominant_polyx_3p(&seq2, px) {
             delta.poly_x_trimmed_reads += 1;
-            delta.poly_x_trimmed_bases += (seq2.len() - cut) as u64;
-            seq2.truncate(cut);
-            qual2.truncate(cut);
+            delta.poly_x_trimmed_bases += (seq2.len() - r.trim_at) as u64;
+            seq2.truncate(r.trim_at);
+            qual2.truncate(r.trim_at);
         }
     }
 

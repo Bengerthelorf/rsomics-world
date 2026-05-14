@@ -162,7 +162,6 @@ fn build_config(cli: &Cli) -> PipelineConfig {
     };
     let poly_x = if cli.trim_poly_x {
         Some(PolyXConfig {
-            base: b'G',
             min_len: cli.poly_x_min_len,
             ..PolyXConfig::default()
         })
@@ -171,11 +170,11 @@ fn build_config(cli: &Cli) -> PipelineConfig {
     };
 
     let overlap = if cli.detect_adapter_for_pe {
-        Some(OverlapConfig {
-            overlap_require: cli.overlap_len_require,
-            diff_limit: cli.overlap_diff_limit,
-            diff_percent_limit: cli.overlap_diff_percent_limit,
-        })
+        Some(OverlapConfig::sanitised(
+            cli.overlap_len_require,
+            cli.overlap_diff_limit,
+            cli.overlap_diff_percent_limit,
+        ))
     } else {
         None
     };

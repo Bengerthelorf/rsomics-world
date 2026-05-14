@@ -223,9 +223,14 @@ fn extend(
 }
 
 fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
+    let mut seen = [false; 256];
     let mut total: u64 = 0;
-    for n in needles {
-        total += bytecount::count(haystack, *n) as u64;
+    for &n in needles {
+        if seen[n as usize] {
+            continue;
+        }
+        seen[n as usize] = true;
+        total += bytecount::count(haystack, n) as u64;
     }
     total
 }

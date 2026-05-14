@@ -1,27 +1,25 @@
-//! Poly-X tail trimming. Generalises fastp's poly-G handling (the default
-//! for `NextSeq` / `NovaSeq` 2-color chemistry) to any single-base run.
+//! Poly-X tail trimming. Two scan modes:
 //!
-//! Verbatim port of `PolyX::trimPolyG` from fastp's `polyx.cpp`, with
-//! the target base parameterised so the same scan handles poly-A / -T /
-//! -C / -G alike. The algorithm:
+//! - [`find_polyx_3p`] — forced-base scan (poly-G is the common case for
+//!   2-color-chemistry instruments where dark cycles read as G).
+//! - [`find_dominant_polyx_3p`] — fastp's generalised poly-X: count A/C/G/T
+//!   simultaneously, pick the dominant base post-scan, return its trim
+//!   position.
 //!
-//! - Walk from the 3' end one base at a time.
-//! - Track the last position where the target base was seen (`first_g_pos`
-//!   in fastp's naming — for us "last target seen").
-//! - Allow mismatches up to two simultaneous caps:
-//!   - a hard cap (fastp default 5)
-//!   - a rate cap of `floor(scanned / divisor)` (fastp uses divisor 8 =
-//!     "one mismatch per 8 bases").
-//! - Stop when either cap is exceeded *and* we've scanned ≥ `min_len`
-//!   bases; trim at the last-seen-target position.
+//! Both are ports of `PolyX::trimPolyG` and `PolyX::trimPolyX` from
+//! `polyx.cpp`. The rate-based mismatch budget (`floor(scanned /
+//! mismatch_per_bases)`) absorbs interspersed non-target bases inside
+//! a long run, so an isolated G at the 5'-most edge of a poly-G stretch
+//! still shifts the trim point left.
 
-/// Poly-X configuration.
+use std::num::NonZeroUsize;
+
 #[derive(Debug, Clone, Copy)]
 pub struct PolyXConfig {
     pub base: u8,
     pub min_len: usize,
     pub max_mismatches: usize,
-    pub mismatch_per_bases: usize,
+    pub mismatch_per_bases: NonZeroUsize,
 }
 
 impl Default for PolyXConfig {
@@ -30,7 +28,7 @@ impl Default for PolyXConfig {
             base: b'G',
             min_len: 10,
             max_mismatches: 5,
-            mismatch_per_bases: 8,
+            mismatch_per_bases: NonZeroUsize::new(8).expect("8 is nonzero"),
         }
     }
 }
@@ -42,7 +40,7 @@ impl PolyXConfig {
     }
 
     #[must_use]
-    pub fn poly_x(base: u8) -> Self {
+    pub fn for_base(base: u8) -> Self {
         Self {
             base,
             ..Self::default()
@@ -50,18 +48,16 @@ impl PolyXConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct PolyXResult {
-    pub trimmed: usize,
+#[derive(Debug, Clone, Copy)]
+pub struct DominantPolyXResult {
+    /// Dominant base of the trimmed tail (uppercase ASCII).
+    pub base: u8,
+    /// 0-based offset where the trim happens — keep `seq[..trim_at]`.
+    pub trim_at: usize,
 }
 
-/// Return the 0-based offset at which the 3' poly-X tail starts, or
-/// `None` if no qualifying tail is found. Trim point is the last
-/// occurrence of `cfg.base` within the scanned tail — non-base
-/// interspersed bases that fall within the allowed mismatch budget
-/// stay inside the trimmed-off region (matches fastp's behaviour
-/// where an isolated G at the 5'-most end of the poly-G run still
-/// shifts the trim point left).
+/// Forced-base scan. Returns the 0-based trim offset, or `None` if no
+/// qualifying tail of length `≥ cfg.min_len` is found.
 #[must_use]
 pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
     let rlen = seq.len();
@@ -70,28 +66,88 @@ pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
     }
     let target = cfg.base.to_ascii_uppercase();
     let mut mismatch: usize = 0;
-    let mut last_target_pos: usize = rlen - 1;
+    let mut last_target_pos: Option<usize> = None;
     let mut i: usize = 0;
-    let mut found_any_target = false;
+    let divisor = cfg.mismatch_per_bases.get();
     while i < rlen {
         let b = seq[rlen - i - 1].to_ascii_uppercase();
         if b == target {
-            last_target_pos = rlen - i - 1;
-            found_any_target = true;
+            last_target_pos = Some(rlen - i - 1);
         } else {
             mismatch += 1;
         }
-        let allowed = (i + 1) / cfg.mismatch_per_bases;
+        let allowed = (i + 1) / divisor;
         if mismatch > cfg.max_mismatches || (mismatch > allowed && i + 1 >= cfg.min_len) {
             break;
         }
         i += 1;
     }
-    if i >= cfg.min_len && found_any_target {
-        Some(last_target_pos)
-    } else {
-        None
+    if i >= cfg.min_len { last_target_pos } else { None }
+}
+
+/// Dominant-base scan. Counts A/C/G/T simultaneously walking from the 3'
+/// end; on stop, picks the most-represented base as the polyX target and
+/// returns the trim offset at its last-occurrence position. `N` increments
+/// all four counters (fastp parity).
+#[must_use]
+pub fn find_dominant_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<DominantPolyXResult> {
+    let rlen = seq.len();
+    if rlen == 0 {
+        return None;
     }
+    // counts[0]=A, [1]=C, [2]=G, [3]=T
+    let mut counts: [usize; 4] = [0; 4];
+    let mut i: usize = 0;
+    let divisor = cfg.mismatch_per_bases.get();
+    while i < rlen {
+        let b = seq[rlen - i - 1].to_ascii_uppercase();
+        match b {
+            b'A' => counts[0] += 1,
+            b'C' => counts[1] += 1,
+            b'G' => counts[2] += 1,
+            b'T' => counts[3] += 1,
+            b'N' => {
+                for c in &mut counts {
+                    *c += 1;
+                }
+            }
+            _ => {}
+        }
+        let cmp = i + 1;
+        let allowed = cfg.max_mismatches.min(cmp / divisor);
+        let mut any_within_budget = false;
+        for &c in &counts {
+            if cmp - c <= allowed {
+                any_within_budget = true;
+                break;
+            }
+        }
+        if !any_within_budget && (i >= divisor || cmp + 1 >= cfg.min_len) {
+            break;
+        }
+        i += 1;
+    }
+    if i + 1 < cfg.min_len {
+        return None;
+    }
+    let mut dom_idx = 0usize;
+    for j in 1..4 {
+        if counts[j] > counts[dom_idx] {
+            dom_idx = j;
+        }
+    }
+    let dom_base = b"ACGT"[dom_idx];
+    let mut pos = i;
+    while pos > 0 && seq[rlen - pos - 1].to_ascii_uppercase() != dom_base {
+        pos -= 1;
+    }
+    if seq[rlen - pos - 1].to_ascii_uppercase() != dom_base {
+        return None;
+    }
+    Some(DominantPolyXResult {
+        base: dom_base,
+        trim_at: rlen - pos - 1,
+    })
 }
 
 #[cfg(test)]
@@ -106,9 +162,6 @@ mod tests {
 
     #[test]
     fn polyg_at_3prime_trims_at_run_start() {
-        // fastp's rate-based algorithm absorbs the isolated G at pos 18
-        // into the run because the mismatch rate (1/14 bases) stays within
-        // the 1-per-8 budget. Trim point is the last G observed.
         let seq = b"ACGTACGTACGTACGTACGTGGGGGGGGGGGG";
         assert_eq!(find_polyx_3p(seq, PolyXConfig::default()), Some(18));
     }
@@ -125,7 +178,7 @@ mod tests {
         let cfg = PolyXConfig {
             min_len: 9,
             max_mismatches: 1,
-            mismatch_per_bases: 8,
+            mismatch_per_bases: NonZeroUsize::new(8).unwrap(),
             ..Default::default()
         };
         assert_eq!(find_polyx_3p(seq, cfg), Some(12));
@@ -134,15 +187,33 @@ mod tests {
     #[test]
     fn lowercase_g_counts() {
         let seq = b"ACGTACGTACGTACGTACGTgggggggggggg";
-        // Same rate-based absorption as the uppercase test — isolated G
-        // at pos 18 is included in the run.
         assert_eq!(find_polyx_3p(seq, PolyXConfig::default()), Some(18));
     }
 
     #[test]
-    fn polya_with_base_param() {
+    fn polya_with_for_base() {
         let seq = b"ACGTACGTACGTACGTACGTAAAAAAAAAAAA";
-        let cfg = PolyXConfig::poly_x(b'A');
+        let cfg = PolyXConfig::for_base(b'A');
         assert_eq!(find_polyx_3p(seq, cfg), Some(20));
+    }
+
+    #[test]
+    fn dominant_polyx_detects_polya() {
+        let seq = b"GCTAGCTAGCTAGCTAGCTAAAAAAAAAAAA";
+        let r = find_dominant_polyx_3p(seq, PolyXConfig::default()).unwrap();
+        assert_eq!(r.base, b'A');
+    }
+
+    #[test]
+    fn dominant_polyx_detects_polyc() {
+        let seq = b"GATGCATGCATGCATGCATGCCCCCCCCCCCC";
+        let r = find_dominant_polyx_3p(seq, PolyXConfig::default()).unwrap();
+        assert_eq!(r.base, b'C');
+    }
+
+    #[test]
+    fn dominant_polyx_no_dominant_tail_returns_none() {
+        let seq = b"ACGTACGTACGTACGTACGTACGTACGTACGT";
+        assert!(find_dominant_polyx_3p(seq, PolyXConfig::default()).is_none());
     }
 }

@@ -61,6 +61,55 @@ License: MIT OR Apache-2.0. Upstream credit: [seqkit] (MIT).
 [needletail]: https://crates.io/crates/needletail
 [seqkit]: https://github.com/shenwei356/seqkit
 
+## JSON output schema (`--json`)
+
+```jsonc
+{
+  "schema_version": "1.0",
+  "tool": "rsomics-fasta-stats",
+  "tool_version": "0.1.0",
+  "status": "ok",
+  "result": [                      // one element per input file
+    {
+      "file": "chr22.fa",          // path as supplied on CLI
+      "format": "FASTA",
+      "type": "DNA",               // DNA | RNA | Protein | Other
+      "num_seqs": 1,               // record count
+      "sum_len": 50818468,         // total bases, gaps stripped
+      "min_len": 50818468,
+      "max_len": 50818468,
+      "avg_len": 50818468.0,       // f64, %.1f when printed
+      "extended": {                // present iff --all
+        "Q1": 50818468.0,          // length quartiles (float)
+        "Q2": 50818468.0,
+        "Q3": 50818468.0,
+        "sum_gap": 0,              // bases matching --gap-letters
+        "N50": 50818468,           // verbatim seqkit semantics
+        "N50_num": 1,              // L50 — unique-length bucket count
+        "GC(%)": 36.22,            // f64, %.2f when printed
+        "sum_n": 11658691          // N (nucleotide) or X (protein) count
+      }
+    }
+  ]
+}
+```
+
+Failure envelope routes to stderr (stdout stays parseable):
+
+```jsonc
+{
+  "schema_version": "1.0",
+  "tool": "rsomics-fasta-stats",
+  "tool_version": "0.1.0",
+  "status": "error",
+  "error": { "kind": "InvalidInput", "message": "..." },
+  "exit_code": 1
+}
+```
+
+`schema_version` is `MAJOR.MINOR`. MINOR adds optional fields, MAJOR
+removes/renames. Pin against MAJOR.
+
 ## Performance
 
 Benchmark results live in `.autopilot/state/bench-rsomics-fasta-stats-*.toml`

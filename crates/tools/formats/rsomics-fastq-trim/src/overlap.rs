@@ -31,11 +31,33 @@
 //! the insert and both reads are clean).
 
 /// Knobs for the overlap scan. Defaults match fastp's defaults.
+/// `diff_percent_limit` must be a fraction in `[0.0, 1.0]`; values
+/// outside this range are clamped at [`Self::sanitised`] construction.
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapConfig {
     pub overlap_require: usize,
     pub diff_limit: usize,
     pub diff_percent_limit: f32,
+}
+
+impl OverlapConfig {
+    /// Construct from raw values and clamp `diff_percent_limit` into
+    /// `[0.0, 1.0]`. Use this at the CLI boundary so out-of-range user
+    /// input fails loudly rather than silently turning into a bogus
+    /// budget downstream.
+    #[must_use]
+    pub fn sanitised(overlap_require: usize, diff_limit: usize, diff_percent_limit: f32) -> Self {
+        let pct = if diff_percent_limit.is_nan() {
+            0.0
+        } else {
+            diff_percent_limit.clamp(0.0, 1.0)
+        };
+        Self {
+            overlap_require,
+            diff_limit,
+            diff_percent_limit: pct,
+        }
+    }
 }
 
 impl Default for OverlapConfig {
