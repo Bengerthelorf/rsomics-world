@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
 use clap::Parser;
+use rsomics_common::{Result, RsomicsError};
 
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
@@ -107,7 +107,11 @@ fn main() -> Result<()> {
         let loc = match args.umi_loc.as_str() {
             "read1" => UmiLoc::Read1,
             "read2" => UmiLoc::Read2,
-            other => anyhow::bail!("--umi_loc must be read1 or read2, got: {other}"),
+            other => {
+                return Err(RsomicsError::ConfigError(format!(
+                    "--umi_loc must be read1 or read2, got: {other}"
+                )));
+            }
         };
         Some(UmiConfig {
             loc,
@@ -142,7 +146,9 @@ fn main() -> Result<()> {
             )?;
         }
         _ => {
-            anyhow::bail!("--in2 and --out2 must both be set, or both unset");
+            return Err(RsomicsError::ConfigError(
+                "--in2 and --out2 must both be set, or both unset".into(),
+            ));
         }
     }
     Ok(())

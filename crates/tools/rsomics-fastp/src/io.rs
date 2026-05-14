@@ -2,10 +2,10 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use anyhow::{Context, Result};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use needletail::parse_fastx_file;
+use rsomics_common::{Context, Result, RsomicsError};
 
 use crate::filter::{FilterConfig, FilterResult, classify};
 use crate::polyg::{PolyGConfig, find_polyg_3p};
@@ -27,7 +27,7 @@ enum FastqWriter {
 impl FastqWriter {
     fn create(path: &Path) -> Result<Self> {
         let file = File::create(path)
-            .with_context(|| format!("creating output FASTQ {}", path.display()))?;
+            .rs_with_context(|| format!("creating output FASTQ {}", path.display()))?;
         let buf = BufWriter::new(file);
         if path
             .extension()
@@ -41,9 +41,9 @@ impl FastqWriter {
 
     fn finalize(self) -> Result<()> {
         match self {
-            Self::Plain(mut w) => w.flush().context("flushing plain output writer")?,
+            Self::Plain(mut w) => w.flush().rs_context("flushing plain output writer")?,
             Self::Gzip(w) => {
-                w.finish().context("finishing gzip output stream")?;
+                w.finish().rs_context("finishing gzip output stream")?;
             }
         }
         Ok(())
@@ -66,6 +66,10 @@ impl Write for FastqWriter {
     }
 }
 
+fn parse_err(prefix: &str, e: impl std::fmt::Display) -> RsomicsError {
+    RsomicsError::InvalidInput(format!("{prefix}: {e}"))
+}
+
 /// Identity-copy a single-end FASTQ file. No transformation; validates the
 /// reader / writer plumbing in isolation before filtering layers ride on top.
 /// Input compression is auto-detected by needletail; output is gzipped iff the
@@ -77,12 +81,12 @@ impl Write for FastqWriter {
 /// the output cannot be created, or a write to the output fails.
 pub fn copy_se(input: &Path, output: &Path) -> Result<()> {
     let mut reader = parse_fastx_file(input)
-        .with_context(|| format!("opening input FASTQ {}", input.display()))?;
+        .map_err(|e| parse_err(&format!("opening input FASTQ {}", input.display()), e))?;
     let mut writer = FastqWriter::create(output)?;
     while let Some(record) = reader.next() {
-        let rec = record.context("malformed FASTQ record")?;
+        let rec = record.map_err(|e| parse_err("malformed FASTQ record", e))?;
         rec.write(&mut writer, None)
-            .context("writing record to output")?;
+            .map_err(|e| parse_err("writing record to output", e))?;
     }
     writer.finalize()
 }
@@ -144,14 +148,15 @@ pub fn process_se(
     polyg: Option<PolyGConfig>,
     umi: Option<UmiConfig>,
 ) -> Result<SeOutcome> {
-    if let Some(u) = umi {
-        anyhow::ensure!(
-            u.loc == UmiLoc::Read1,
-            "single-end UMI extraction only supports umi_loc=read1"
-        );
+    if let Some(u) = umi
+        && u.loc != UmiLoc::Read1
+    {
+        return Err(RsomicsError::ConfigError(
+            "single-end UMI extraction only supports umi_loc=read1".into(),
+        ));
     }
     let mut reader = parse_fastx_file(input)
-        .with_context(|| format!("opening input FASTQ {}", input.display()))?;
+        .map_err(|e| parse_err(&format!("opening input FASTQ {}", input.display()), e))?;
     let mut writer = FastqWriter::create(output)?;
 
     let mut pre = ReadStats::default();
@@ -159,9 +164,11 @@ pub fn process_se(
     let mut filtering = FilteringResult::default();
 
     while let Some(record) = reader.next() {
-        let rec = record.context("malformed FASTQ record")?;
+        let rec = record.map_err(|e| parse_err("malformed FASTQ record", e))?;
         let seq = rec.seq();
-        let qual = rec.qual().context("FASTQ record missing quality scores")?;
+        let qual = rec
+            .qual()
+            .ok_or_else(|| RsomicsError::InvalidInput("FASTQ record missing quality".into()))?;
         pre.observe(&seq, qual);
 
         let (id_buf, off) = if let Some(u) = umi {
@@ -191,7 +198,7 @@ pub fn process_se(
         if matches!(outcome, FilterResult::Pass) {
             post.observe(seq_t, qual_t);
             write_record(&mut writer, &id_buf, seq_t, qual_t)
-                .context("writing record to output")?;
+                .rs_context("writing record to output")?;
         }
     }
     writer.finalize()?;
@@ -219,10 +226,12 @@ pub fn process_se(
 
 fn write_json_report(report: &FastpJsonReport, path: &Path) -> Result<()> {
     let mut json_writer = BufWriter::new(
-        File::create(path).with_context(|| format!("creating JSON report {}", path.display()))?,
+        File::create(path)
+            .rs_with_context(|| format!("creating JSON report {}", path.display()))?,
     );
-    serde_json::to_writer_pretty(&mut json_writer, report).context("serializing JSON report")?;
-    json_writer.flush().context("flushing JSON writer")?;
+    serde_json::to_writer_pretty(&mut json_writer, report)
+        .map_err(|e| parse_err("serializing JSON report", e))?;
+    json_writer.flush().rs_context("flushing JSON writer")?;
     Ok(())
 }
 
@@ -246,10 +255,10 @@ pub fn process_pe(
     polyg: Option<PolyGConfig>,
     umi: Option<UmiConfig>,
 ) -> Result<PeOutcome> {
-    let mut r1_reader =
-        parse_fastx_file(in1).with_context(|| format!("opening input R1 {}", in1.display()))?;
-    let mut r2_reader =
-        parse_fastx_file(in2).with_context(|| format!("opening input R2 {}", in2.display()))?;
+    let mut r1_reader = parse_fastx_file(in1)
+        .map_err(|e| parse_err(&format!("opening input R1 {}", in1.display()), e))?;
+    let mut r2_reader = parse_fastx_file(in2)
+        .map_err(|e| parse_err(&format!("opening input R2 {}", in2.display()), e))?;
     let mut w1 = FastqWriter::create(out1)?;
     let mut w2 = FastqWriter::create(out2)?;
 
@@ -264,12 +273,16 @@ pub fn process_pe(
         let r2 = r2_reader.next();
         match (r1, r2) {
             (Some(rec1), Some(rec2)) => {
-                let rec1 = rec1.context("malformed R1 record")?;
-                let rec2 = rec2.context("malformed R2 record")?;
+                let rec1 = rec1.map_err(|e| parse_err("malformed R1 record", e))?;
+                let rec2 = rec2.map_err(|e| parse_err("malformed R2 record", e))?;
                 let seq1 = rec1.seq();
-                let q1 = rec1.qual().context("R1 missing quality")?;
+                let q1 = rec1
+                    .qual()
+                    .ok_or_else(|| RsomicsError::InvalidInput("R1 missing quality".into()))?;
                 let seq2 = rec2.seq();
-                let q2 = rec2.qual().context("R2 missing quality")?;
+                let q2 = rec2
+                    .qual()
+                    .ok_or_else(|| RsomicsError::InvalidInput("R2 missing quality".into()))?;
                 pre_r1.observe(&seq1, q1);
                 pre_r2.observe(&seq2, q2);
 
@@ -322,17 +335,19 @@ pub fn process_pe(
                 if matches!(pair_verdict, FilterResult::Pass) {
                     post_r1.observe(seq1_t, q1_t);
                     post_r2.observe(seq2_t, q2_t);
-                    write_record(&mut w1, &id1_buf, seq1_t, q1_t).context("writing R1 record")?;
-                    write_record(&mut w2, &id2_buf, seq2_t, q2_t).context("writing R2 record")?;
+                    write_record(&mut w1, &id1_buf, seq1_t, q1_t)
+                        .rs_context("writing R1 record")?;
+                    write_record(&mut w2, &id2_buf, seq2_t, q2_t)
+                        .rs_context("writing R2 record")?;
                 }
             }
             (None, None) => break,
             (Some(_), None) | (None, Some(_)) => {
-                anyhow::bail!(
+                return Err(RsomicsError::InvalidInput(format!(
                     "paired-end inputs have different record counts: {} vs {}",
                     in1.display(),
                     in2.display(),
-                );
+                )));
             }
         }
     }

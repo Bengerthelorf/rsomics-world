@@ -17,7 +17,6 @@ libdeflate = ["dep:libdeflater"]
 
 [dependencies]
 rsomics-common = { path = "../../foundation/rsomics-common", version = "0.0.0" }
-anyhow.workspace = true
 clap.workspace = true
 rayon.workspace = true
 serde.workspace = true
@@ -30,7 +29,6 @@ noodles = { workspace = true, features = ["fastq"] }
 libdeflater = { version = "1.25", optional = true }
 
 [dev-dependencies]
-anyhow.workspace = true
 tempfile = "3"
 
 [lints.rust]
