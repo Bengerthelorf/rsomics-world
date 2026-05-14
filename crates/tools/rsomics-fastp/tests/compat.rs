@@ -6,22 +6,10 @@
 //! isn't on PATH the tests print a skip notice and pass — CI is responsible
 //! for ensuring fastp is installed where compat is meaningful.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-fn fastp_on_path() -> bool {
-    Command::new("fastp")
-        .arg("--version")
-        .output()
-        .is_ok_and(|out| out.status.success())
-}
-
-fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-        .join(name)
-}
+use rsomics_common::{fixture_path, test_support::tool_on_path};
 
 fn count_fastq_records(path: &Path) -> usize {
     let text = std::fs::read_to_string(path).expect("read fastq");
@@ -57,11 +45,11 @@ fn run_upstream_fastp(input: &Path, output: &Path) {
 
 #[test]
 fn surviving_read_count_matches_upstream_on_se_mixed() {
-    if !fastp_on_path() {
+    if !tool_on_path("fastp") {
         eprintln!("skip: upstream fastp not on PATH");
         return;
     }
-    let input = fixture("se_mixed.fastq");
+    let input = fixture_path!("se_mixed.fastq");
     let ours = tempfile::Builder::new()
         .suffix("_ours.fastq")
         .tempfile()

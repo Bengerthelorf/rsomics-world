@@ -3,23 +3,16 @@
 //! FASTQ files under `tests/golden/`.
 
 use std::fs;
-use std::path::PathBuf;
 
+use rsomics_common::fixture_path;
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
 use rsomics_fastp::umi::{UmiConfig, UmiLoc};
 
-fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-        .join(name)
-}
-
 #[test]
 fn copy_se_is_identity() {
-    let input = fixture("se_basic.fastq");
+    let input = fixture_path!("se_basic.fastq");
     let tmp = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()
@@ -39,7 +32,7 @@ fn copy_se_is_identity() {
 fn copy_se_writes_gzipped_output_when_extension_is_gz() {
     use std::io::Read;
 
-    let input = fixture("se_basic.fastq");
+    let input = fixture_path!("se_basic.fastq");
     let tmp = tempfile::Builder::new()
         .suffix(".fastq.gz")
         .tempfile()
@@ -72,7 +65,7 @@ fn copy_se_writes_gzipped_output_when_extension_is_gz() {
 
 #[test]
 fn process_se_classifies_each_failure_mode() {
-    let input = fixture("se_mixed.fastq");
+    let input = fixture_path!("se_mixed.fastq");
     let out = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()
@@ -140,7 +133,7 @@ fn process_se_classifies_each_failure_mode() {
 
 #[test]
 fn process_se_trims_adapter_at_3prime() {
-    let input = fixture("se_adapter.fastq");
+    let input = fixture_path!("se_adapter.fastq");
     let out = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()
@@ -175,7 +168,7 @@ fn process_se_trims_adapter_at_3prime() {
 
 #[test]
 fn process_se_trims_polyg_tail() {
-    let input = fixture("se_polyg.fastq");
+    let input = fixture_path!("se_polyg.fastq");
     let out = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()
@@ -209,7 +202,7 @@ fn process_se_trims_polyg_tail() {
 
 #[test]
 fn process_se_extracts_umi_into_read_id() {
-    let input = fixture("se_basic.fastq");
+    let input = fixture_path!("se_basic.fastq");
     let out = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()

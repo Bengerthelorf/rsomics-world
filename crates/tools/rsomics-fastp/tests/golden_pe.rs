@@ -1,21 +1,14 @@
 //! Paired-end golden-fixture tests.
 
 use std::fs;
-use std::path::PathBuf;
 
+use rsomics_common::fixture_path;
 use rsomics_fastp::filter::FilterConfig;
-
-fn fixture(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("golden")
-        .join(name)
-}
 
 #[test]
 fn process_pe_rejects_pair_when_either_mate_fails() {
-    let in1 = fixture("pe_mixed_r1.fastq");
-    let in2 = fixture("pe_mixed_r2.fastq");
+    let in1 = fixture_path!("pe_mixed_r1.fastq");
+    let in2 = fixture_path!("pe_mixed_r2.fastq");
     let out1 = tempfile::Builder::new()
         .suffix(".fastq")
         .tempfile()

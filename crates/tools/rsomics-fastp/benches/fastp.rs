@@ -11,6 +11,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use rsomics_common::test_support::tool_on_path;
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::io::process_se;
 
@@ -34,13 +35,6 @@ fn synth_fastq(path: &Path) -> std::io::Result<u64> {
     }
     f.flush()?;
     Ok(std::fs::metadata(path)?.len())
-}
-
-fn fastp_on_path() -> bool {
-    Command::new("fastp")
-        .arg("--version")
-        .output()
-        .is_ok_and(|out| out.status.success())
 }
 
 fn bench_se_filter(c: &mut Criterion) {
@@ -76,7 +70,7 @@ fn bench_se_filter(c: &mut Criterion) {
         );
     });
 
-    if fastp_on_path() {
+    if tool_on_path("fastp") {
         group.bench_function(BenchmarkId::new("upstream_fastp", "synth_100k"), |b| {
             b.iter_with_setup(
                 || {
