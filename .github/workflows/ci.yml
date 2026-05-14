@@ -70,13 +70,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # fastp → rsomics-fastq-trim compat
-          # samtools → rsomics-bam-* compat
-          # seqkit → rsomics-fasta-stats compat
-          # When the binary list grows past ~4 tools, split into per-crate
-          # matrix install steps so each test job only carries what it
-          # actually needs.
-          sudo apt-get install -y --no-install-recommends fastp samtools seqkit
+          # fastp + samtools via apt are kept (recent enough versions);
+          # seqkit's apt package is too old to emit the modern `--all`
+          # column layout the compat test parses, so pull the upstream
+          # static binary instead. Architecture-aware (amd64 / arm64).
+          sudo apt-get install -y --no-install-recommends fastp samtools
+          arch=$(uname -m)
+          case "$arch" in
+            x86_64)  seqkit_arch=amd64 ;;
+            aarch64) seqkit_arch=arm64 ;;
+            *) echo "unsupported arch $arch for seqkit fetch" >&2 ; exit 1 ;;
+          esac
+          curl -fsSL -o /tmp/seqkit.tar.gz \
+            "https://github.com/shenwei356/seqkit/releases/download/v2.10.0/seqkit_linux_${seqkit_arch}.tar.gz"
+          tar -xzf /tmp/seqkit.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
           fastp --version
           samtools --version | head -1
           seqkit version
