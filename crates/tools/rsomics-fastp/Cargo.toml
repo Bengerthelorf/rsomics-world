@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-fastp"
-version = "0.0.0"
+version = "0.1.0"
 description = "Pure-Rust FASTQ preprocessor — adapter trimming, quality filtering, polyG trimming, JSON QC reports. Output-compatible with OpenGene/fastp."
 edition.workspace = true
 rust-version.workspace = true
@@ -16,7 +16,7 @@ default = []
 libdeflate = ["dep:libdeflater"]
 
 [dependencies]
-rsomics-common = { path = "../../foundation/rsomics-common", version = "0.0.0" }
+rsomics-common = { path = "../../foundation/rsomics-common", version = "0.1.0" }
 clap.workspace = true
 rayon.workspace = true
 serde.workspace = true
