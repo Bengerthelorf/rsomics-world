@@ -72,15 +72,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fastp
           fastp --version
-      - name: Resolve toolchain cargo
+      - name: Resolve toolchain cargo + rustc
         run: |
-          # The ~/.cargo/bin proxies (cargo, rustup) on GH's macOS images
-          # intermittently masquerade as rustup-init. Hop straight to the
-          # toolchain's cargo binary to dodge the proxy entirely.
-          CARGO=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -path '*/bin/cargo' -type f | head -n 1)
-          if [ -z "$CARGO" ]; then CARGO="$(command -v cargo)"; fi
-          echo "TOOLCHAIN_CARGO=$CARGO" >> "$GITHUB_ENV"
-          "$CARGO" --version
+          # ~/.cargo/bin proxies on GH's macOS images intermittently
+          # masquerade as rustup-init — and cargo's internal `rustc`
+          # invocation can hit the bad proxy even when the cargo binary
+          # itself is fine, because cargo resolves rustc by PATH lookup.
+          # Resolve BOTH binaries to their absolute toolchain paths and
+          # prepend that dir to PATH so any other subprocess wins too.
+          BIN=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -type d -name bin | head -n 1)
+          if [ -z "$BIN" ]; then
+            BIN="$HOME/.cargo/bin"
+          fi
+          echo "TOOLCHAIN_CARGO=$BIN/cargo" >> "$GITHUB_ENV"
+          echo "RUSTC=$BIN/rustc" >> "$GITHUB_ENV"
+          echo "$BIN" >> "$GITHUB_PATH"
+          "$BIN/cargo" --version
+          "$BIN/rustc" --version
       - name: cargo test
         run: |
           "$TOOLCHAIN_CARGO" test --workspace --all-features
