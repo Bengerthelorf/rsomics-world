@@ -1,20 +1,22 @@
 [package]
 name = "rsomics-fastp"
 version = "0.0.0"
-description = "Pure-Rust FASTQ preprocessor — adapter trimming, quality filtering, UMI handling, polyG trimming, JSON+HTML QC reports. Output-compatible with OpenGene/fastp."
+description = "Pure-Rust FASTQ preprocessor — adapter trimming, quality filtering, polyG trimming, JSON QC reports. Output-compatible with OpenGene/fastp."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
+keywords = ["bioinformatics", "fastq", "preprocessing", "ngs", "qc"]
+categories = ["command-line-utilities", "science::bioinformatics"]
 
 [features]
 default = []
 libdeflate = ["dep:libdeflater"]
-test-support = []
 
 [dependencies]
-rsomics-common = { path = "../../foundation/rsomics-common" }
+rsomics-common = { path = "../../foundation/rsomics-common", version = "0.0.0" }
 anyhow.workspace = true
 clap.workspace = true
 rayon.workspace = true
