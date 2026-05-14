@@ -342,6 +342,11 @@ pub fn process_pe(
                 }
             }
             (None, None) => break,
+            // If either side returned Some(Err(...)), surface that parse error
+            // first — "different record counts" would be a misdiagnosis when
+            // the truth is a corrupted record on the still-reading side.
+            (Some(Err(e)), _) => return Err(parse_err("malformed R1 record", e)),
+            (_, Some(Err(e))) => return Err(parse_err("malformed R2 record", e)),
             (Some(_), None) | (None, Some(_)) => {
                 return Err(RsomicsError::InvalidInput(format!(
                     "paired-end inputs have different record counts: {} vs {}",
