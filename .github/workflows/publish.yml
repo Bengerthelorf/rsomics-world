@@ -3,6 +3,11 @@ on:
   push:
     tags:
       - 'rsomics-*-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to re-publish (e.g. rsomics-fasta-stats-v0.1.0)"
+        required: true
 
 jobs:
   publish:
@@ -11,13 +16,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
       - name: Parse tag → crate + version
         id: parse
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
           VERSION="${TAG##*-v}"
           CRATE="${TAG%-v*}"
           echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
@@ -25,7 +32,7 @@ jobs:
 
       - name: Verify Cargo.toml version matches tag
         run: |
-          MANIFEST=$(find crates -mindepth 3 -maxdepth 3 -path "*/${{ steps.parse.outputs.crate }}/Cargo.toml" | head -n 1)
+          MANIFEST=$(find crates -mindepth 3 -maxdepth 5 -path "*/${{ steps.parse.outputs.crate }}/Cargo.toml" | head -n 1)
           if [ -z "$MANIFEST" ]; then
             echo "::error::no Cargo.toml found for ${{ steps.parse.outputs.crate }}"
             exit 1
