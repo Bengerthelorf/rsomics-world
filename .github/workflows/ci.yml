@@ -66,12 +66,17 @@ jobs:
           fi
           rustc --version
       - uses: Swatinem/rust-cache@v2
-      - name: Install upstream fastp for compat tests
+      - name: Install upstream binaries for compat tests (Linux only)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fastp
+          # fastp → rsomics-fastp compat; samtools → rsomics-bam compat.
+          # When the binary list grows past ~4 tools, split into per-crate
+          # matrix install steps so each test job only carries what it
+          # actually needs.
+          sudo apt-get install -y --no-install-recommends fastp samtools
           fastp --version
+          samtools --version | head -1
       - name: Resolve toolchain cargo + rustc
         run: |
           # ~/.cargo/bin proxies on GH's macOS images intermittently
