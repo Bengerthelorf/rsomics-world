@@ -94,6 +94,33 @@ impl<T> Context<T> for std::result::Result<T, io::Error> {
     }
 }
 
+impl<T> Context<T> for Result<T> {
+    fn rs_context(self, msg: impl Into<String>) -> Result<T> {
+        self.map_err(|e| prepend(&msg.into(), e))
+    }
+
+    fn rs_with_context<F>(self, f: F) -> Result<T>
+    where
+        F: FnOnce() -> String,
+    {
+        self.map_err(|e| prepend(&f(), e))
+    }
+}
+
+/// Chain a contextual prefix onto an existing `RsomicsError` while preserving
+/// its variant (so [`crate::ExitCode`] mapping stays correct).
+fn prepend(prefix: &str, e: RsomicsError) -> RsomicsError {
+    match e {
+        RsomicsError::Io(inner) => {
+            let kind = inner.kind();
+            RsomicsError::Io(io::Error::new(kind, format!("{prefix}: {inner}")))
+        }
+        RsomicsError::InvalidInput(s) => RsomicsError::InvalidInput(format!("{prefix}: {s}")),
+        RsomicsError::ConfigError(s) => RsomicsError::ConfigError(format!("{prefix}: {s}")),
+        RsomicsError::UpstreamError(s) => RsomicsError::UpstreamError(format!("{prefix}: {s}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,5 +164,27 @@ mod tests {
             "should not be evaluated".into()
         });
         assert!(!called, "closure must not run on Ok");
+    }
+
+    #[test]
+    fn rs_context_chains_through_rsomics_error_and_preserves_variant() {
+        let res: Result<()> = Err(RsomicsError::InvalidInput("bad header".into()));
+        let err = res.rs_context("parsing record 17").unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid input: parsing record 17: bad header"
+        );
+        assert!(matches!(err, RsomicsError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn rs_context_chains_through_io_variant_preserves_kind() {
+        let inner = io::Error::new(io::ErrorKind::PermissionDenied, "denied");
+        let res: Result<()> = Err(RsomicsError::Io(inner));
+        let err = res.rs_context("opening output").unwrap_err();
+        let RsomicsError::Io(io_err) = err else {
+            panic!("expected Io variant");
+        };
+        assert_eq!(io_err.kind(), io::ErrorKind::PermissionDenied);
     }
 }
