@@ -1,0 +1,33 @@
+[package]
+name = "rsomics-fasta-stats"
+version = "0.1.0"
+description = "Per-record statistics for FASTA files (num_seqs, sum_len, GC%, N50, …) — Rust port of `seqkit stats` (FASTA-only subset)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+categories = ["science", "command-line-utilities"]
+keywords = ["fasta", "bioinformatics", "n50", "gc-content", "seqkit"]
+
+[[bin]]
+name = "rsomics-fasta-stats"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2" }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+anyhow.workspace = true
+needletail = { version = "0.7", default-features = false, features = ["compression"] }
+bytecount = { version = "0.6", features = ["runtime-dispatch-simd"] }
+memchr = "2"
+
+[dev-dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2", features = ["test-support", "rayon"] }
+tempfile = "3"
+
+[lints]
+workspace = true

@@ -1,0 +1,8 @@
+>seq1 simple
+ACGTACGT
+>seq2 mixed
+ACGTNNNN-ACGT
+>seq3 short
+GGGG
+>seq4 longer with a gap
+AAAACCCCGGGGTTTT-AAAA
