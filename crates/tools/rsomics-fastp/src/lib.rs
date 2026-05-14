@@ -4,3 +4,4 @@ pub mod polyg;
 pub mod report;
 pub mod stats;
 pub mod trim;
+pub mod umi;

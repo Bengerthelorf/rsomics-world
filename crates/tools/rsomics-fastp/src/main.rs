@@ -6,6 +6,7 @@ use clap::Parser;
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
+use rsomics_fastp::umi::{UmiConfig, UmiLoc};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -67,6 +68,18 @@ struct Args {
     /// Minimum poly-G run length to trim.
     #[arg(long = "poly_g_min_len", default_value_t = 10)]
     poly_g_min_len: usize,
+
+    /// Enable UMI extraction. Off by default.
+    #[arg(long = "umi", default_value_t = false)]
+    umi: bool,
+
+    /// Which mate holds the UMI: `read1` or `read2`. SE only supports `read1`.
+    #[arg(long = "umi_loc", default_value = "read1")]
+    umi_loc: String,
+
+    /// UMI length (bases to take from the 5' end of the donor mate).
+    #[arg(long = "umi_len", default_value_t = 8)]
+    umi_len: usize,
 }
 
 fn main() -> Result<()> {
@@ -90,6 +103,19 @@ fn main() -> Result<()> {
         min_len: args.poly_g_min_len,
         max_mismatches: 0,
     });
+    let umi = if args.umi {
+        let loc = match args.umi_loc.as_str() {
+            "read1" => UmiLoc::Read1,
+            "read2" => UmiLoc::Read2,
+            other => anyhow::bail!("--umi_loc must be read1 or read2, got: {other}"),
+        };
+        Some(UmiConfig {
+            loc,
+            len: args.umi_len,
+        })
+    } else {
+        None
+    };
     match (args.in2, args.out2) {
         (Some(in2), Some(out2)) => {
             rsomics_fastp::io::process_pe(
@@ -101,6 +127,7 @@ fn main() -> Result<()> {
                 cfg,
                 adapter.as_ref(),
                 polyg,
+                umi,
             )?;
         }
         (None, None) => {
@@ -111,6 +138,7 @@ fn main() -> Result<()> {
                 cfg,
                 adapter.as_ref(),
                 polyg,
+                umi,
             )?;
         }
         _ => {

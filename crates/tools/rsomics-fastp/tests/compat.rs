@@ -78,6 +78,7 @@ fn surviving_read_count_matches_upstream_on_se_mixed() {
         rsomics_fastp::filter::FilterConfig::default(),
         None,
         None,
+        None,
     )
     .expect("rsomics-fastp run");
     run_upstream_fastp(&input, theirs.path());

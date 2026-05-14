@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
+use rsomics_fastp::umi::{UmiConfig, UmiLoc};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -88,6 +89,7 @@ fn process_se_classifies_each_failure_mode() {
         FilterConfig::default(),
         None,
         None,
+        None,
     )
     .expect("process_se");
 
@@ -151,6 +153,7 @@ fn process_se_trims_adapter_at_3prime() {
         FilterConfig::default(),
         Some(&AdapterConfig::illumina_truseq_r1()),
         None,
+        None,
     )
     .expect("process_se");
 
@@ -185,6 +188,7 @@ fn process_se_trims_polyg_tail() {
         FilterConfig::default(),
         None,
         Some(PolyGConfig::default()),
+        None,
     )
     .expect("process_se");
 
@@ -201,4 +205,45 @@ fn process_se_trims_polyg_tail() {
         !out_text.contains("GGGGG"),
         "poly-G tail leaked into output"
     );
+}
+
+#[test]
+fn process_se_extracts_umi_into_read_id() {
+    let input = fixture("se_basic.fastq");
+    let out = tempfile::Builder::new()
+        .suffix(".fastq")
+        .tempfile()
+        .expect("tempfile");
+
+    let outcome = rsomics_fastp::io::process_se(
+        &input,
+        out.path(),
+        None,
+        FilterConfig::default(),
+        None,
+        None,
+        Some(UmiConfig {
+            loc: UmiLoc::Read1,
+            len: 4,
+        }),
+    )
+    .expect("process_se");
+
+    assert!(
+        outcome.filtering.passed_filter_reads > 0,
+        "expected at least one passing read"
+    );
+
+    let out_text = std::fs::read_to_string(out.path()).expect("read output");
+    // Every read id line must carry the ':<4 base UMI>' suffix.
+    for line in out_text.lines().filter(|l| l.starts_with('@')) {
+        let parts: Vec<&str> = line.rsplitn(2, ':').collect();
+        assert_eq!(parts.len(), 2, "id line {line:?} missing ':' UMI separator");
+        let umi = parts[0];
+        assert_eq!(umi.len(), 4, "umi length wrong on {line:?}");
+        assert!(
+            umi.chars().all(|c| "ACGTNacgtn".contains(c)),
+            "umi {umi:?} is not nucleotides"
+        );
+    }
 }

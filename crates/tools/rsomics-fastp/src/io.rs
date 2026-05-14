@@ -12,6 +12,7 @@ use crate::polyg::{PolyGConfig, find_polyg_3p};
 use crate::report::{FastpJsonReport, FilteringResult};
 use crate::stats::ReadStats;
 use crate::trim::{AdapterConfig, find_adapter_3p};
+use crate::umi::{UmiConfig, UmiLoc, extract as umi_extract};
 
 /// FASTQ output sink. Both arms write through a `BufWriter` so needletail's
 /// small per-record writes batch into larger I/O. The gzip variant must be
@@ -141,7 +142,14 @@ pub fn process_se(
     cfg: FilterConfig,
     adapter: Option<&AdapterConfig>,
     polyg: Option<PolyGConfig>,
+    umi: Option<UmiConfig>,
 ) -> Result<SeOutcome> {
+    if let Some(u) = umi {
+        anyhow::ensure!(
+            u.loc == UmiLoc::Read1,
+            "single-end UMI extraction only supports umi_loc=read1"
+        );
+    }
     let mut reader = parse_fastx_file(input)
         .with_context(|| format!("opening input FASTQ {}", input.display()))?;
     let mut writer = FastqWriter::create(output)?;
@@ -156,21 +164,33 @@ pub fn process_se(
         let qual = rec.qual().context("FASTQ record missing quality scores")?;
         pre.observe(&seq, qual);
 
+        let (id_buf, off) = if let Some(u) = umi {
+            let Some(pair) = umi_extract(rec.id(), &seq, u) else {
+                filtering.record(FilterResult::TooShort);
+                continue;
+            };
+            pair
+        } else {
+            (rec.id().to_vec(), 0)
+        };
+        let seq_u = &seq[off..];
+        let qual_u = &qual[off..];
+
         let after_polyg = polyg
-            .and_then(|pg| find_polyg_3p(&seq, pg))
-            .unwrap_or(seq.len());
+            .and_then(|pg| find_polyg_3p(seq_u, pg))
+            .unwrap_or(seq_u.len());
         let after_adapter = adapter
-            .and_then(|ad| find_adapter_3p(&seq[..after_polyg], ad))
+            .and_then(|ad| find_adapter_3p(&seq_u[..after_polyg], ad))
             .unwrap_or(after_polyg);
         let trim_at = after_adapter;
-        let seq_t = &seq[..trim_at];
-        let qual_t = &qual[..trim_at];
+        let seq_t = &seq_u[..trim_at];
+        let qual_t = &qual_u[..trim_at];
 
         let outcome = classify(seq_t, qual_t, cfg);
         filtering.record(outcome);
         if matches!(outcome, FilterResult::Pass) {
             post.observe(seq_t, qual_t);
-            write_record(&mut writer, rec.id(), seq_t, qual_t)
+            write_record(&mut writer, &id_buf, seq_t, qual_t)
                 .context("writing record to output")?;
         }
     }
@@ -224,6 +244,7 @@ pub fn process_pe(
     cfg: FilterConfig,
     adapter: Option<&AdapterConfig>,
     polyg: Option<PolyGConfig>,
+    umi: Option<UmiConfig>,
 ) -> Result<PeOutcome> {
     let mut r1_reader =
         parse_fastx_file(in1).with_context(|| format!("opening input R1 {}", in1.display()))?;
@@ -252,22 +273,47 @@ pub fn process_pe(
                 pre_r1.observe(&seq1, q1);
                 pre_r2.observe(&seq2, q2);
 
+                // Extract UMI from the configured mate. We stamp the umi
+                // string onto BOTH mates' read ids so the pair stays
+                // identifiable downstream.
+                let (id1_buf, id2_buf, off1, off2) = if let Some(u) = umi {
+                    let src_id = rec1.id();
+                    let donor = if u.loc == UmiLoc::Read1 { &seq1 } else { &seq2 };
+                    let Some((new_id, off)) = umi_extract(src_id, donor, u) else {
+                        filtering.record(FilterResult::TooShort);
+                        continue;
+                    };
+                    let id2_buf = stamp_umi(rec2.id(), &new_id[src_id.len()..]);
+                    let (o1, o2) = if u.loc == UmiLoc::Read1 {
+                        (off, 0)
+                    } else {
+                        (0, off)
+                    };
+                    (new_id, id2_buf, o1, o2)
+                } else {
+                    (rec1.id().to_vec(), rec2.id().to_vec(), 0, 0)
+                };
+                let seq1_u = &seq1[off1..];
+                let q1_u = &q1[off1..];
+                let seq2_u = &seq2[off2..];
+                let q2_u = &q2[off2..];
+
                 let g1 = polyg
-                    .and_then(|pg| find_polyg_3p(&seq1, pg))
-                    .unwrap_or(seq1.len());
+                    .and_then(|pg| find_polyg_3p(seq1_u, pg))
+                    .unwrap_or(seq1_u.len());
                 let g2 = polyg
-                    .and_then(|pg| find_polyg_3p(&seq2, pg))
-                    .unwrap_or(seq2.len());
+                    .and_then(|pg| find_polyg_3p(seq2_u, pg))
+                    .unwrap_or(seq2_u.len());
                 let t1 = adapter
-                    .and_then(|ad| find_adapter_3p(&seq1[..g1], ad))
+                    .and_then(|ad| find_adapter_3p(&seq1_u[..g1], ad))
                     .unwrap_or(g1);
                 let t2 = adapter
-                    .and_then(|ad| find_adapter_3p(&seq2[..g2], ad))
+                    .and_then(|ad| find_adapter_3p(&seq2_u[..g2], ad))
                     .unwrap_or(g2);
-                let seq1_t = &seq1[..t1];
-                let q1_t = &q1[..t1];
-                let seq2_t = &seq2[..t2];
-                let q2_t = &q2[..t2];
+                let seq1_t = &seq1_u[..t1];
+                let q1_t = &q1_u[..t1];
+                let seq2_t = &seq2_u[..t2];
+                let q2_t = &q2_u[..t2];
 
                 let v1 = classify(seq1_t, q1_t, cfg);
                 let v2 = classify(seq2_t, q2_t, cfg);
@@ -276,8 +322,8 @@ pub fn process_pe(
                 if matches!(pair_verdict, FilterResult::Pass) {
                     post_r1.observe(seq1_t, q1_t);
                     post_r2.observe(seq2_t, q2_t);
-                    write_record(&mut w1, rec1.id(), seq1_t, q1_t).context("writing R1 record")?;
-                    write_record(&mut w2, rec2.id(), seq2_t, q2_t).context("writing R2 record")?;
+                    write_record(&mut w1, &id1_buf, seq1_t, q1_t).context("writing R1 record")?;
+                    write_record(&mut w2, &id2_buf, seq2_t, q2_t).context("writing R2 record")?;
                 }
             }
             (None, None) => break,
@@ -329,4 +375,13 @@ fn pair_filter_result(v1: FilterResult, v2: FilterResult) -> FilterResult {
     } else {
         v1
     }
+}
+
+/// Append the already-formed `:UMI` suffix from the donor mate's new id
+/// onto a second mate's id, so both mates carry the same umi tag.
+fn stamp_umi(id: &[u8], suffix: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(id.len() + suffix.len());
+    out.extend_from_slice(id);
+    out.extend_from_slice(suffix);
+    out
 }
