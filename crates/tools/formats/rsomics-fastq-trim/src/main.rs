@@ -372,8 +372,9 @@ fn pipeline(args: &Cli) -> Result<TrimReport> {
     Ok(report)
 }
 
+#[allow(clippy::too_many_lines)]
 fn print_rich_help() {
-    use rsomics_help::{Banner, example_line, flag_row, section_header, tagline};
+    use rsomics_help::{Banner, FlagRowSpec, example_line, flag_table, section_header, tagline};
     let color = !rsomics_help::no_color_env();
     println!();
     println!("{}", Banner::family(META.name).render(color));
@@ -387,250 +388,172 @@ fn print_rich_help() {
     println!("{}", section_header("INPUT / OUTPUT", color));
     println!(
         "{}",
-        flag_row(
-            Some('i'),
-            "in1",
-            Some("<path>"),
-            "R1 input (gz/bz2/xz/zst autodetect)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('o'),
-            "out1",
-            Some("<path>"),
-            "R1 output (.gz uses parallel libdeflate)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('I'),
-            "in2",
-            Some("<path>"),
-            "R2 input (PE mode)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('O'),
-            "out2",
-            Some("<path>"),
-            "R2 output (PE mode)",
-            color,
-            26
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('i'),
+                    long: "in1",
+                    value: Some("<path>"),
+                    desc: "R1 input (gz/bz2/xz/zst autodetect)"
+                },
+                FlagRowSpec {
+                    short: Some('o'),
+                    long: "out1",
+                    value: Some("<path>"),
+                    desc: "R1 output (.gz uses parallel libdeflate)"
+                },
+                FlagRowSpec {
+                    short: Some('I'),
+                    long: "in2",
+                    value: Some("<path>"),
+                    desc: "R2 input (PE mode)"
+                },
+                FlagRowSpec {
+                    short: Some('O'),
+                    long: "out2",
+                    value: Some("<path>"),
+                    desc: "R2 output (PE mode)"
+                },
+            ],
+            color
         )
     );
     println!();
     println!("{}", section_header("ADAPTER TRIM", color));
     println!(
         "{}",
-        flag_row(
-            Some('a'),
-            "adapter_sequence",
-            Some("<seq>"),
-            "R1 adapter (default: Illumina TruSeq R1)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "adapter_sequence_r2",
-            Some("<seq>"),
-            "R2 adapter (PE, default: TruSeq R2)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "adapter_min_len",
-            Some("<n>"),
-            "Min match length (default 5, matches fastp)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "adapter_max_mismatch_rate",
-            Some("<f>"),
-            "Max mismatch fraction (default 0.20)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('A'),
-            "disable_adapter_trimming",
-            None,
-            "Skip static-seq adapter trim",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('2'),
-            "detect_adapter_for_pe",
-            None,
-            "PE overlap-detect (off by default)",
-            color,
-            26
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('a'),
+                    long: "adapter_sequence",
+                    value: Some("<seq>"),
+                    desc: "R1 adapter (default: Illumina TruSeq R1)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_sequence_r2",
+                    value: Some("<seq>"),
+                    desc: "R2 adapter (PE, default: TruSeq R2)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_min_len",
+                    value: Some("<n>"),
+                    desc: "Min match length (default 5, matches fastp)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_max_mismatch_rate",
+                    value: Some("<f>"),
+                    desc: "Max mismatch fraction (default 0.20)"
+                },
+                FlagRowSpec {
+                    short: Some('A'),
+                    long: "disable_adapter_trimming",
+                    value: None,
+                    desc: "Skip static-seq adapter trim"
+                },
+                FlagRowSpec {
+                    short: Some('2'),
+                    long: "detect_adapter_for_pe",
+                    value: None,
+                    desc: "PE overlap-detect (off by default)"
+                },
+            ],
+            color
         )
     );
     println!();
     println!("{}", section_header("POLY-G / POLY-X", color));
     println!(
         "{}",
-        flag_row(
-            Some('g'),
-            "trim_poly_g",
-            None,
-            "Force poly-G trim (NextSeq/NovaSeq 2-color)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('x'),
-            "trim_poly_x",
-            None,
-            "Dominant-base poly-X (A/T/C/G auto-detect)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "poly_g_min_len",
-            Some("<n>"),
-            "Poly-G min run length (default 10)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "polyx_max_mismatches",
-            Some("<n>"),
-            "Hard cap on run mismatches (default 5)",
-            color,
-            26
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('g'),
+                    long: "trim_poly_g",
+                    value: None,
+                    desc: "Force poly-G trim (NextSeq/NovaSeq 2-color)"
+                },
+                FlagRowSpec {
+                    short: Some('x'),
+                    long: "trim_poly_x",
+                    value: None,
+                    desc: "Dominant-base poly-X (A/T/C/G auto-detect)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "poly_g_min_len",
+                    value: Some("<n>"),
+                    desc: "Poly-G min run length (default 10)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "polyx_max_mismatches",
+                    value: Some("<n>"),
+                    desc: "Hard cap on run mismatches (default 5)"
+                },
+            ],
+            color
         )
     );
     println!();
     println!("{}", section_header("FIXED + OUTPUT", color));
     println!(
         "{}",
-        flag_row(
-            Some('f'),
-            "trim_front1",
-            Some("<n>"),
-            "Bases trimmed from R1 5' (default 0)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "trim_tail1",
-            Some("<n>"),
-            "Bases trimmed from R1 3' (default 0)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('l'),
-            "length_required",
-            Some("<n>"),
-            "Discard reads shorter (default 15, fastp default)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('L'),
-            "disable_length_filtering",
-            None,
-            "Disable length floor (= -l 1)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "compression",
-            Some("<lvl>"),
-            "gz compression level 1-12 (default 4)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "json",
-            None,
-            "Emit AI-friendly JSON envelope on stdout",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('t'),
-            "threads",
-            Some("<n>"),
-            "Worker threads (default: available cores)",
-            color,
-            26
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('h'),
-            "help",
-            None,
-            "Show this help (add --plain or --json for alt modes)",
-            color,
-            26
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('f'),
+                    long: "trim_front1",
+                    value: Some("<n>"),
+                    desc: "Bases trimmed from R1 5' (default 0)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "trim_tail1",
+                    value: Some("<n>"),
+                    desc: "Bases trimmed from R1 3' (default 0)"
+                },
+                FlagRowSpec {
+                    short: Some('l'),
+                    long: "length_required",
+                    value: Some("<n>"),
+                    desc: "Discard reads shorter (default 15, fastp default)"
+                },
+                FlagRowSpec {
+                    short: Some('L'),
+                    long: "disable_length_filtering",
+                    value: None,
+                    desc: "Disable length floor (= -l 1)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "compression",
+                    value: Some("<lvl>"),
+                    desc: "gz compression level 1-12 (default 4)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "json",
+                    value: None,
+                    desc: "Emit AI-friendly JSON envelope on stdout"
+                },
+                FlagRowSpec {
+                    short: Some('t'),
+                    long: "threads",
+                    value: Some("<n>"),
+                    desc: "Worker threads (default: available cores)"
+                },
+                FlagRowSpec {
+                    short: Some('h'),
+                    long: "help",
+                    value: None,
+                    desc: "Show this help (add --plain or --json for alt modes)"
+                },
+            ],
+            color
         )
     );
     println!();
@@ -662,6 +585,7 @@ fn print_rich_help() {
     println!();
 }
 
+#[allow(clippy::too_many_lines)]
 fn print_json_help() {
     use rsomics_help::{Example, FlagGroup, FlagSpec, HelpJson, Origin};
     let help = HelpJson {

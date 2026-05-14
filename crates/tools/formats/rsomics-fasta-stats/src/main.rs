@@ -92,7 +92,7 @@ fn emit_stdout(results: &[FastaStats], tabular: bool) {
 }
 
 fn print_rich_help() {
-    use rsomics_help::{Banner, example_line, flag_row, section_header, tagline};
+    use rsomics_help::{Banner, FlagRowSpec, example_line, flag_table, section_header, tagline};
     let color = !rsomics_help::no_color_env();
     println!();
     println!("{}", Banner::family(META.name).render(color));
@@ -105,68 +105,46 @@ fn print_rich_help() {
     println!("{}", section_header("OPTIONS", color));
     println!(
         "{}",
-        flag_row(
-            Some('a'),
-            "all",
-            None,
-            "Emit extended stats (Q1/Q2/Q3, N50, GC%, sum_gap, sum_n)",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('a'),
+                    long: "all",
+                    value: None,
+                    desc: "Emit extended stats (Q1/Q2/Q3, N50, GC%, sum_gap, sum_n)",
+                },
+                FlagRowSpec {
+                    short: Some('T'),
+                    long: "tabular",
+                    value: None,
+                    desc: "Tab-separated machine-readable output",
+                },
+                FlagRowSpec {
+                    short: Some('G'),
+                    long: "gap-letters",
+                    value: Some("<CHARS>"),
+                    desc: "Gap chars for --all (default \"- .\", matches seqkit)",
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "json",
+                    value: None,
+                    desc: "Emit AI-friendly JSON envelope on stdout",
+                },
+                FlagRowSpec {
+                    short: Some('t'),
+                    long: "threads",
+                    value: Some("<N>"),
+                    desc: "Worker thread count (default: available cores)",
+                },
+                FlagRowSpec {
+                    short: Some('h'),
+                    long: "help",
+                    value: None,
+                    desc: "Show this help; add `--plain` or `--json` for alt modes",
+                },
+            ],
             color,
-            18
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('T'),
-            "tabular",
-            None,
-            "Tab-separated machine-readable output",
-            color,
-            18
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('G'),
-            "gap-letters",
-            Some("<CHARS>"),
-            "Gap chars for --all (default \"- .\", matches seqkit)",
-            color,
-            18
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            None,
-            "json",
-            None,
-            "Emit AI-friendly JSON envelope on stdout",
-            color,
-            18
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('t'),
-            "threads",
-            Some("<N>"),
-            "Worker thread count (default: available cores)",
-            color,
-            18
-        )
-    );
-    println!(
-        "{}",
-        flag_row(
-            Some('h'),
-            "help",
-            None,
-            "Show this help; add `--plain` or `--json` for alt modes",
-            color,
-            18
         )
     );
     println!();

@@ -28,8 +28,10 @@ pub fn tagline(name: &str, version: &str, description: &str, color: bool) -> Str
 /// `desc` is the help text. Set `short` to `None` when the flag has
 /// no short alias.
 ///
-/// Layout: 2-space indent, optional `-x, ` short, then `--long` (padded
-/// to `long_width`), then `<value>` if present, then the description.
+/// `desc_col` is the absolute column at which descriptions start. The
+/// row pads (or, if the flag+value is already too wide, just inserts
+/// two spaces) so descriptions line up in a column regardless of how
+/// long `--long_name` or `<value>` happens to be.
 #[must_use]
 pub fn flag_row(
     short: Option<char>,
@@ -37,21 +39,59 @@ pub fn flag_row(
     value: Option<&str>,
     desc: &str,
     color: bool,
-    long_width: usize,
+    desc_col: usize,
 ) -> String {
-    let short_part = match short {
-        Some(c) => rgb(color, Palette::GREEN, &format!("-{c}")),
-        None => "  ".to_string(),
+    // Visible-width budget (ignoring ANSI escapes since they don't
+    // contribute to terminal columns):
+    //   2 indent + short_part (4 if short, 4 spaces otherwise)
+    //   + "--" + long
+    //   + (" " + value) if value
+    let short_visible = match short {
+        Some(_) => "-x, ".len(),
+        None => "    ".len(),
     };
-    let sep = if short.is_some() { ", " } else { "  " };
+    let value_visible = value.map_or(0, |v| 1 + v.len());
+    let used = 2 + short_visible + 2 + long.len() + value_visible;
+    let pad = desc_col.saturating_sub(used).max(2);
+
+    let short_part = match short {
+        Some(c) => format!("{}, ", rgb(color, Palette::GREEN, &format!("-{c}"))),
+        None => "    ".to_string(),
+    };
     let long_painted = rgb(color, Palette::GREEN, &format!("--{long}"));
-    let pad = long_width.saturating_sub(long.len() + 2);
     let value_part = value.map_or_else(String::new, |v| format!(" {}", dim(color, v)));
     let desc_part = dim(color, desc);
     format!(
-        "  {short_part}{sep}{long_painted}{value_part}{}  {desc_part}",
+        "  {short_part}{long_painted}{value_part}{}{desc_part}",
         " ".repeat(pad)
     )
+}
+
+/// Per-row spec for [`flag_table`].
+pub struct FlagRowSpec<'a> {
+    pub short: Option<char>,
+    pub long: &'a str,
+    pub value: Option<&'a str>,
+    pub desc: &'a str,
+}
+
+/// Render a group of flags with descriptions aligned at a common column
+/// computed from the widest flag in the group.
+#[must_use]
+pub fn flag_table(rows: &[FlagRowSpec<'_>], color: bool) -> String {
+    let widest = rows
+        .iter()
+        .map(|r| {
+            // 2 indent + "-x, " (4) or "    " (4) + "--" (2) + long + value
+            2 + 4 + 2 + r.long.len() + r.value.map_or(0, |v| 1 + v.len())
+        })
+        .max()
+        .unwrap_or(0);
+    let desc_col = widest + 2;
+    rows.iter()
+        .map(|r| flag_row(r.short, r.long, r.value, r.desc, color, desc_col))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Two-line example: dim description followed by indented command.

@@ -21,4 +21,4 @@ pub use ansi::{Palette, no_color_env};
 pub use banner::{Banner, Gradient};
 pub use json::{Example, FlagGroup, FlagSpec, HelpJson, Origin};
 pub use modes::{HelpMode, detect_mode, intercept_help};
-pub use section::{example_line, flag_row, section_header, tagline};
+pub use section::{FlagRowSpec, example_line, flag_row, flag_table, section_header, tagline};
