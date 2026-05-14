@@ -7,8 +7,20 @@ use std::path::{Path, PathBuf};
 use clap::Args;
 use rsomics_common::{Result, StderrLog};
 use rust_htslib::bam::{Read, Reader, Record};
+use serde::Serialize;
 
 use crate::htslib_bridge::{HtsResultExt, from_htslib};
+
+/// `--json` envelope `result` body for `view`. Fields stable across
+/// versions; bump `rsomics_common::SCHEMA_VERSION` if a field is removed
+/// or renamed.
+#[derive(Debug, Serialize)]
+pub struct ViewSummary {
+    pub subcommand: &'static str,
+    pub input: PathBuf,
+    pub records: u64,
+    pub mode: &'static str,
+}
 
 #[derive(Debug, Args)]
 pub struct ViewArgs {
@@ -54,16 +66,33 @@ pub fn count_records(input: &Path) -> Result<u64> {
 /// Without `--count`, the reader iterates records without emitting them
 /// — record projection (SAM / BAM out, region filter) is a follow-up
 /// subcommand surface.
-pub fn run(args: &ViewArgs, _log: &StderrLog) -> Result<()> {
+pub fn run(args: &ViewArgs, log: &StderrLog) -> Result<ViewSummary> {
     if args.count {
         let n = count_records(&args.input)?;
-        println!("{n}");
-        return Ok(());
+        // The human-friendly count goes to stdout when --json is OFF;
+        // when --json is ON, the envelope to stdout is the structured
+        // output. Keep both predictable for the agentic caller.
+        if !log.json {
+            println!("{n}");
+        }
+        return Ok(ViewSummary {
+            subcommand: "view",
+            input: args.input.clone(),
+            records: n,
+            mode: "count",
+        });
     }
     let mut reader = Reader::from_path(&args.input).rs()?;
     let mut rec = Record::new();
+    let mut n: u64 = 0;
     while let Some(r) = reader.read(&mut rec) {
         r.map_err(from_htslib)?;
+        n += 1;
     }
-    Ok(())
+    Ok(ViewSummary {
+        subcommand: "view",
+        input: args.input.clone(),
+        records: n,
+        mode: "iter",
+    })
 }

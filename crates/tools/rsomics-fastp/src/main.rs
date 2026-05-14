@@ -10,12 +10,37 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use rsomics_common::{CommonFlags, Result, RsomicsError, StderrLog, run};
+use rsomics_common::{CommonFlags, Result, RsomicsError, StderrLog, ToolMeta, run};
+use serde::Serialize;
 
 use rsomics_fastp::filter::FilterConfig;
 use rsomics_fastp::polyg::PolyGConfig;
 use rsomics_fastp::trim::AdapterConfig;
 use rsomics_fastp::umi::{UmiConfig, UmiLoc};
+
+const META: ToolMeta = ToolMeta {
+    name: env!("CARGO_PKG_NAME"),
+    version: env!("CARGO_PKG_VERSION"),
+};
+
+/// `--json` envelope `result` body for a fastp run. Fields chosen to be
+/// machine-friendly and stable across versions; the schema is documented
+/// at the workspace level under `schema/`. Bump `rsomics_common::SCHEMA_VERSION`
+/// if a field is removed or renamed.
+#[derive(Debug, Serialize)]
+struct RunSummary {
+    mode: &'static str,
+    input_r1: PathBuf,
+    input_r2: Option<PathBuf>,
+    output_r1: PathBuf,
+    output_r2: Option<PathBuf>,
+    json_report: Option<PathBuf>,
+    total_reads: u64,
+    passed_filter_reads: u64,
+    too_short_reads: u64,
+    too_many_n_reads: u64,
+    low_quality_reads: u64,
+}
 
 #[derive(Debug, Parser)]
 #[command(
@@ -97,7 +122,8 @@ struct Args {
     common: CommonFlags,
 }
 
-fn pipeline(args: Args) -> Result<()> {
+#[allow(clippy::too_many_lines)]
+fn pipeline(args: Args) -> Result<RunSummary> {
     let log = StderrLog::from_flags(&args.common);
     let requested_threads = args.common.thread_count();
     if requested_threads > 1 {
@@ -143,7 +169,7 @@ fn pipeline(args: Args) -> Result<()> {
     } else {
         None
     };
-    match (args.in2, args.out2) {
+    let summary = match (args.in2.clone(), args.out2.clone()) {
         (Some(in2), Some(out2)) => {
             let outcome = rsomics_fastp::io::process_pe(
                 &args.in1,
@@ -161,9 +187,22 @@ fn pipeline(args: Args) -> Result<()> {
                 + outcome.filtering.too_many_n_reads
                 + outcome.filtering.too_short_reads;
             log.info(format_args!(
-                "PE: kept {passed}/{total} pairs",
+                "PE: kept {passed}/{total} reads (= 2 × pairs)",
                 passed = outcome.filtering.passed_filter_reads,
             ));
+            RunSummary {
+                mode: "PE",
+                input_r1: args.in1,
+                input_r2: Some(in2),
+                output_r1: args.out1,
+                output_r2: Some(out2),
+                json_report: args.json_report,
+                total_reads: total,
+                passed_filter_reads: outcome.filtering.passed_filter_reads,
+                too_short_reads: outcome.filtering.too_short_reads,
+                too_many_n_reads: outcome.filtering.too_many_n_reads,
+                low_quality_reads: outcome.filtering.low_quality_reads,
+            }
         }
         (None, None) => {
             let outcome = rsomics_fastp::io::process_se(
@@ -183,18 +222,31 @@ fn pipeline(args: Args) -> Result<()> {
                 "SE: kept {passed}/{total} reads",
                 passed = outcome.filtering.passed_filter_reads,
             ));
+            RunSummary {
+                mode: "SE",
+                input_r1: args.in1,
+                input_r2: None,
+                output_r1: args.out1,
+                output_r2: None,
+                json_report: args.json_report,
+                total_reads: total,
+                passed_filter_reads: outcome.filtering.passed_filter_reads,
+                too_short_reads: outcome.filtering.too_short_reads,
+                too_many_n_reads: outcome.filtering.too_many_n_reads,
+                low_quality_reads: outcome.filtering.low_quality_reads,
+            }
         }
         _ => {
             return Err(RsomicsError::ConfigError(
                 "--in2 and --out2 must both be set, or both unset".into(),
             ));
         }
-    }
-    Ok(())
+    };
+    Ok(summary)
 }
 
 fn main() -> ExitCode {
     let args = Args::parse();
     let common = args.common.clone();
-    run(&common, || pipeline(args))
+    run(&common, META, || pipeline(args))
 }

@@ -1,9 +1,14 @@
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use rsomics_common::{CommonFlags, Result, StderrLog, run};
+use rsomics_common::{CommonFlags, Result, StderrLog, ToolMeta, run};
 
-use rsomics_bam::cmd::view::{self, ViewArgs};
+use rsomics_bam::cmd::view::{self, ViewArgs, ViewSummary};
+
+const META: ToolMeta = ToolMeta {
+    name: env!("CARGO_PKG_NAME"),
+    version: env!("CARGO_PKG_VERSION"),
+};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -26,15 +31,23 @@ enum Cmd {
     View(ViewArgs),
 }
 
-fn dispatch(cli: &Cli) -> Result<()> {
+/// `--json` envelope `result` body. The enum carries the subcommand
+/// tag in its `subcommand` field so callers branch cleanly on it.
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+enum DispatchSummary {
+    View(ViewSummary),
+}
+
+fn dispatch(cli: &Cli) -> Result<DispatchSummary> {
     let log = StderrLog::from_flags(&cli.common);
     match &cli.cmd {
-        Cmd::View(a) => view::run(a, &log),
+        Cmd::View(a) => view::run(a, &log).map(DispatchSummary::View),
     }
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let common = cli.common.clone();
-    run(&common, || dispatch(&cli))
+    run(&common, META, || dispatch(&cli))
 }

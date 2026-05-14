@@ -1083,7 +1083,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-bam"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "criterion",
@@ -1098,11 +1098,12 @@ dependencies = [
 
 [[package]]
 name = "rsomics-common"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "clap",
  "rayon",
  "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.18",
@@ -1112,7 +1113,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fastp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "criterion",

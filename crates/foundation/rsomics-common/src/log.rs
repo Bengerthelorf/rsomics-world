@@ -15,6 +15,11 @@ use crate::flags::CommonFlags;
 pub struct StderrLog {
     pub quiet: bool,
     pub verbose: bool,
+    /// Mirrors `CommonFlags::json`. Subcommand handlers consult this to
+    /// suppress human-friendly stdout chatter (raw counts, progress lines)
+    /// that would otherwise interleave with the structured JSON envelope
+    /// [`crate::run`] emits to stdout at the end of a successful run.
+    pub json: bool,
 }
 
 impl StderrLog {
@@ -23,6 +28,7 @@ impl StderrLog {
         Self {
             quiet: common.quiet,
             verbose: common.verbose,
+            json: common.json,
         }
     }
 
