@@ -75,7 +75,7 @@ License: MIT OR Apache-2.0. Upstream credit: [fastp] (MIT).
 {
   "schema_version": "1.0",
   "tool": "rsomics-fastq-trim",
-  "tool_version": "0.1.1",
+  "tool_version": "0.2.0",
   "status": "ok",
   "result": {
     "reads_in": 50000,                    // input record count (PE counts both mates)
@@ -102,7 +102,7 @@ Failure envelope routes to stderr (stdout stays parseable):
 {
   "schema_version": "1.0",
   "tool": "rsomics-fastq-trim",
-  "tool_version": "0.1.1",
+  "tool_version": "0.2.0",
   "status": "error",
   "error": { "kind": "InvalidInput", "message": "..." },
   "exit_code": 1
