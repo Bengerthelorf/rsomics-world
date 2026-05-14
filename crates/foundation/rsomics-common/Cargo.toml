@@ -26,6 +26,7 @@ thiserror.workspace = true
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+flate2.workspace = true
 rayon = { workspace = true, optional = true }
 toml = { version = "0.9", optional = true }
 sha2 = { version = "0.10", optional = true }

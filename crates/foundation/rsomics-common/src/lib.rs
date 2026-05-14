@@ -53,6 +53,7 @@
 
 pub mod error;
 pub mod exit;
+pub mod fastq;
 pub mod flags;
 pub mod json;
 pub mod log;

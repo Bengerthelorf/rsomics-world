@@ -1,0 +1,36 @@
+[package]
+name = "rsomics-fastq-trim"
+version = "0.1.0"
+description = "FASTQ adapter / poly-G / poly-X / fixed-length trimming. Rust port of fastp's trim hot path with rayon-parallel SE + PE pipelines and AI-friendly --json output."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+categories = ["science", "command-line-utilities"]
+keywords = ["fastq", "bioinformatics", "fastp", "adapter-trimming", "polyg"]
+
+[[bin]]
+name = "rsomics-fastq-trim"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2" }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+anyhow.workspace = true
+needletail = { version = "0.7", default-features = false, features = ["compression"] }
+bytecount = { version = "0.6", features = ["runtime-dispatch-simd"] }
+rayon.workspace = true
+flate2.workspace = true
+libdeflater = "1"
+memchr = "2"
+
+[dev-dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.2", features = ["test-support", "rayon"] }
+tempfile = "3"
+
+[lints]
+workspace = true
