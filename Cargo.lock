@@ -451,6 +451,9 @@ dependencies = [
 [[package]]
 name = "rsomics-common"
 version = "0.0.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "rsomics-fastp"
