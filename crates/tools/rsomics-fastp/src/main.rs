@@ -1,3 +1,11 @@
+//! Single-pipeline rsomics-* template — every flag sits on one `Args` struct.
+//! Appropriate when the tool does exactly one thing end-to-end.
+//!
+//! For multi-subcommand tools (`view` / `sort` / `index` / …) see
+//! [`rsomics-bam`](https://crates.io/crates/rsomics-bam) instead — that
+//! crate's `src/main.rs` and `src/cmd/` layout is the right template to
+//! clone when the tool has more than one distinct operating mode.
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
