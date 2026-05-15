@@ -932,6 +932,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-bed-subtract"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-intervals",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-common"
 version = "0.5.1"
 dependencies = [
@@ -1033,7 +1045,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-popgen-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "thiserror 2.0.18",
 ]
