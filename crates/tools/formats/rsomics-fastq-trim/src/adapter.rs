@@ -1,16 +1,6 @@
-//! 3' adapter trimming via prefix-match scan.
-//!
-//! Scan each offset in the read, compare the suffix against the adapter
-//! prefix within a mismatch budget, trim at the earliest qualifying match.
-//! Covers SE and the R1-only PE fallback path; the PE overlap-detection
-//! variant lives in [`crate::overlap`].
-//!
-//! Algorithm: Hamming-distance only — fastp's one-insertion and
-//! one-deletion fallback phases are not implemented.
+// Hamming-distance only — fastp's one-insertion and one-deletion fallback
+// phases are not implemented.
 
-/// Adapter-trim configuration. Defaults match fastp's: `TruSeq` adapter
-/// (R1 sense-strand prefix), 5 bp minimum compared length, 20% mismatch
-/// budget.
 #[derive(Debug, Clone)]
 pub struct AdapterConfig {
     pub sequence: Vec<u8>,
@@ -38,12 +28,6 @@ impl AdapterConfig {
     }
 }
 
-/// Return the 0-based offset where the read should be trimmed to remove
-/// the adapter, or `None` if no signature found at the 3' end. The
-/// earliest qualifying match wins.
-///
-/// "Qualifying match" = at least `min_match_len` bases compared and the
-/// mismatch fraction across the compared region ≤ `max_mismatch_rate`.
 #[must_use]
 pub fn find_adapter_3p(seq: &[u8], cfg: &AdapterConfig) -> Option<usize> {
     let adapter = &cfg.sequence;

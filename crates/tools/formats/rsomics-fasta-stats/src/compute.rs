@@ -1,10 +1,3 @@
-//! Streaming aggregation over a FASTA input.
-//!
-//! Layout: one streaming pass via needletail; for every record we (a) push
-//! its length and (b) optionally sweep the bytes for GC / N / gap counts
-//! through `bytecount` (SIMD-accelerated). N50 / quartiles need sorted
-//! lengths, so when `--all` is requested we keep every per-record length
-//! in a `Vec<u64>` and sort once at the end.
 
 // `u64 as f64` casts here are intentional: lengths and base counts comfortably
 // fit in f64's 52-bit mantissa for any biologically realistic input (max
@@ -20,11 +13,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Emit the extended-statistics block (`Q1` / `Q2` / `Q3`, `N50`,
-    /// `GC(%)`, `sum_gap`, `sum_n`). Matches seqkit's `--all`.
     pub extended: bool,
-    /// Bytes counted as gap characters. seqkit default is `b"- ."` (hyphen,
-    /// space, period). Caller is responsible for de-duplication.
     pub gap_letters: Vec<u8>,
 }
 
@@ -37,9 +26,6 @@ impl Default for Config {
     }
 }
 
-/// Coarse sequence-type guess. seqkit uses a redundant-letter heuristic over
-/// the first N bases; this crate uses the same: scan up to
-/// `ALPHABET_GUESS_LIMIT` bases across all records and classify the alphabet.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub enum SeqType {
     #[serde(rename = "DNA")]
@@ -64,8 +50,6 @@ impl SeqType {
     }
 }
 
-/// Aggregated stats for a single FASTA input. Mirrors the FASTA-only
-/// column set of `seqkit stats`.
 #[derive(Debug, Clone, Serialize)]
 pub struct FastaStats {
     pub file: String,
@@ -105,11 +89,7 @@ pub struct ExtendedStats {
 
 const ALPHABET_GUESS_LIMIT: usize = 10_000;
 
-/// # Errors
-///
-/// Returns `InvalidInput` if the file can't be opened, contains a malformed
-/// record, or contains zero records (matches seqkit's behaviour of refusing
-/// to print a stats line for an empty input).
+#[allow(clippy::missing_errors_doc)]
 pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
     let mut reader = parse_fastx_file(path)
         .map_err(|e| RsomicsError::InvalidInput(format!("opening {}: {e}", path.display())))?;
@@ -389,11 +369,6 @@ impl LengthStats {
     }
 }
 
-/// Alphabet guess using the same redundant-letter heuristic seqkit applies:
-/// scan a prefix sample and decide DNA / RNA / Protein / Other based on the
-/// set of distinct letters observed. Ambiguous nucleotide codes (IUPAC) are
-/// allowed in DNA / RNA; anything outside the union of those code sets is
-/// taken as evidence of protein when it's also a valid amino-acid letter.
 fn classify(sample: &[u8]) -> SeqType {
     if sample.is_empty() {
         return SeqType::Other;

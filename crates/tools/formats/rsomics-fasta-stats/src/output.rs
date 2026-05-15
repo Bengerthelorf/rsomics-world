@@ -1,13 +1,3 @@
-//! Renderers for `FastaStats`.
-//!
-//! Two surfaces:
-//! - [`render_tabular`] — `seqkit stats --tabular`-compatible TSV. One line
-//!   of headers, one line of values. This is the compat-anchor surface.
-//! - [`render_pretty`] — two-space-padded human-readable form with
-//!   thousand-separator commas on integers. Mirrors seqkit's default layout
-//!   close enough for visual diffing; not the compat anchor.
-//!
-//! `--json` output is handled by `rsomics-common`'s envelope, not here.
 
 use std::fmt::Write as _;
 
@@ -140,7 +130,6 @@ fn humanize_u64(n: u64) -> String {
         if !out.is_empty() {
             out.push(',');
         }
-        // `to_string` of a u64 is decimal ASCII — non-UTF-8 impossible.
         out.push_str(std::str::from_utf8(triplet).expect("decimal digits are ASCII"));
     }
     out

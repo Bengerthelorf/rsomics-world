@@ -1,11 +1,3 @@
-//! figlet-rs banner with multi-stop gradient + width-adaptive font.
-//!
-//! The whole-family banner is auto-generated from the binary name — no
-//! per-crate ASCII art files. The font is chosen at render time: try
-//! `Slant` first; if it overflows the detected terminal width, fall back
-//! to `Small`; if even that overflows, return an empty banner so the
-//! caller skips the row entirely. The gradient is a 4-stop polyline
-//! approximating pikpaktui's ANSI-16 hue walk (cyan → blue → magenta).
 
 use figlet_rs::FIGlet;
 
@@ -13,9 +5,6 @@ use crate::ansi::{Palette, rgb};
 
 const FALLBACK_TERM_WIDTH: usize = 80;
 
-/// Multi-stop linear gradient in 24-bit RGB. With N stops the parameter
-/// `t ∈ [0, 1]` walks the polyline `stops[0] → stops[1] → … → stops[N-1]`
-/// at uniform speed (each segment spans `1 / (N − 1)` of the range).
 #[derive(Debug, Clone, Copy)]
 pub struct Gradient<'a> {
     pub stops: &'a [(u8, u8, u8)],
@@ -27,14 +16,11 @@ impl<'a> Gradient<'a> {
         Self { stops }
     }
 
-    /// Family default: the pikpaktui-style 4-stop gradient bound on
-    /// [`Palette::FAMILY_GRADIENT`].
     #[must_use]
     pub const fn family_default() -> Gradient<'static> {
         Gradient::new(&Palette::FAMILY_GRADIENT)
     }
 
-    /// Sample the gradient at `t`.
     #[must_use]
     pub fn at(&self, t: f32) -> (u8, u8, u8) {
         if self.stops.is_empty() {
@@ -63,9 +49,6 @@ impl<'a> Gradient<'a> {
     }
 }
 
-/// The figlet-rs built-in fonts the adaptive renderer picks from. Other
-/// built-ins (`standard`, `big`) overflow more often than they help; not
-/// exposed until a real need surfaces.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Font {
     Slant,
@@ -82,8 +65,6 @@ impl Font {
     }
 }
 
-/// Banner spec: what to render, with which gradient. Font is chosen
-/// adaptively at render time.
 #[derive(Debug, Clone)]
 pub struct Banner<'a> {
     pub text: String,
@@ -91,7 +72,6 @@ pub struct Banner<'a> {
 }
 
 impl Banner<'_> {
-    /// Family-default constructor: family gradient, adaptive font.
     #[must_use]
     pub fn family(text: impl Into<String>) -> Self {
         Self {
@@ -100,9 +80,6 @@ impl Banner<'_> {
         }
     }
 
-    /// Render the banner, picking the widest font whose output fits the
-    /// terminal. Returns an empty string when no font fits (caller should
-    /// then skip the banner row instead of printing a malformed one).
     #[must_use]
     pub fn render(&self, color: bool) -> String {
         let term_width =

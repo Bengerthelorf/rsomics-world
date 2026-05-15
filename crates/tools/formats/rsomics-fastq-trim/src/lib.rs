@@ -1,8 +1,3 @@
-//! FASTQ-trim library: adapter / polyG / polyX / fixed-length trimming.
-//!
-//! Per-function partition of fastp's surface — quality filter, UMI, and
-//! stats live in sibling crates. See `crates/tools/formats/README.md`
-//! for the cross-crate map.
 
 pub mod adapter;
 pub mod fixed;

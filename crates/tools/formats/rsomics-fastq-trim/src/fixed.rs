@@ -1,20 +1,9 @@
-//! Fixed-length 5' / 3' trimming. Drops a fixed prefix and/or suffix
-//! regardless of content. Matches fastp's `--trim_front{1,2}` and
-//! `--trim_tail{1,2}` flags.
-
-/// Fixed-trim configuration. Per-mate so PE callers can use different
-/// front/tail trims on R1 vs R2 — matches fastp's separate `_1` / `_2`
-/// flag pairs.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FixedTrimConfig {
     pub trim_front: usize,
     pub trim_tail: usize,
 }
 
-/// Compute the half-open `[start, end)` slice of the record after applying
-/// the fixed-length cut. Returns `None` if `front + tail >= seq.len()`,
-/// i.e. the cut would leave a zero-length read — the caller is expected
-/// to discard such records.
 #[must_use]
 pub fn apply_fixed(seq_len: usize, cfg: FixedTrimConfig) -> Option<(usize, usize)> {
     let total = cfg.trim_front.checked_add(cfg.trim_tail)?;

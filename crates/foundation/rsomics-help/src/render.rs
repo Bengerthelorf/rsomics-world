@@ -1,4 +1,3 @@
-//! One-shot rendering of a [`HelpSpec`] in any mode.
 
 use serde::Serialize;
 
@@ -7,8 +6,6 @@ use crate::banner::Banner;
 use crate::modes::HelpMode;
 use crate::spec::{FlagSpec, HELP_SCHEMA_VERSION, HelpSpec};
 
-/// Render `spec` in `mode` to stdout. Binaries call this once from
-/// `main()` after [`crate::intercept_help`] returns the mode.
 pub fn render(spec: &HelpSpec, mode: HelpMode) {
     match mode {
         HelpMode::Rich => render_rich(spec),
@@ -103,8 +100,6 @@ fn rich_tagline(name: &str, version: &str, description: &str, color: bool) -> St
     format!("{name_part} {version_part}  {sep}  {desc_part}")
 }
 
-/// Render one section's flag table with descriptions aligned at the
-/// section's widest flag-cell column.
 fn render_flag_table(flags: &[FlagSpec<'_>], color: bool) -> String {
     let widest_visible = flags.iter().map(visible_flag_width).max().unwrap_or(0);
     let desc_col = widest_visible + 2;

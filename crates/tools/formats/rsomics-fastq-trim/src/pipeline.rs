@@ -1,16 +1,3 @@
-//! Rayon-chunked scatter/gather over a FASTQ input.
-//!
-//! Per-record work order (matches fastp `seprocessor.cpp` for SE,
-//! `peprocessor.cpp` for PE, with the per-function partition trimming
-//! the quality / UMI / stats stages that live in sibling crates):
-//!
-//! - SE: fixed → adapter → polyG → polyX → emit
-//! - PE: fixed → polyG → overlap → (fallback static adapter) → polyX → emit
-//!
-//! The only quality-adjacent check kept in this crate is the **post-trim
-//! min-length gate** — a zero-length read after trim must be discarded
-//! since no downstream tool will emit it. Full quality / N-content /
-//! sliding-window filtering lives in `rsomics-fastq-quality`.
 
 use std::path::Path;
 
@@ -28,10 +15,8 @@ use crate::overlap::{
 use crate::parallel_gz::ChunkedWriter;
 use crate::polyx::{PolyXConfig, find_dominant_polyx_3p, find_polyx_3p};
 
-/// Chunk size for the parallel scatter/gather. Larger amortises rayon
-/// dispatch overhead; smaller reduces memory peak. 8192 records ≈ 12 MB
-/// of sequence per chunk for typical 150 bp reads — comfortable on any
-/// modern machine and significantly fewer dispatches per file.
+// 8192 records ≈ 12 MB per chunk at 150 bp read length — amortises rayon
+// dispatch overhead while keeping memory peak modest.
 const CHUNK_RECORDS: usize = 8192;
 
 /// One FASTQ record decoupled from needletail's borrowed buffers.
@@ -75,8 +60,6 @@ impl Default for PipelineConfig {
     }
 }
 
-/// Counters returned by [`Pipeline::run_se`] / [`Pipeline::run_pe`].
-/// Serialised inside the `--json` envelope's `result`.
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct TrimReport {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -134,11 +117,7 @@ impl<'cfg> Pipeline<'cfg> {
         Self { cfg }
     }
 
-    /// Stream a single-end FASTQ through the trim pipeline.
-    ///
-    /// # Errors
-    ///
-    /// `InvalidInput` if input parsing fails; `Io` if output write fails.
+    #[allow(clippy::missing_errors_doc)]
     pub fn run_se(&self, input: &Path, output: &Path) -> Result<TrimReport> {
         let mut reader = parse_fastx_file(input)
             .map_err(|e| parse_err(&format!("opening input {}", input.display()), e))?;
@@ -186,12 +165,7 @@ impl<'cfg> Pipeline<'cfg> {
         Ok(report)
     }
 
-    /// Stream a paired-end FASTQ through the trim pipeline.
-    ///
-    /// # Errors
-    ///
-    /// `InvalidInput` if either input parses incorrectly or the pair
-    /// counts diverge; `Io` if writes fail.
+    #[allow(clippy::missing_errors_doc)]
     pub fn run_pe(&self, in1: &Path, in2: &Path, out1: &Path, out2: &Path) -> Result<TrimReport> {
         let mut r1 = parse_fastx_file(in1)
             .map_err(|e| parse_err(&format!("opening input {}", in1.display()), e))?;
@@ -255,9 +229,8 @@ impl<'cfg> Pipeline<'cfg> {
     }
 }
 
-/// A trimmed record kept in its original-allocation `Vec`s with a live
-/// `[start, end)` window. Skips the O(n) 5'-shift that `Vec::drain(..start)`
-/// would force on every front-trimmed record.
+/// `[start, end)` window into the original `Vec`s — avoids the O(n)
+/// shift that `Vec::drain(..start)` forces on every front-trimmed record.
 struct TrimmedRecord {
     id: Vec<u8>,
     seq: Vec<u8>,
@@ -295,8 +268,6 @@ fn trim_se_record(rec: OwnedRecord, cfg: &PipelineConfig) -> ProcessedSe {
 
     let original_len = rec.seq.len();
 
-    // Operate on a sliding `[start, end)` window into rec.seq / rec.qual.
-    // Avoids the O(n) `Vec::drain(..start)` shift on every fixed-trim run.
     let Some((start, mut end)) = apply_fixed(original_len, cfg.fixed1) else {
         delta.reads_too_short_after_trim = 1;
         return ProcessedSe { delta, write: None };

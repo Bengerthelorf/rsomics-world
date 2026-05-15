@@ -14,8 +14,6 @@ const META: ToolMeta = ToolMeta {
     version: env!("CARGO_PKG_VERSION"),
 };
 
-// Declarative help spec. The binary owns the data only — rich / plain /
-// json layouts all dispatch from this single struct in `rsomics-help`.
 const HELP: HelpSpec = HelpSpec {
     name: META.name,
     version: META.version,

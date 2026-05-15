@@ -2,19 +2,9 @@ use std::io;
 
 use thiserror::Error;
 
-/// Canonical error type for every `rsomics-*` tool. Variants carve out the
-/// distinctions that callers actually act on: input validity, configuration
-/// validity, upstream-tool / FFI failures, and I/O. Anything else collapses
-/// into one of these; we deliberately keep the variant count small so the
-/// [`crate::ExitCode`] mapping stays exhaustive without ceremony.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum RsomicsError {
-    /// Any failure surfaced through `std::io::Error`. Note this also catches
-    /// "user gave a non-existent path" cases — at this layer we can't tell
-    /// a hardware fault from a typo, so both route here. Integrators that
-    /// need finer granularity should bracket their boundary code with an
-    /// explicit `Path::exists()` check and map to `InvalidInput`.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
 
@@ -24,25 +14,10 @@ pub enum RsomicsError {
     #[error("configuration error: {0}")]
     ConfigError(String),
 
-    /// Failure surfaced from an external dependency. Covers two distinct
-    /// shapes that share an exit-code mapping but differ at the operator-
-    /// debug level:
-    ///
-    /// - **FFI return**: a `rust-htslib` or similar wrapped C library
-    ///   returned an error code or threw across the FFI boundary.
-    /// - **Subprocess non-zero**: a child process invoked for compat tests
-    ///   (e.g., `samtools view -c`) exited with a non-zero status.
-    ///
-    /// Both route to [`crate::ExitCode::UpstreamError`]. Callers that need
-    /// to distinguish should match on the embedded message prefix or
-    /// promote to a dedicated variant in a future minor bump.
     #[error("upstream tool error: {0}")]
     UpstreamError(String),
 }
 
-/// Shorthand `Result` parameterised over [`RsomicsError`]. Tool code should
-/// return this from any fallible boundary; the runner ([`crate::run`]) maps
-/// it to a process exit code.
 pub type Result<T> = std::result::Result<T, RsomicsError>;
 
 impl From<std::num::ParseIntError> for RsomicsError {
@@ -63,26 +38,12 @@ impl From<std::str::Utf8Error> for RsomicsError {
     }
 }
 
-/// Attach a description to a `Result` that turns into the prefix of the
-/// resulting `RsomicsError` message. Lets tools write
-/// `File::create(p).rs_context(|| format!("opening {}", p.display()))?` and
-/// get a contextual error without an `anyhow` dependency.
+/// Attach a contextual prefix to a `Result`, turning it into `RsomicsError`.
 pub trait Context<T> {
-    /// Eager-evaluated context. Use when the message is a literal or
-    /// already-computed string.
-    ///
-    /// # Errors
-    ///
-    /// Returns the original `Err` wrapped as [`RsomicsError`] with the
-    /// supplied prefix prepended.
+    #[allow(clippy::missing_errors_doc)]
     fn rs_context(self, msg: impl Into<String>) -> Result<T>;
 
-    /// Lazy-evaluated context. The closure runs only when the result is
-    /// `Err`, so `format!` work is avoided on the success path.
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::rs_context`].
+    #[allow(clippy::missing_errors_doc)]
     fn rs_with_context<F>(self, f: F) -> Result<T>
     where
         F: FnOnce() -> String;
@@ -120,8 +81,6 @@ impl<T> Context<T> for Result<T> {
     }
 }
 
-/// Chain a contextual prefix onto an existing `RsomicsError` while preserving
-/// its variant (so [`crate::ExitCode`] mapping stays correct).
 fn prepend(prefix: &str, e: RsomicsError) -> RsomicsError {
     match e {
         RsomicsError::Io(inner) => {

@@ -1,10 +1,3 @@
-//! Test-only scaffolding shared across `rsomics-*` integration tests and
-//! benches. Behind the `test-support` Cargo feature so the production binary
-//! never carries the symbols.
-//!
-//! The fixture-path resolver is a macro rather than a function because
-//! `env!("CARGO_MANIFEST_DIR")` resolves at the *call site* — we need each
-//! consuming crate to read its OWN manifest dir, not rsomics-common's.
 
 #[cfg(feature = "tier2")]
 pub mod tier2;
@@ -12,13 +5,8 @@ pub mod tier2;
 use std::process::{Command, Output, Stdio};
 
 /// Build a `PathBuf` pointing to `tests/golden/<rel>` under the **caller's**
-/// crate manifest directory.
-///
-/// ```no_run
-/// # use rsomics_common::fixture_path;
-/// let p = fixture_path!("tiny.bam");
-/// assert!(p.ends_with("tests/golden/tiny.bam"));
-/// ```
+/// crate manifest directory. Must be a macro so `env!("CARGO_MANIFEST_DIR")`
+/// resolves at the call site.
 #[macro_export]
 macro_rules! fixture_path {
     ($rel:expr) => {{
@@ -30,13 +18,6 @@ macro_rules! fixture_path {
     }};
 }
 
-/// Resolve the path to the workspace-root Tier-2 fixture manifest from
-/// any `rsomics-*` crate. Assumes the workspace layout
-/// `<root>/crates/{foundation,tools}/<crate>/` and that the manifest
-/// lives at `<root>/tests/fixtures-manifest.toml`.
-///
-/// Lives as a macro so `env!("CARGO_MANIFEST_DIR")` resolves at the
-/// caller's compile site.
 #[macro_export]
 macro_rules! tier2_manifest_path {
     () => {{
@@ -51,8 +32,6 @@ macro_rules! tier2_manifest_path {
     }};
 }
 
-/// True if `<name>` is on `PATH` and `<name> --version` exits zero. Used by
-/// compat tests to skip gracefully when the upstream binary isn't installed.
 #[must_use]
 pub fn tool_on_path(name: &str) -> bool {
     Command::new(name)
@@ -63,15 +42,8 @@ pub fn tool_on_path(name: &str) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-/// Run an external tool with the given args and return its captured `Output`.
-/// Panics if the spawn fails entirely — callers should have gated this with
-/// [`tool_on_path`] first.
-///
-/// # Panics
-///
-/// Panics if `Command::output` returns `Err` (the binary couldn't even be
-/// spawned — distinct from "spawned and exited non-zero").
 #[must_use]
+#[allow(clippy::missing_panics_doc)]
 pub fn run_tool(name: &str, args: &[&str]) -> Output {
     Command::new(name)
         .args(args)

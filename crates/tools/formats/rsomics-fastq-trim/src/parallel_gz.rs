@@ -1,22 +1,8 @@
-//! Parallel-gzip output via rayon-distributed libdeflate compression.
-//!
-//! `flate2` with the `zlib-rs` backend gives us ~80 MB/s single-threaded
-//! compression — competitive with system gzip but ~3× slower than fastp's
-//! libdeflate-backed write path. Compression dominates the wall clock for
-//! a no-trim pass (decompress takes ~13 ms on a 17 MB input; compress
-//! 380 ms), so this is the only axis where a parallel-codec win is large
-//! enough to matter.
-//!
-//! ## Approach
-//!
-//! Gzip permits concatenated members in one file — `gunzip` / fastp /
-//! seqkit / pigz all decode it transparently. So we batch trimmed FASTQ
-//! bytes into ~256 KB chunks, hand each chunk to a rayon worker that
-//! produces a self-contained gzip member via libdeflate, then write the
-//! compressed members to the output file in input order.
-//!
-//! For plain-text output we skip this whole module and write directly
-//! through a `BufWriter`.
+// Gzip permits concatenated members — gunzip/fastp/seqkit/pigz decode them
+// transparently. We produce one self-contained gzip member per ~256 KB chunk
+// via libdeflate on rayon workers, then write in input order.
+// flate2/zlib-rs (~80 MB/s ST) is ~3× slower than fastp's libdeflate path;
+// parallel chunking closes that gap.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -26,22 +12,12 @@ use libdeflater::{CompressionLvl, Compressor};
 use rayon::prelude::*;
 use rsomics_common::{Context, Result, RsomicsError};
 
-/// Target plain-FASTQ bytes per compression chunk. 256 KB gives ~4×
-/// gzip ratio → ~64 KB compressed members, modest header overhead, and
-/// enough work per rayon dispatch to amortise the per-call cost.
 pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 
-/// Default libdeflate compression level (fastp matches at 4). 1 =
-/// fastest / largest output, 12 = slowest / smallest. Override per
-/// `ChunkedWriter::create`.
 #[cfg(test)]
 pub(crate) const GZ_DEFAULT_LEVEL: i32 = 4;
 
-/// Maximum number of pending plain-byte chunks the writer holds before
-/// it forces a parallel-compress + write of the queued batch. Keeps the
-/// in-memory footprint bounded regardless of input size: at any moment
-/// at most `MAX_PENDING_CHUNKS * GZ_CHUNK_BYTES` plain bytes are held.
-/// 16 × 256 KB = 4 MB cap, enough work per rayon dispatch.
+// 16 × 256 KB = 4 MB peak in-flight. Flush when this fills.
 pub const MAX_PENDING_CHUNKS: usize = 16;
 
 /// Compress one buffer to a self-contained gzip member.

@@ -9,17 +9,9 @@ use crate::error::Result;
 #[cfg(feature = "rayon")]
 use crate::error::RsomicsError;
 
-/// Flag block every `rsomics-*` tool flattens into its own `clap::Parser`
-/// struct via `#[command(flatten)]`. Holding these in one place keeps short
-/// names, help text, and semantics consistent across the family — a user
-/// running `rsomics-bam`'s `--threads` learns nothing new vs. `rsomics-fastp`.
-///
-/// **Placement rule**: flatten into the **top-level** `Parser` struct, not
-/// into a subcommand `Args` struct. Each flag has `global = true` so clap
-/// propagates it down to every subcommand; defining the flags inside a
-/// subcommand-level struct would either (a) duplicate the surface across
-/// every subcommand or (b) cause `global = true` to attach to the wrong
-/// scope and surface a clap parse error at runtime.
+/// Common flags flattened into every tool's top-level `clap::Parser` via
+/// `#[command(flatten)]`. Each flag carries `global = true` so clap
+/// propagates it through subcommands — flatten at the top level only.
 #[derive(Debug, Clone, Args)]
 pub struct CommonFlags {
     /// Number of worker threads to use. Defaults to available parallelism.
@@ -47,8 +39,6 @@ pub struct CommonFlags {
 }
 
 impl CommonFlags {
-    /// Effective thread count. Falls back to `std::thread::available_parallelism`
-    /// then to 1 if even that fails.
     #[must_use]
     pub fn thread_count(&self) -> usize {
         self.threads
@@ -56,20 +46,8 @@ impl CommonFlags {
             .unwrap_or(1)
     }
 
-    /// Configure the global rayon pool to match `thread_count()`. Idempotent
-    /// when the existing pool already matches; loud when a pre-existing pool
-    /// has a different thread count and our `--threads` request would
-    /// silently be ignored.
-    ///
-    /// When the `rayon` feature is disabled this is a no-op returning `Ok(())` —
-    /// the API stays stable so [`crate::run`] doesn't need conditional code.
-    ///
-    /// # Errors
-    ///
-    /// Returns `ConfigError` when `build_global` failed AND the resulting
-    /// active pool size doesn't match the requested thread count — i.e. the
-    /// user asked for N threads but the process is locked into M ≠ N.
     #[cfg(feature = "rayon")]
+    #[allow(clippy::missing_errors_doc)]
     pub fn install_rayon_pool(&self) -> Result<()> {
         let want = self.thread_count();
         if ThreadPoolBuilder::new()
@@ -88,20 +66,13 @@ impl CommonFlags {
         Ok(())
     }
 
-    /// No-op variant when rayon support is disabled. Same signature as the
-    /// `#[cfg(feature = "rayon")]` arm so [`crate::run`] can call it
-    /// unconditionally.
     #[cfg(not(feature = "rayon"))]
     #[allow(clippy::unused_self)]
     pub fn install_rayon_pool(&self) -> Result<()> {
         Ok(())
     }
 
-    /// Seed value for downstream RNGs. If `--seed` was supplied that value
-    /// wins (including `--seed 0` — explicit-zero is preserved, not treated
-    /// as "no seed"). Otherwise a high-entropy value is drawn from the OS
-    /// once per process via [`OnceLock`], so repeated calls within a run
-    /// agree on a single fresh seed.
+    /// `--seed 0` is preserved verbatim — explicit zero is not treated as "no seed".
     #[must_use]
     pub fn seed_rng(&self) -> u64 {
         static FRESH_SEED: OnceLock<u64> = OnceLock::new();
@@ -112,11 +83,6 @@ impl CommonFlags {
     }
 }
 
-/// Fold the process id, monotonic time, and a small bit of address-space
-/// entropy into a `u64`. The output isn't cryptographic but is good enough
-/// to seed downstream RNGs without pulling in a fresh `getrandom`
-/// dependency at this layer. Zero is a valid output — callers must not
-/// treat any specific value as a sentinel.
 #[allow(clippy::cast_possible_truncation)]
 fn fresh_os_seed() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};

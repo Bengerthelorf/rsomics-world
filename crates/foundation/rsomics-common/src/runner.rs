@@ -8,33 +8,6 @@ use crate::flags::CommonFlags;
 use crate::json::{ToolMeta, emit_error, emit_ok};
 use crate::log::StderrLog;
 
-/// Standard tool entrypoint. Every `rsomics-*` binary's `main` calls this:
-///
-/// ```ignore
-/// const META: rsomics_common::ToolMeta = rsomics_common::ToolMeta {
-///     name: env!("CARGO_PKG_NAME"),
-///     version: env!("CARGO_PKG_VERSION"),
-/// };
-///
-/// fn main() -> std::process::ExitCode {
-///     let args = Cli::parse();
-///     let common = args.common.clone();
-///     rsomics_common::run(&common, META, || pipeline(args))
-/// }
-/// ```
-///
-/// Responsibilities, in order:
-///
-/// 1. Install the global rayon pool sized to `--threads`. A failure here
-///    becomes a `ConfigError` and the process exits with
-///    [`ExitCode::ConfigError`] before `body` runs.
-/// 2. Run `body`. Its `Result<T>` is consumed: on `Ok(T)`, if `--json` is
-///    set, emit a [`crate::json`] success envelope wrapping `T` to stdout;
-///    otherwise discard `T`. On `Err`, emit an error envelope to stderr
-///    when `--json` is set, plus the human-readable error line always.
-/// 3. Map the outcome to an [`ExitCode`] and return it.
-///
-/// The `process::ExitCode` returned is what `main` should return directly.
 pub fn run<T, F>(common: &CommonFlags, meta: ToolMeta, body: F) -> process::ExitCode
 where
     F: FnOnce() -> Result<T>,

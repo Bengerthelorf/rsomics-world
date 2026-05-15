@@ -3,22 +3,17 @@ use std::io::{self, Write};
 
 use crate::flags::CommonFlags;
 
-/// Stderr sink that respects `CommonFlags::quiet`. Error-level messages
-/// always print; info/debug honour `--quiet` / `--verbose`.
+/// Stderr sink that respects `--quiet` / `--verbose`. `error` always prints;
+/// `info` respects quiet; `debug` requires verbose.
 ///
-/// Deliberately minimal — no `log` / `tracing` indirection at this layer.
-/// Callers write `log.info(format_args!("..."))` directly; that's cheap
-/// enough to not deserve a macro wrapper, and avoids dropping `info!` /
-/// `error!` / `debug!` into every dependent crate's prelude where they'd
-/// collide with the well-known `log` crate macros.
+/// No `log`/`tracing` indirection — avoids name collision with the `log` crate
+/// macros in dependent crates' preludes.
 #[derive(Debug, Clone, Copy)]
 pub struct StderrLog {
     pub quiet: bool,
     pub verbose: bool,
-    /// Mirrors `CommonFlags::json`. Subcommand handlers consult this to
-    /// suppress human-friendly stdout chatter (raw counts, progress lines)
-    /// that would otherwise interleave with the structured JSON envelope
-    /// [`crate::run`] emits to stdout at the end of a successful run.
+    /// When true, suppress human-friendly stdout output that would interleave
+    /// with the JSON envelope emitted by `rsomics_common::run`.
     pub json: bool,
 }
 
@@ -32,12 +27,10 @@ impl StderrLog {
         }
     }
 
-    /// Always-on diagnostic — errors never get silenced.
     pub fn error(&self, args: fmt::Arguments<'_>) {
         let _ = writeln!(io::stderr().lock(), "error: {args}");
     }
 
-    /// Non-error progress / info. Suppressed under `--quiet`.
     pub fn info(&self, args: fmt::Arguments<'_>) {
         if self.quiet {
             return;
@@ -45,8 +38,6 @@ impl StderrLog {
         let _ = writeln!(io::stderr().lock(), "{args}");
     }
 
-    /// Debug-level diagnostic. Only printed under `--verbose`, and even
-    /// then suppressed by `--quiet`.
     pub fn debug(&self, args: fmt::Arguments<'_>) {
         if self.quiet || !self.verbose {
             return;

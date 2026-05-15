@@ -2,10 +2,8 @@ use std::process;
 
 use crate::error::RsomicsError;
 
-/// Numeric process exit codes shared across every `rsomics-*` binary. The
-/// integer assignments are part of the tool contract — callers (shell
-/// pipelines, schedulers) branch on them. New variants are additions, not
-/// renumberings.
+/// Exit codes are part of the tool contract — callers branch on them.
+/// New variants are additions, not renumberings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ExitCode {

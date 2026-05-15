@@ -1,13 +1,3 @@
-//! Poly-X tail trimming. Two scan modes:
-//!
-//! - [`find_polyx_3p`] — forced-base scan (default poly-G).
-//! - [`find_dominant_polyx_3p`] — A/C/G/T simultaneous count, dominant
-//!   base post-scan.
-//!
-//! Ports of `PolyX::trimPolyG` and `PolyX::trimPolyX` from fastp's
-//! `polyx.cpp`. The rate-based mismatch budget absorbs interspersed
-//! non-target bases inside a long run — an isolated G at the 5'-most
-//! edge of a poly-G stretch still shifts the trim point left.
 
 use std::num::NonZeroUsize;
 
@@ -47,14 +37,10 @@ impl PolyXConfig {
 
 #[derive(Debug, Clone, Copy)]
 pub struct DominantPolyXResult {
-    /// Dominant base of the trimmed tail (uppercase ASCII).
     pub base: u8,
-    /// 0-based offset where the trim happens — keep `seq[..trim_at]`.
     pub trim_at: usize,
 }
 
-/// Forced-base scan. Returns the 0-based trim offset, or `None` if no
-/// qualifying tail of length `≥ cfg.min_len` is found.
 #[must_use]
 pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
     let rlen = seq.len();
@@ -86,10 +72,7 @@ pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
     }
 }
 
-/// Dominant-base scan. Counts A/C/G/T simultaneously walking from the 3'
-/// end; on stop, picks the most-represented base as the polyX target and
-/// returns the trim offset at its last-occurrence position. `N` increments
-/// all four counters (fastp parity).
+/// `N` increments all four A/C/G/T counters — fastp parity.
 #[must_use]
 pub fn find_dominant_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<DominantPolyXResult> {
     let rlen = seq.len();

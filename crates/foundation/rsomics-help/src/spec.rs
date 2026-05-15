@@ -1,7 +1,3 @@
-//! Declarative help spec — the data each binary hands to
-//! [`crate::render`]. The binary owns no rendering logic; it just
-//! declares what its help screen *says*, and `rsomics-help` decides
-//! *how* to paint it across rich / plain / JSON.
 
 use serde::Serialize;
 

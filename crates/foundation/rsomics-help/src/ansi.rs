@@ -1,24 +1,13 @@
-//! ANSI escape primitives + `NO_COLOR` detection.
-//!
-//! 24-bit foreground colors via `\x1b[38;2;R;G;Bm` (universally supported
-//! in modern terminals; degrades visibly but harmlessly elsewhere). The
-//! family palette is bound here so every binary's `--help` lands on the
-//! same hues.
 
 pub(crate) const RESET: &str = "\x1b[0m";
 pub(crate) const BOLD: &str = "\x1b[1m";
 pub(crate) const DIM: &str = "\x1b[2m";
 
-/// Returns `true` if the user has set `NO_COLOR` to any value. Per
-/// <https://no-color.org/>, that's an environment-wide opt-out.
 #[must_use]
 pub fn no_color_env() -> bool {
     std::env::var_os("NO_COLOR").is_some()
 }
 
-/// Family color palette. TEAL anchors taglines / section colors; the
-/// banner uses a separate 4-stop progression that mirrors pikpaktui's
-/// bright-cyan → cyan → bright-blue → bright-magenta hue walk.
 pub struct Palette;
 
 impl Palette {
@@ -30,8 +19,8 @@ impl Palette {
     pub const YELLOW: (u8, u8, u8) = (250, 204, 21);
     pub const SLATE: (u8, u8, u8) = (148, 163, 184);
 
-    /// Banner gradient stops — RGB approximations of the ANSI-16 sequence
-    /// `\x1b[96m → [36m → [94m → [95m` used by pikpaktui's `dMP` art.
+    // RGB approximations of the ANSI-16 sequence `\x1b[96m → [36m → [94m → [95m`
+    // used by pikpaktui's `dMP` art.
     pub const FAMILY_GRADIENT: [(u8, u8, u8); 4] = [
         (85, 255, 255),
         (0, 205, 205),
@@ -40,8 +29,6 @@ impl Palette {
     ];
 }
 
-/// Format `s` with a 24-bit RGB foreground. When `color` is `false`,
-/// returns `s` unchanged (no escapes).
 #[must_use]
 pub fn rgb(color: bool, rgb: (u8, u8, u8), s: &str) -> String {
     if !color {
@@ -51,7 +38,6 @@ pub fn rgb(color: bool, rgb: (u8, u8, u8), s: &str) -> String {
     format!("\x1b[38;2;{r};{g};{b}m{s}{RESET}")
 }
 
-/// Bold-style wrapper. No-op when `color` is `false`.
 #[must_use]
 pub fn bold(color: bool, s: &str) -> String {
     if color {
@@ -61,7 +47,6 @@ pub fn bold(color: bool, s: &str) -> String {
     }
 }
 
-/// Dim-style wrapper. No-op when `color` is `false`.
 #[must_use]
 pub fn dim(color: bool, s: &str) -> String {
     if color {

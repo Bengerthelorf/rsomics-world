@@ -1,47 +1,3 @@
-//! Machine-readable JSON envelope for AI / scripting consumers.
-//!
-//! Every `rsomics-*` binary supports `--json` (workspace-wide bool from
-//! [`crate::CommonFlags`]). When set, the binary emits a stable, versioned
-//! JSON object on success (to **stdout**) or on error (to **stderr**),
-//! mutually exclusive — stdout stays parseable for the success case.
-//!
-//! Envelope shape (success):
-//!
-//! ```json
-//! {
-//!   "schema_version": "1.0",
-//!   "tool": "rsomics-fastp",
-//!   "tool_version": "0.2.0",
-//!   "status": "ok",
-//!   "result": { ...tool-specific summary... }
-//! }
-//! ```
-//!
-//! Envelope shape (error):
-//!
-//! ```json
-//! {
-//!   "schema_version": "1.0",
-//!   "tool": "rsomics-fastp",
-//!   "tool_version": "0.2.0",
-//!   "status": "error",
-//!   "error": { "kind": "InvalidInput", "message": "..." },
-//!   "exit_code": 1
-//! }
-//! ```
-//!
-//! ## Schema versioning
-//!
-//! `schema_version` is `MAJOR.MINOR`. MINOR bumps add optional fields; MAJOR
-//! bumps remove or rename fields. Consumers should accept any MINOR within
-//! their pinned MAJOR. The current value is [`SCHEMA_VERSION`].
-//!
-//! ## Why stdout/stderr split
-//!
-//! Success JSON to stdout means `rsomics-fastp ... --json | jq '.result'`
-//! works directly. Error JSON to stderr means a streaming consumer's stdout
-//! parser doesn't have to decide between "is this a partial result or an
-//! error?" — errors never appear in the stdout stream.
 
 use std::io::Write;
 
@@ -50,13 +6,9 @@ use serde::Serialize;
 use crate::error::RsomicsError;
 use crate::exit::ExitCode;
 
-/// Current envelope schema version. Bump MINOR for additive fields,
-/// MAJOR for breaking changes (field removal / rename / type change).
+/// Schema version: MINOR bumps add optional fields; MAJOR bumps are breaking.
 pub const SCHEMA_VERSION: &str = "1.0";
 
-/// Tool identity, baked into every envelope. Tools construct one of these
-/// from `env!("CARGO_PKG_NAME")` + `env!("CARGO_PKG_VERSION")` and pass it
-/// to [`crate::run`].
 #[derive(Debug, Clone, Copy)]
 pub struct ToolMeta {
     pub name: &'static str,
@@ -88,8 +40,6 @@ struct ErrorBody<'a> {
     message: &'a str,
 }
 
-/// Emit a success envelope wrapping `result` to stdout. Adds a trailing
-/// newline so consumers using `read_until('\n')` see a complete line.
 pub fn emit_ok<T: Serialize>(meta: &ToolMeta, result: &T) {
     let env = OkEnvelope {
         schema_version: SCHEMA_VERSION,
@@ -102,9 +52,6 @@ pub fn emit_ok<T: Serialize>(meta: &ToolMeta, result: &T) {
     let _ = writeln!(std::io::stdout().lock());
 }
 
-/// Emit an error envelope to stderr. The `kind` field uses one of the
-/// stable variant names (`Io`, `InvalidInput`, `ConfigError`,
-/// `UpstreamError`) so scripts can dispatch without parsing the message.
 pub fn emit_error(meta: &ToolMeta, err: &RsomicsError) {
     let kind = match err {
         RsomicsError::Io(_) => "Io",

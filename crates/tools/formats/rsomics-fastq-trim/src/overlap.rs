@@ -1,24 +1,8 @@
-//! PE overlap-based adapter detection.
-//!
-//! When the insert is shorter than the read, R2's reverse complement
-//! overlaps R1 at the 3' end and the bases past the overlap region are
-//! adapter. fastp scans every shift offset of R2-RC against R1 within a
-//! mismatch budget; the first match wins and the trim point falls out
-//! of the geometry.
-//!
-//! Hamming-distance scan only — fastp's
-//! `--allow_gap_overlap_trimming` path is not implemented.
-//!
-//! Forward scan tries `offset` in `0..=len1-overlap_require` (R2-RC
-//! starts inside R1); reverse scan tries `offset` down to
-//! `-(len2-overlap_require)` (R2-RC starts before R1). Per-overlap
-//! mismatch budget: `min(diff_limit, floor(overlap_len * pct))`. Trim
-//! geometry: negative offset = adapter present at the 3' end of both
-//! mates; non-negative offset = no adapter trim needed.
+// Hamming-distance only — fastp's `--allow_gap_overlap_trimming` path is not
+// implemented. Trim geometry: negative offset = adapter present; non-negative
+// = no adapter trim needed.
 
-/// Knobs for the overlap scan. Defaults match fastp's defaults.
-/// `diff_percent_limit` must be a fraction in `[0.0, 1.0]`; values
-/// outside this range are clamped at [`Self::sanitised`] construction.
+/// `diff_percent_limit` is clamped to `[0.0, 1.0]` at `sanitised` construction.
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapConfig {
     pub overlap_require: usize,
@@ -27,10 +11,6 @@ pub struct OverlapConfig {
 }
 
 impl OverlapConfig {
-    /// Construct from raw values and clamp `diff_percent_limit` into
-    /// `[0.0, 1.0]`. Use this at the CLI boundary so out-of-range user
-    /// input fails loudly rather than silently turning into a bogus
-    /// budget downstream.
     #[must_use]
     pub fn sanitised(overlap_require: usize, diff_limit: usize, diff_percent_limit: f32) -> Self {
         let pct = if diff_percent_limit.is_nan() {
@@ -56,12 +36,10 @@ impl Default for OverlapConfig {
     }
 }
 
-/// Outcome of a single overlap scan.
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapResult {
     pub overlapped: bool,
-    /// Positive = R2-RC starts inside R1; negative = R2-RC starts before
-    /// R1 (adapter-present geometry).
+    /// Positive = R2-RC starts inside R1; negative = adapter-present geometry.
     pub offset: i64,
     pub overlap_len: usize,
     pub diff: usize,
@@ -103,8 +81,6 @@ fn complement(b: u8) -> u8 {
     }
 }
 
-/// Scan `r1` against pre-RC'd `r2_rc` and return the best-fit overlap
-/// geometry.
 #[must_use]
 pub fn analyze(r1: &[u8], r2_rc: &[u8], cfg: OverlapConfig) -> OverlapResult {
     let len1 = r1.len();
@@ -182,10 +158,8 @@ fn count_mismatches_bounded(a: &[u8], b: &[u8], limit: usize) -> usize {
     diff
 }
 
-/// Only fires when `ov.offset < 0` (adapter-present geometry).
-/// `front_trimmed1` / `front_trimmed2` are the per-mate fixed-front
-/// trim counts already applied — needed so the overlap-derived trim
-/// lengths stay consistent with the original read frame.
+/// `front_trimmed1`/`front_trimmed2` are already-applied fixed-front trims —
+/// required to keep overlap-derived lengths consistent with the original read frame.
 #[must_use]
 pub fn trim_lengths(
     ov: OverlapResult,
