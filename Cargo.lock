@@ -361,6 +361,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "divsufsort"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e57e36c45fe0b4ef9bc690e53cce2f46dc193f7be3bc93bb7d23ca6dc1be820"
+dependencies = [
+ "sacabase",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1032,6 +1041,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-fm-index"
+version = "0.1.0"
+dependencies = [
+ "divsufsort",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rsomics-help"
 version = "0.3.1"
 dependencies = [
@@ -1153,6 +1170,15 @@ dependencies = [
  "ring",
  "rustls-pki-types",
  "untrusted",
+]
+
+[[package]]
+name = "sacabase"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9883fc3d6ce3d78bb54d908602f8bc1f7b5f983afe601dabe083009d86267a84"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
