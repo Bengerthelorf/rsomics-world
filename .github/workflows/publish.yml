@@ -48,7 +48,7 @@ jobs:
           # The compat tests assert these are on PATH (fail-loud if missing).
           # See ci.yml for the same install step.
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fastp samtools
+          sudo apt-get install -y --no-install-recommends fastp samtools bedtools
           arch=$(uname -m)
           case "$arch" in
             x86_64)  seqkit_arch=amd64 ;;
@@ -61,6 +61,7 @@ jobs:
           sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
           fastp --version
           seqkit version
+          bedtools --version
 
       - name: cargo test
         run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features
