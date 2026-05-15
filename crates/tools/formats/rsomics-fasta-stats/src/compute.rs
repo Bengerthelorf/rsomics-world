@@ -294,7 +294,14 @@ impl LengthStats {
                 }
             }
         }
-        0.0
+        // The last bucket's `acc` equals `self.count`; q1/q2/q3 callers
+        // pass `i_med_l < self.count`, so the loop must always return.
+        // Reaching here means a caller broke the invariant — louder than
+        // a silent 0.0.
+        unreachable!(
+            "LengthStats::get_value: i_med_l={i_med_l} not bracketed in counts (count={}, flag={flag}, prev={prev})",
+            self.count
+        )
     }
 
     fn q2(&self) -> f64 {

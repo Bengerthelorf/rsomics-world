@@ -138,7 +138,10 @@ pub fn find_dominant_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<DominantPo
         }
     }
     let dom_base = b"ACGT"[dom_idx];
-    let mut pos = i;
+    // `i` counts scanned bytes (0..=rlen); back-search uses
+    // `seq[rlen - pos - 1]`, so `pos` must stay within `[0, rlen-1]`.
+    // The natural-exit path (loop ran to `i == rlen`) needs the clamp.
+    let mut pos = i.min(rlen - 1);
     while pos > 0 && seq[rlen - pos - 1].to_ascii_uppercase() != dom_base {
         pos -= 1;
     }
@@ -216,5 +219,20 @@ mod tests {
     fn dominant_polyx_no_dominant_tail_returns_none() {
         let seq = b"ACGTACGTACGTACGTACGTACGTACGTACGT";
         assert!(find_dominant_polyx_3p(seq, PolyXConfig::default()).is_none());
+    }
+
+    #[test]
+    fn dominant_polyx_iupac_ambiguity_no_panic() {
+        // IUPAC ambiguity codes (R/Y/S/W/K/M/B/D/H/V) are not in the
+        // A/C/G/T/N count arms — counts stay zero. With a loose budget the
+        // scan reaches `i == rlen`; the back-search must still be in-bounds.
+        let seq = b"RYSWKMBDHVRYSWKMBDHVRYSWKMBDHVRY";
+        let cfg = PolyXConfig {
+            base: b'G',
+            min_len: seq.len(),
+            max_mismatches: usize::MAX,
+            mismatch_per_bases: NonZeroUsize::new(1).unwrap(),
+        };
+        assert!(find_dominant_polyx_3p(seq, cfg).is_none());
     }
 }
