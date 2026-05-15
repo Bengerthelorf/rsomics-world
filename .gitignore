@@ -1,5 +1,6 @@
 /target
 /.autopilot/
+/.claude/
 /tests/fixtures-cache/
 *.swp
 .DS_Store
