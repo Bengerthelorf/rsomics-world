@@ -1,0 +1,129 @@
+//! Criterion bench vs `fastp` on a deterministic synthetic FASTQ.
+//!
+//! Fixture: 100 000 SE reads × 150 bp with a 33 bp 3' adapter overhang on
+//! ~30% of records (≈40 MB plain). Both binaries are pinned to 1 thread
+//! and run with adapter-only flags so the comparison is on the same hot
+//! path the fairness audit was about (`bench-rsomics-fastq-trim-2026-05-15.toml`).
+
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
+use std::process::Command;
+
+const N_READS: usize = 100_000;
+const READ_LEN: usize = 150;
+const ADAPTER: &[u8] = b"AGATCGGAAGAGCACACGTCTGAACTCCAGTCA";
+const SEED: u64 = 0x0000_BEE5;
+
+fn synth_fastq(path: &PathBuf) {
+    let f = File::create(path).expect("create bench fixture");
+    let mut w = BufWriter::new(f);
+    let mut rng = SEED;
+    for i in 0..N_READS {
+        writeln!(w, "@read_{i}").unwrap();
+        let has_adapter = (i % 3) == 0;
+        let body_len = if has_adapter {
+            READ_LEN - ADAPTER.len()
+        } else {
+            READ_LEN
+        };
+        for _ in 0..body_len {
+            rng = rng.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            w.write_all(&[b"ACGT"[((rng >> 33) & 3) as usize]]).unwrap();
+        }
+        if has_adapter {
+            w.write_all(ADAPTER).unwrap();
+        }
+        w.write_all(b"\n+\n").unwrap();
+        for _ in 0..READ_LEN {
+            w.write_all(b"I").unwrap();
+        }
+        w.write_all(b"\n").unwrap();
+    }
+}
+
+fn ensure_fixture() -> PathBuf {
+    let mut p = std::env::temp_dir();
+    p.push(format!("rsomics-fastq-trim-bench-{N_READS}x{READ_LEN}.fq"));
+    if !p.exists() {
+        synth_fastq(&p);
+    }
+    p
+}
+
+fn fastp_available() -> bool {
+    Command::new("fastp")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+fn bench(c: &mut Criterion) {
+    let fixture = ensure_fixture();
+    let ours = env!("CARGO_BIN_EXE_rsomics-fastq-trim");
+    let outdir = tempfile::tempdir().expect("bench outdir");
+    let out_ours = outdir.path().join("ours.fq");
+    let out_fastp = outdir.path().join("fastp.fq");
+    let json_fastp = outdir.path().join("fastp.json");
+    let html_fastp = outdir.path().join("fastp.html");
+
+    let mut group = c.benchmark_group(format!("fastq_trim_adapter/{N_READS}x{READ_LEN}"));
+    group.sample_size(10);
+
+    group.bench_function("rsomics-fastq-trim", |b| {
+        b.iter(|| {
+            let out = Command::new(ours)
+                .args([
+                    "-i",
+                    fixture.to_str().unwrap(),
+                    "-o",
+                    out_ours.to_str().unwrap(),
+                    "-t",
+                    "1",
+                ])
+                .output()
+                .expect("ours run");
+            assert!(
+                out.status.success(),
+                "rsomics-fastq-trim failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        });
+    });
+
+    if fastp_available() {
+        group.bench_function("fastp", |b| {
+            b.iter(|| {
+                let out = Command::new("fastp")
+                    .args([
+                        "-i",
+                        fixture.to_str().unwrap(),
+                        "-o",
+                        out_fastp.to_str().unwrap(),
+                        "--thread",
+                        "1",
+                        "--disable_quality_filtering",
+                        "--disable_length_filtering",
+                        "--json",
+                        json_fastp.to_str().unwrap(),
+                        "--html",
+                        html_fastp.to_str().unwrap(),
+                    ])
+                    .output()
+                    .expect("fastp run");
+                assert!(
+                    out.status.success(),
+                    "fastp failed: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            });
+        });
+    } else {
+        eprintln!("fastp not on PATH — skipping upstream comparison");
+    }
+    group.finish();
+}
+
+criterion_group!(benches, bench);
+criterion_main!(benches);

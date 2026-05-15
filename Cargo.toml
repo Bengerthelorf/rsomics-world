@@ -29,6 +29,7 @@ rayon = "1"
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
 
 noodles = "0.110"
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
 
 # Shared lint posture across every crate in the workspace. Crates inherit
 # via `[lints] workspace = true`. The rationale lives in the per-rule

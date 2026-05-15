@@ -24,4 +24,28 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo bench --workspace --no-run
+      - name: Install upstream binaries for comparison benches
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fastp samtools
+          arch=$(uname -m)
+          case "$arch" in
+            x86_64)  seqkit_arch=amd64 ;;
+            aarch64) seqkit_arch=arm64 ;;
+            *) echo "unsupported arch $arch for seqkit fetch" >&2 ; exit 1 ;;
+          esac
+          curl -fsSL -o /tmp/seqkit.tar.gz \
+            "https://github.com/shenwei356/seqkit/releases/download/v2.13.0/seqkit_linux_${seqkit_arch}.tar.gz"
+          tar -xzf /tmp/seqkit.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
+          fastp --version
+          seqkit version
+      - name: Run benches (criterion)
+        run: cargo bench --workspace
+      - name: Upload criterion artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-${{ matrix.target.triple }}
+          path: target/criterion/
+          if-no-files-found: ignore

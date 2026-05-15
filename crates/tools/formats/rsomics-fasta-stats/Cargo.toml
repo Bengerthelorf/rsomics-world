@@ -29,6 +29,11 @@ memchr = "2"
 [dev-dependencies]
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5", features = ["test-support", "rayon"] }
 tempfile = "3"
+criterion.workspace = true
+
+[[bench]]
+name = "fasta_stats"
+harness = false
 
 [lints]
 workspace = true
