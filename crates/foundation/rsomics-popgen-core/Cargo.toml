@@ -1,0 +1,17 @@
+[package]
+name = "rsomics-popgen-core"
+version = "0.1.0"
+description = "Population-genetics primitives: π, Watterson's θ, Tajima's D, Hardy-Weinberg exact, LD r². Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["popgen", "bioinformatics", "hardy-weinberg", "tajima-d", "linkage-disequilibrium"]
+
+[dependencies]
+thiserror.workspace = true
+
+[lints]
+workspace = true

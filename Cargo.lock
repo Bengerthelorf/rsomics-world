@@ -1032,6 +1032,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-popgen-core"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rsomics-pvalue-adjust"
 version = "0.1.0"
 dependencies = [
