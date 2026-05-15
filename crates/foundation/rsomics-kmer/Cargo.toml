@@ -1,0 +1,20 @@
+[package]
+name = "rsomics-kmer"
+version = "0.1.0"
+description = "K-mer encoding, canonicalisation, ntHash rolling hash, MurmurHash3, k-mer counting for the rsomics-* tool family. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["kmer", "bioinformatics", "nthash", "minhash", "hashing"]
+
+[dependencies]
+rsomics-common = { path = "../rsomics-common", version = "0.5" }
+nthash = "0.5"
+murmur3 = "0.5"
+thiserror.workspace = true
+
+[lints]
+workspace = true
