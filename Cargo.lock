@@ -1034,6 +1034,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-hmm"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rsomics-intervals"
 version = "0.1.2"
 dependencies = [
