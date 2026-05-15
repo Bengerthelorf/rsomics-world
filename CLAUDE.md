@@ -273,11 +273,11 @@ For **FFI-wrapper adopt** (rust-htslib, minimap2-rs etc.): record in entry as **
 
 Workflows in `.github/workflows/`:
 
-- `ci.yml`: fmt + clippy + test matrix (4 first-class targets × stable + MSRV).
+- `ci.yml`: fmt + clippy + test. Per-push runs a **minimal fast lane** — Linux x86_64 stable (the truth: runs compat tests), Linux x86_64 MSRV `1.91` (rustc-version gate, OS-independent), and one `macos-latest` stable (macOS is the only platform that has ever broken this repo — GH-image rustup poisoning). aarch64-Linux and x86_64-apple-darwin are **not** on the per-push lane; GitHub's Intel-macOS pool is being retired/queue-starved and Actions minutes are finite even on a public repo, so those targets ride the authoritative gate (release.yml on every tag) plus a **weekly `schedule`** that runs the full 4-target × {stable, MSRV} matrix. macOS uses the moving `*-latest` alias, never a pinned version, to avoid label rot. `concurrency: cancel-in-progress` supersedes mid-stack pushes. The all-four-targets coverage invariant holds at release.yml + the weekly sweep, not on every commit.
 - `bench.yml`: criterion benches on Linux x86_64 + aarch64, manual trigger. Regression detection.
-- `release.yml`: triggered by tag push; cross-compiles binaries, uploads to GitHub Release.
+- `release.yml`: triggered by tag push; builds **all four** first-class-target binaries (incl. x86_64-apple-darwin), uploads to GitHub Release. This is the authoritative pre-publish target gate.
 
-**CI is the truth.** Local Mac smoke is supplementary. After every push, `gh run list --branch main --limit 3` and wait for green before any tag.
+**CI is the truth.** Local Mac smoke is supplementary. After every push, `gh run list --branch main --limit 3` and wait for green before any tag. The tag → release.yml run (not the per-push fast lane) is the gate that must be green before `cargo publish`.
 
 ## Disk + environment hygiene (mini_m2 + autopilot)
 
