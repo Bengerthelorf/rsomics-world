@@ -1,0 +1,20 @@
+[package]
+name = "rsomics-pgen"
+version = "0.1.0"
+description = "PLINK1 .bed / .bim / .fam genotype-matrix reader + writer for the rsomics-* tool family. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["plink", "genotype", "bioinformatics", "gwas", "popgen"]
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
