@@ -18,8 +18,10 @@ for the rules; the short version:
 - `crates/foundation/` — **Layer A**, library-only primitives (IO, intervals,
   k-mers, FM-index, alignment cores, stats). A crate is in A iff ≥ 2 tools
   depend on it.
-- `crates/tools/` — **Layer B**, each crate is one installable binary
-  (`rsomics-fastp`, `rsomics-bam`, `rsomics-bwa`, …).
+- `crates/tools/<domain>/` — **Layer B**, each crate is **one operation**
+  (`rsomics-fastq-trim`, `rsomics-fasta-stats`, `rsomics-bam-view`, …). The
+  partition is per-function, not per-upstream-binary — Swiss-army wraps like
+  `samtools` get split into `view` / `sort` / `index` / `markdup` / … crates.
 - Dependency direction is **B → A → external**, enforced. A never depends on
   B; B never depends on B; sharing happens through A.
 
@@ -45,11 +47,16 @@ TODO checklists using the entry schema in [`CONVENTIONS.md`](CONVENTIONS.md).
 
 ## Status
 
-Public monorepo workspace, **Phase 2 in progress**. The first tool
-(`rsomics-fastp`) lives at [`crates/tools/rsomics-fastp/`](crates/tools/rsomics-fastp/);
-foundation primitives live under `crates/foundation/`. Once `rsomics-common`
-and `rsomics-fastp` are published, both will install via
-`cargo install rsomics-<name>`.
+Public monorepo workspace. Published pilots:
+
+- [`rsomics-fasta-stats`](crates/tools/formats/rsomics-fasta-stats/) — Rust port of
+  `seqkit stats` (FASTA subset), `cargo install rsomics-fasta-stats`.
+- [`rsomics-fastq-trim`](crates/tools/formats/rsomics-fastq-trim/) — fastp's adapter /
+  poly-G / poly-X / fixed-length trim hot path, `cargo install rsomics-fastq-trim`.
+
+Foundation primitives live under `crates/foundation/` (`rsomics-common`,
+`rsomics-help`). The full ~150-crate partition catalog lives in
+[`docs/`](docs/) and [`TODO.md`](TODO.md).
 
 ## Why Rust?
 
