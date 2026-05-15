@@ -42,17 +42,26 @@ upstream_version = "sort --version"
 [exempt.rsomics-pvalue-adjust]
 reason = "No standalone C/Python/R *binary* upstream — R's p.adjust is a library function, not a CLI tool. The perf contract targets ports of standalone binaries; covered instead by an in-crate criterion micro-bench."
 
+[spec.rsomics-bed-intersect]
+# CLI + upstream verified from src/main.rs (-a/-b/-o) and tests/compat.rs.
+fixture          = "bed:1500000:24"
+fixture2         = "bed:1500000:24"
+ours_args        = "-a FIX -b FIX2"
+upstream_bin     = "bedtools"
+upstream_args    = "intersect -a FIX -b FIX2"
+upstream_version = "bedtools --version"
+
+[spec.rsomics-bed-subtract]
+fixture          = "bed:1500000:24"
+fixture2         = "bed:1500000:24"
+ours_args        = "-a FIX -b FIX2"
+upstream_bin     = "bedtools"
+upstream_args    = "subtract -a FIX -b FIX2"
+upstream_version = "bedtools --version"
+
 # --- needs_spec: publish BLOCKED until a verified spec lands + passes ---
-# CLI flags / upstream mapping not yet verified this session; authoring an
-# unverified spec would be inventing flags. Cleared in task #105 (backlog).
 [needs_spec.rsomics-fastq-dedup]
-note = "vs fastp --dedup; verify fastp dedup flag + rsomics-fastq-dedup CLI on 4090."
-
-[needs_spec.rsomics-bed-intersect]
-note = "vs `bedtools intersect -a A -b B`; needs FIX2; verify ours -a/-b CLI."
-
-[needs_spec.rsomics-bed-subtract]
-note = "vs `bedtools subtract -a A -b B`; needs FIX2; verify ours CLI."
+note = "ours -i/-o, --mode=bin (fastp -D-style lossy). Fair upstream + mode pairing needs on-4090 check: fastp 0.20.1 may lack --dedup; seqkit rmdup -s is exact (different work than mode=bin). Resolve by inspecting fastp 0.20.1 --help + ours exact-mode value on 4090."
 
 [needs_spec.rsomics-bed-complement]
-note = "vs `bedtools complement -i FIX -g GENOME`; needs a genome fixture; verify ours CLI."
+note = "ours -i/-g/-o; upstream `bedtools complement -i FIX -g GENOME`. Needs a genome-sizes fixture kind in mkfixture.py + chrom-sort-order matching between bed input and genome (bedtools errors otherwise; compat test pre-sorts via `bedtools sort`)."

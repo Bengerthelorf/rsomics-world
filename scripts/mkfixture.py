@@ -13,7 +13,9 @@ import sys
 
 KIND, OUT = sys.argv[1], sys.argv[2]
 A, B = int(sys.argv[3]), int(sys.argv[4])
-random.seed(0x00C0FFEE)
+# Optional 5th arg = seed, so a two-input tool gets distinct a/b fixtures.
+SEED = int(sys.argv[5]) if len(sys.argv) > 5 else 0x00C0FFEE
+random.seed(SEED)
 ACGT = b"ACGT"
 ADAPTER = b"AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC"
 

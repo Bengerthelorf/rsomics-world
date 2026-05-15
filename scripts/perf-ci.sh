@@ -68,10 +68,10 @@ while IFS=$'\t' read -r k v; do
   esac
 done <<< "$cls"
 
-mkfix() { # "<kind>:<a>:<b>" -> path
-  local spec=$1 dst=$2 IFS=:
+mkfix() { # "<kind>:<a>:<b>" dst [seed] -> path
+  local spec=$1 dst=$2 seed=${3:-} IFS=:
   set -- $spec
-  python3 scripts/mkfixture.py "$1" "$dst" "$2" "$3" >/dev/null
+  python3 scripts/mkfixture.py "$1" "$dst" "$2" "$3" $seed >/dev/null
   echo "$dst"
 }
 
@@ -81,7 +81,8 @@ tdir=${CARGO_TARGET_DIR:-target}
 args=(--name "ci-${CRATE}" --fixture "$fix"
       --ours-bin "$tdir/release/${CRATE}" --ours-args "$f_ours_args"
       --upstream-bin "$f_upstream_bin" --upstream-args "$f_upstream_args")
-[ -n "$f_fixture2" ] && args+=(--fixture2 "$(mkfix "$f_fixture2" "$work/fix2")")
+# Distinct seed so a (FIX) and b (FIX2) differ for two-input tools.
+[ -n "$f_fixture2" ] && args+=(--fixture2 "$(mkfix "$f_fixture2" "$work/fix2" 424242)")
 [ -n "$f_upstream_version" ] && args+=(--upstream-version "$f_upstream_version")
 
 cargo build --release -p "$CRATE"
