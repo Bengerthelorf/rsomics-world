@@ -114,7 +114,7 @@ When adopting, the TODO entry's `Existing Rust kind` field records ①②③④ 
 ## Operating mode
 
 - **No clarifying questions.** Decide, commit, document the reason in the commit body.
-- **Don't stop unless a real decision is needed.** Autopilot means autopilot. Inside a phase, when the directive is clear (e.g. "implement rsomics-fastp's preprocessing pipeline"), keep going through the next logical sub-task without surfacing for confirmation. **Halt only when**: (a) you hit one of the gate-defined stop conditions or halt triggers, (b) a genuine decision arises that materially changes scope or requires user judgment (not a stylistic preference, not a "good stopping point"), or (c) you finish the phase. Session-end courtesy halts ("opening landed, ready for next session") are not allowed — if there is more work scoped within the current phase / directive, do it. If the user wanted you to stop, they would say so.
+- **Don't stop unless a real decision is needed.** Autopilot means autopilot — and the scope is **wider than one phase**. When the current phase finishes, the next phase is whatever `partition-master` / the latest sub-agent recommendation / the natural follow-up dictates; enter it without surfacing. **Halt only when**: (a) you hit a universal stop condition (the correctness-protecting list below — committing an unverified claim, inventing a name, etc.), (b) the action requires something only the user can supply or do — a personal preference with no prior signal, an unrevealed secret, an account-bound action you can't perform, or a value judgment whose answer isn't recoverable from project context, or (c) a genuine decision materially changes scope or reverses architectural assumptions and you have no prior user signal to act on. Phase boundaries, version bump choices, "is now a good time to publish", "should we start the next foundation crate" — none of these are halt points. Session-end courtesy halts ("opening landed, ready for next session") are not allowed. If the user wanted you to stop, they would say so.
 - **Solo, no PRs.** Direct commits to `main`. Conventional prefixes:
   - `docs(<module>):` for catalog content (under `docs/`)
   - `feat(<crate>):` for new crate or feature
@@ -125,20 +125,20 @@ When adopting, the TODO entry's `Existing Rust kind` field records ①②③④ 
   - `ci:` for `.github/workflows/`
 - **No `Co-Authored-By` trailer. Ever.**
 - **One concern per commit. Fine-grained, push every 3-5 commits.** After every push: `gh run list --branch main --limit 3` and wait for green before tagging.
-- **Tags are user decisions** — never tag, never `gh release create`. Surface to user when a phase deserves a release.
+- **Tag at the natural release moment** — when a crate's `Cargo.toml` version is bumped, CI is green, and the code is publish-ready, push the matching `rsomics-<crate>-v<version>` tag. `publish.yml` + `release.yml` handle the rest. Tag/push/yank/archive-delete are all pre-authorised in this repo (commit history is backup).
 
-## Gate-based checkpoints
+## Phase log (record-only, no halt)
 
-Autopilot is autonomous **within a phase**. Between phases, halt and let the user review.
+Autopilot is autonomous across phases. Phase boundaries are recorded for traceability but do **not** halt execution.
 
-Each phase ends by writing `.autopilot/gates/gate-<N>-<date>.md` summarizing:
+When a phase finishes, write `.autopilot/gates/gate-<N>-<date>.md` summarising:
 1. What changed (file list + commit shas).
-2. **Decisions taken without asking (with reasoning).** List every autonomous choice — version pins, runner-label substitutions, default values picked, schema additions, scope expansions, naming choices — even when the choice feels like a neutral substitution or an improvement. Distinguish direct user policy ("user said untrack ROADMAP.md") from autopilot autonomy ("substituted retired macos-13 with macos-15-intel"). User policy doesn't go in this section; autonomy does.
+2. **Decisions taken without asking (with reasoning).** Every autonomous choice — version pins, runner-label substitutions, defaults, schema additions, scope expansions, naming. Distinguish direct user policy from autopilot autonomy; user policy doesn't go here, autonomy does.
 3. Needs-review backlog (count + categories).
-4. What the next phase requires the user to bless.
-5. Recommended next phase prompt.
+4. Anything that future sessions or the user need to know to keep context.
+5. The next phase entered (and a one-line rationale).
 
-Then **stop**. Next session: read the most recent un-approved gate file; if the user has appended `approved: yes`, proceed. Otherwise wait or revise per their comments.
+Then **continue into the next phase**. Halt only on the universal stop conditions or true decision points listed in `Operating mode` above.
 
 ## Verification gates — non-negotiable, applied to EVERY external claim
 
@@ -428,11 +428,15 @@ If a test passes on one and fails on another, the test is fragile, not the code.
 
 ## Universal stop conditions (any phase)
 
+These are correctness gates, not process gates — they halt because continuing would emit something wrong or destroy recoverable state.
+
 - About to commit a claim you couldn't verify → STOP, log to needs-review.
 - About to invent a crate name / URL / version → STOP, log to needs-review.
 - Three external signals diverge for one tool (crates.io / GitHub / source disagree) → STOP, document.
-- More than 5 unrelated files in one commit → wrong scoping, restart.
-- More than 3 iterations producing no meaningful diff → easy wins exhausted, gate out.
 - Disk usage on `/` > 80% → STOP, audit cargo target placement.
-- `needs-review/` accumulates > 20 entries → too many unverifiables, halt for batch review.
 - Architecture (2-layer / 4-quadrant / monorepo) looks wrong for the task at hand → never restructure unilaterally; surface to user.
+
+Non-halt heuristics (recalibrate, don't stop):
+- More than 5 unrelated files in one commit → wrong scoping, split the commit and continue.
+- More than 3 iterations producing no meaningful diff → easy wins exhausted, change approach.
+- `needs-review/` accumulates > 20 entries → schedule a batch-review pass, don't halt outright.
