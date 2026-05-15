@@ -46,8 +46,7 @@ pub fn welch_t(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResult> {
         return Err(StatsError::ZeroVariance);
     }
     let t = (ma - mb) / se2.sqrt();
-    // Welch–Satterthwaite df.
-    let df = se2.powi(2) / ((va / na).powi(2) / (na - 1.0) + (vb / nb).powi(2) / (nb - 1.0));
+    let df = se2.powi(2) / ((va / na).powi(2) / (na - 1.0) + (vb / nb).powi(2) / (nb - 1.0)); // Welch–Satterthwaite
     let dist = StudentsT::new(0.0, 1.0, df).map_err(|e| StatsError::Statrs(e.to_string()))?;
     let p = match alt {
         Alternative::TwoSided => 2.0 * (1.0 - dist.cdf(t.abs())),
@@ -67,7 +66,6 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
     let n1 = a.len() as f64;
     let n2 = b.len() as f64;
 
-    // Pool, sort, mid-rank ties.
     let mut pooled: Vec<(f64, u8)> = a.iter().map(|&x| (x, 0u8)).collect();
     pooled.extend(b.iter().map(|&x| (x, 1u8)));
     pooled.sort_by(|x, y| x.0.partial_cmp(&y.0).expect("NaN in input — not supported"));
@@ -81,8 +79,7 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
             j += 1;
         }
         let tied = (j - i) as f64;
-        // Mid-rank of [i..j) in 1-based ranks is (i+1 + j) / 2.
-        let mid = (i as f64 + 1.0 + j as f64) / 2.0;
+        let mid = (i as f64 + 1.0 + j as f64) / 2.0; // mid-rank in 1-based: (i+1 + j) / 2
         for r in ranks.iter_mut().take(j).skip(i) {
             *r = mid;
         }
@@ -103,14 +100,12 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
 
     let mu = n1 * n2 / 2.0;
     let n = n1 + n2;
-    // Normal approximation with tie correction. Exact distribution for tiny n
-    // is not implemented here; callers needing it should switch tools.
+    // Normal approximation with tie correction; exact distribution for small n not implemented.
     let sigma = (n1 * n2 / 12.0 * ((n + 1.0) - tie_correction / (n * (n - 1.0)))).sqrt();
     if sigma == 0.0 {
         return Err(StatsError::ZeroVariance);
     }
-    // Continuity correction shifts U by 0.5 toward the mean.
-    let u = u1.min(u2);
+    let u = u1.min(u2); // continuity-corrected below
     let z = (u - mu + 0.5) / sigma;
     let normal = statrs::distribution::Normal::new(0.0, 1.0)
         .map_err(|e| StatsError::Statrs(e.to_string()))?;
@@ -126,10 +121,8 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
 }
 
 /// 2×2 contingency: `[[a, b], [c, d]]`. Returns the two-sided / one-sided
-/// p-value via the hypergeometric tail. For very large tables falls back to
-/// the same hypergeometric — no approximations.
+/// p-value via the hypergeometric tail — no approximations.
 pub fn fisher_exact_2x2(a: u64, b: u64, c: u64, d: u64, alt: Alternative) -> Result<TestResult> {
-    // Population, successes-in-pop, sample drawn.
     let n = a + b + c + d;
     let kk = a + c;
     let nn = a + b;
@@ -189,8 +182,7 @@ mod tests {
 
     #[test]
     fn welch_known_value() {
-        // Equal variance, mean diff = -2, pooled SE = 1, df ≈ 8 → t ≈ -2,
-        // two-sided p(|t|>2; df=8) ≈ 0.0805.
+        // df ≈ 8, t ≈ -2 → two-sided p ≈ 0.0805
         let r = welch_t(
             &[1.0, 2.0, 3.0, 4.0, 5.0],
             &[3.0, 4.0, 5.0, 6.0, 7.0],
@@ -213,7 +205,6 @@ mod tests {
 
     #[test]
     fn mann_whitney_separated_samples() {
-        // Completely separated: a < b for every pair.
         let r =
             mann_whitney_u(&[1.0, 2.0, 3.0], &[10.0, 11.0, 12.0], Alternative::TwoSided).unwrap();
         assert!(r.p_value < 0.1, "p={}", r.p_value);
@@ -232,14 +223,13 @@ mod tests {
 
     #[test]
     fn fisher_2x2_classic_lady_tasting_tea() {
-        // 4 successes out of 4, vs 4 from 4 in the other arm: p = 1/70.
+        // p = 1/70 (classic lady-tasting-tea exact result)
         let r = fisher_exact_2x2(4, 0, 0, 4, Alternative::Greater).unwrap();
         assert!(approx(r.p_value, 1.0 / 70.0, 1e-6), "p={}", r.p_value);
     }
 
     #[test]
     fn fisher_2x2_two_sided_independence() {
-        // No association: 5/5 each, p should be 1.0.
         let r = fisher_exact_2x2(5, 5, 5, 5, Alternative::TwoSided).unwrap();
         assert!(r.p_value > 0.99, "p={}", r.p_value);
     }

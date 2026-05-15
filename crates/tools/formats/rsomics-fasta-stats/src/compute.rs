@@ -1,7 +1,5 @@
-// `u64 as f64` casts here are intentional: lengths and base counts comfortably
-// fit in f64's 52-bit mantissa for any biologically realistic input (max
-// representable exactly is ~4.5 PB), and the cast happens only at the final
-// quartile / N50 / percentage stage where downstream arithmetic is float.
+// u64→f64 cast: lengths/counts fit in 52-bit mantissa for any real genome;
+// cast only at final quartile/N50/percentage stage.
 #![allow(clippy::cast_precision_loss)]
 
 use std::path::Path;
@@ -75,10 +73,7 @@ pub struct ExtendedStats {
     pub sum_gap: u64,
     #[serde(rename = "N50")]
     pub n50: u64,
-    // seqkit calls this `N50_num`; the value is L50 (the number of
-    // unique-length buckets that cover ≥ 50% of total length), so the
-    // field is named after what it actually is. The `--tabular` output
-    // still renders the seqkit column name for byte-equality compat.
+    // seqkit calls this N50_num; named L50 here. --tabular renders N50_num for compat.
     #[serde(rename = "L50")]
     pub l50: u64,
     #[serde(rename = "GC(%)")]
@@ -93,11 +88,8 @@ pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
     let mut reader = parse_fastx_file(path)
         .map_err(|e| RsomicsError::InvalidInput(format!("opening {}: {e}", path.display())))?;
 
-    // bytecount's runtime-dispatch SIMD outpaces a scalar single-pass
-    // classifier on modern cores — the redundant 4-pass memory bandwidth
-    // is more than recovered by NEON / AVX2 counting per pass. Keep one
-    // call per category. (Verified on Apple M2: scalar LUT regressed
-    // wall-clock from 53 ms → 83 ms on the chr22 fixture.)
+    // bytecount SIMD (4-pass) beats scalar single-pass: NEON/AVX2 recoups
+    // bandwidth cost. (M2: scalar LUT 83 ms vs 53 ms on chr22 fixture.)
     let mut lengths: Vec<u64> = Vec::new();
     let mut num_seqs: u64 = 0;
     let mut sum_len: u64 = 0;
@@ -223,12 +215,10 @@ fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
     total
 }
 
-/// Byte-faithful port of `bio/util/length-stats.go`. seqkit's L50 counts
-/// unique-length buckets rather than records — reproduced verbatim so
-/// `--tabular --all` agrees with `seqkit stats --tabular --all`.
+// Port of bio/util/length-stats.go. seqkit's L50 counts unique-length buckets,
+// not records — reproduced so `--tabular --all` agrees with seqkit.
 struct LengthStats {
-    /// `(length, cumulative_count)` sorted ascending by length, deduplicated.
-    counts: Vec<(u64, u64)>,
+    counts: Vec<(u64, u64)>, // (length, cumulative_count) sorted ascending, deduped
     sum: u64,
     count: u64,
 }
@@ -273,10 +263,8 @@ impl LengthStats {
                 }
             }
         }
-        // The last bucket's `acc` equals `self.count`; q1/q2/q3 callers
-        // pass `i_med_l < self.count`, so the loop must always return.
-        // Reaching here means a caller broke the invariant — louder than
-        // a silent 0.0.
+        // Callers pass i_med_l < self.count, so the last bucket's acc always
+        // terminates the loop. Reaching here means a caller broke the invariant.
         unreachable!(
             "LengthStats::get_value: i_med_l={i_med_l} not bracketed in counts (count={}, flag={flag}, prev={prev})",
             self.count
@@ -342,9 +330,6 @@ impl LengthStats {
         }
     }
 
-    /// Returns `(N50, L50)`. seqkit's L50 is the number of *unique-length
-    /// buckets* swept from the largest end, not the number of records — for
-    /// the common all-unique-lengths case these coincide.
     fn n50_l50(&self) -> (u64, u64) {
         if self.counts.is_empty() {
             return (0, 0);
@@ -383,9 +368,6 @@ fn classify(sample: &[u8]) -> SeqType {
             b'E' | b'F' | b'I' | b'L' | b'P' | b'Q' | b'Z' | b'X' | b'*' => {
                 has_protein_only = true;
             }
-            // Nucleotide alphabet (canonical + IUPAC ambiguity codes) and
-            // whitespace / gap punctuation are all neutral evidence — they
-            // don't disambiguate DNA / RNA / protein on their own.
             b'A' | b'C' | b'G' | b'N' | b'-' | b'.' | b' ' | b'\n' | b'\r' | b'R' | b'Y' | b'S'
             | b'W' | b'K' | b'M' | b'B' | b'D' | b'H' | b'V' => {}
             _ => return SeqType::Other,

@@ -63,8 +63,7 @@ fn intersect_matches_bedtools() {
         .status()
         .unwrap();
     assert!(status.success());
-    // bedtools' default intersect preserves input order from `a`; ours
-    // chrom-sorts on output. Normalise both by sorting before compare.
+    // bedtools preserves input order; ours chrom-sorts. Sort both before compare.
     let mut ours_lines: Vec<String> = std::fs::read_to_string(&out)
         .unwrap()
         .lines()

@@ -181,8 +181,6 @@ fn write_out(path: &str, lines: &[String], pvals: &[f64], adjusted: &[f64]) -> R
         ))
     };
     for ((line, p), adj) in lines.iter().zip(pvals.iter()).zip(adjusted.iter()) {
-        // If the input had multiple columns, emit the full line + adjusted as
-        // a new trailing column. If it had only the p-value, emit `p\tadj`.
         if line.contains('\t') {
             writeln!(w, "{line}\t{adj:.6}").map_err(RsomicsError::Io)?;
         } else {

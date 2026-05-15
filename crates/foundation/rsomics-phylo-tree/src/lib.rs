@@ -47,8 +47,7 @@ impl Tree {
         let mut tree = Tree::default();
         let root = parser.parse_subtree(&mut tree, None)?;
         tree.root = root;
-        // Newick trees terminate with `;`. Tolerate missing-semicolon to be
-        // generous; surface anything past the terminator as an error.
+        // Tolerate missing `;`; error on anything past it.
         parser.skip_ws();
         if parser.pos < parser.src.len() && parser.src[parser.pos] == b';' {
             parser.pos += 1;
@@ -149,7 +148,6 @@ impl Parser<'_> {
             }
         }
 
-        // Optional name + branch length.
         let name = self.read_token();
         if !name.is_empty() {
             tree.nodes[id].name = Some(name);
@@ -195,7 +193,6 @@ mod tests {
 
     #[test]
     fn parse_simple_balanced_tree() {
-        // 4-leaf bifurcating: ((A,B),(C,D));
         let tree = Tree::from_newick("((A,B),(C,D));").unwrap();
         assert_eq!(tree.n_leaves(), 4);
         let names: Vec<&str> = tree

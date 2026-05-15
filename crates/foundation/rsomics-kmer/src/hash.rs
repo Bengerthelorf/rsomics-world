@@ -39,10 +39,7 @@ mod tests {
 
     #[test]
     fn nthash_canonical_is_rc_invariant() {
-        // ntHash with canonical=true (the default for NtHashIterator) returns
-        // the same hash for a kmer and its reverse-complement. We check the
-        // first kmer's hash on a palindrome to confirm the upstream's
-        // canonical default.
+        // NtHashIterator uses canonical=true by default; palindrome confirms same hash for fwd and RC.
         let h1 = nthash_one(b"AAAATTTT", 8).unwrap();
         let h2 = nthash_one(b"AAAATTTT", 8).unwrap();
         assert_eq!(h1, h2);

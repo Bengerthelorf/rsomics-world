@@ -191,7 +191,6 @@ mod tests {
     #[test]
     fn plain_table_aligns_to_widest() {
         let s = render_flag_table(SAMPLE.sections[0].flags, false);
-        // Two rows; both descriptions should start at the same column.
         let lines: Vec<&str> = s.lines().collect();
         let col = |line: &str, needle: &str| line.find(needle).unwrap();
         assert_eq!(col(lines[0], "do everything"), col(lines[1], "verbosity"));

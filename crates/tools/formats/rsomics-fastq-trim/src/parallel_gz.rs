@@ -1,8 +1,6 @@
-// Gzip permits concatenated members — gunzip/fastp/seqkit/pigz decode them
-// transparently. We produce one self-contained gzip member per ~256 KB chunk
-// via libdeflate on rayon workers, then write in input order.
-// flate2/zlib-rs (~80 MB/s ST) is ~3× slower than fastp's libdeflate path;
-// parallel chunking closes that gap.
+// Gzip permits concatenated members; gunzip/fastp/seqkit decode them transparently.
+// One self-contained gzip member per ~256 KB chunk, compressed in parallel via
+// libdeflate. flate2/zlib-rs is ~3× slower single-threaded than fastp's libdeflate.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -17,10 +15,8 @@ pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 #[cfg(test)]
 pub(crate) const GZ_DEFAULT_LEVEL: i32 = 4;
 
-// 16 × 256 KB = 4 MB peak in-flight. Flush when this fills.
-pub const MAX_PENDING_CHUNKS: usize = 16;
+pub const MAX_PENDING_CHUNKS: usize = 16; // 16 × 256 KB = 4 MB peak in-flight
 
-/// Compress one buffer to a self-contained gzip member.
 fn compress_member(plain: &[u8], level: i32) -> Result<Vec<u8>> {
     let level = CompressionLvl::new(level).map_err(|e| {
         RsomicsError::ConfigError(format!("invalid libdeflate level {level}: {e:?}"))
@@ -35,13 +31,9 @@ fn compress_member(plain: &[u8], level: i32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// Compress a list of plain-byte chunks in parallel and write the
-/// resulting gzip members to `out` in input order.
-///
 /// # Errors
 ///
-/// `UpstreamError` if libdeflate compression fails; `Io` if the write to
-/// `out` fails.
+/// `UpstreamError` if libdeflate compression fails; `Io` on write failure.
 pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>, level: i32) -> Result<()> {
     let compressed: Vec<Result<Vec<u8>>> = chunks
         .into_par_iter()
@@ -54,7 +46,6 @@ pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>, level: i32) 
     Ok(())
 }
 
-/// Write one record in `@id\nseq\n+\nqual\n` form. `id` carries no leading `@`.
 fn write_plain_fastq_record<W: Write>(
     w: &mut W,
     id: &[u8],
@@ -70,10 +61,6 @@ fn write_plain_fastq_record<W: Write>(
     w.write_all(b"\n")
 }
 
-/// Append-style writer that buffers plain bytes until a chunk fills, then
-/// emits the chunk via the parallel-gz pipeline. Used by `pipeline.rs`'s
-/// SE/PE write paths. Wraps a `BufWriter` so plain-text output stays
-/// fast too.
 pub struct ChunkedWriter {
     inner: BufWriter<File>,
     buffer: Vec<u8>,
@@ -83,10 +70,6 @@ pub struct ChunkedWriter {
 }
 
 impl ChunkedWriter {
-    /// Open `path` for writing. `.gz` extension selects parallel-gz at
-    /// `level`; any other extension writes plain bytes and ignores
-    /// `level`.
-    ///
     /// # Errors
     ///
     /// `Io` if the file cannot be created.
@@ -105,15 +88,9 @@ impl ChunkedWriter {
         })
     }
 
-    /// Splits off a chunk and queues it for compression when the buffer
-    /// crosses [`GZ_CHUNK_BYTES`]; if more than [`MAX_PENDING_CHUNKS`]
-    /// chunks are waiting, flushes the queue so the writer's footprint
-    /// stays bounded regardless of input size.
-    ///
     /// # Errors
     ///
-    /// `Io` if a plain-text write fails; `UpstreamError` if libdeflate
-    /// compression fails while the pending queue is being drained.
+    /// `Io` on plain-text write failure; `UpstreamError` if libdeflate fails.
     pub fn write_record(&mut self, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
         if self.gzipped {
             self.buffer.push(b'@');
@@ -138,9 +115,6 @@ impl ChunkedWriter {
         Ok(())
     }
 
-    /// Compress the currently queued chunks in parallel and write them
-    /// to disk, leaving the in-progress `buffer` untouched. Called both
-    /// during a run (to bound memory) and from `finalize` for the tail.
     fn drain_pending(&mut self) -> Result<()> {
         if self.pending_chunks.is_empty() {
             return Ok(());
@@ -149,9 +123,6 @@ impl ChunkedWriter {
         write_chunks_gz(&mut self.inner, chunks, self.level)
     }
 
-    /// Compress all pending chunks and flush to disk. Idempotent on
-    /// subsequent calls.
-    ///
     /// # Errors
     ///
     /// `Io` or `UpstreamError` if compression / write fails.
@@ -169,9 +140,6 @@ impl ChunkedWriter {
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// Same as [`Self::flush_pending`].
     pub fn finalize(mut self) -> Result<()> {
         self.flush_pending()
     }

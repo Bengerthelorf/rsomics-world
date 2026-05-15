@@ -20,13 +20,6 @@ const META: ToolMeta = ToolMeta {
 const TAGLINE: &str =
     "FASTQ adapter / polyG / polyX / fixed-length trimming (per-function partition of fastp).";
 
-/// FASTQ adapter / `polyG` / `polyX` / fixed-length trimming.
-///
-/// Flag names follow fastp's `snake_case` convention so existing scripts
-/// can swap `fastp` for `rsomics-fastq-trim` without re-learning the
-/// option surface. Quality / N-content / sliding-window filtering, UMI
-/// extraction, and per-cycle statistics live in sibling crates
-/// (`rsomics-fastq-quality`, `rsomics-fastq-umi`, `rsomics-fastq-stats`).
 #[derive(Parser, Debug)]
 #[command(name = "rsomics-fastq-trim", version, about, long_about = None, disable_help_flag = true)]
 #[allow(clippy::struct_excessive_bools)]

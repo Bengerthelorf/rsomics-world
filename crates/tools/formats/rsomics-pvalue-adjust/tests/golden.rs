@@ -22,7 +22,6 @@ fn bh_single_column_matches_textbook() {
     assert!(status.success());
     let got = std::fs::read_to_string(&out).unwrap();
     let lines: Vec<&str> = got.lines().collect();
-    // BH expected (textbook): 0.05, 0.05, 0.067, 0.125, 0.5.
     assert!(lines[0].ends_with("0.050000"), "{}", lines[0]);
     assert!(lines[1].ends_with("0.050000"), "{}", lines[1]);
     assert!(lines[2].contains("0.066"), "{}", lines[2]);
@@ -52,7 +51,6 @@ fn bonferroni_caps_at_one() {
         .unwrap();
     assert!(status.success());
     let got = std::fs::read_to_string(&out).unwrap();
-    // 0.5 * 3 = 1.5 → clamped to 1.0
     assert!(got.lines().next().unwrap().ends_with("1.000000"));
 }
 
@@ -77,6 +75,5 @@ fn picks_column_from_multi_column_input() {
         .unwrap();
     assert!(status.success());
     let got = std::fs::read_to_string(out).unwrap();
-    // Multi-col input → trailing adjusted column appended.
     assert!(got.starts_with("gene_a\t1.5\t0.01\t"), "{got}");
 }

@@ -1,13 +1,3 @@
-//! Criterion bench vs `seqkit stats` on a deterministic synthetic FASTA.
-//!
-//! Fixture: 5 000 records × 1 000 bp each (~5 MB plain). Generated in the
-//! per-run temp dir from a fixed seed so two consecutive `cargo bench`
-//! invocations time the same bytes.
-//!
-//! The "must outperform upstream" contract lives on the *single-threaded*
-//! axis — both binaries get 1 thread so a thread-count gap isn't the
-//! reason `--release` wins.
-
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::fs::File;
 use std::io::{BufWriter, Write};

@@ -71,15 +71,13 @@ pub fn find_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<usize> {
     }
 }
 
-/// `N` increments all four A/C/G/T counters — fastp parity.
 #[must_use]
 pub fn find_dominant_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<DominantPolyXResult> {
     let rlen = seq.len();
     if rlen == 0 {
         return None;
     }
-    // counts[0]=A, [1]=C, [2]=G, [3]=T
-    let mut counts: [usize; 4] = [0; 4];
+    let mut counts: [usize; 4] = [0; 4]; // [A, C, G, T]
     let mut i: usize = 0;
     let divisor = cfg.mismatch_per_bases.get();
     while i < rlen {
@@ -120,10 +118,7 @@ pub fn find_dominant_polyx_3p(seq: &[u8], cfg: PolyXConfig) -> Option<DominantPo
         }
     }
     let dom_base = b"ACGT"[dom_idx];
-    // `i` counts scanned bytes (0..=rlen); back-search uses
-    // `seq[rlen - pos - 1]`, so `pos` must stay within `[0, rlen-1]`.
-    // The natural-exit path (loop ran to `i == rlen`) needs the clamp.
-    let mut pos = i.min(rlen - 1);
+    let mut pos = i.min(rlen - 1); // clamp for natural-exit path where i == rlen
     while pos > 0 && seq[rlen - pos - 1].to_ascii_uppercase() != dom_base {
         pos -= 1;
     }
@@ -205,9 +200,8 @@ mod tests {
 
     #[test]
     fn dominant_polyx_iupac_ambiguity_no_panic() {
-        // IUPAC ambiguity codes (R/Y/S/W/K/M/B/D/H/V) are not in the
-        // A/C/G/T/N count arms — counts stay zero. With a loose budget the
-        // scan reaches `i == rlen`; the back-search must still be in-bounds.
+        // IUPAC codes not in A/C/G/T/N arms → counts stay zero, scan reaches
+        // i == rlen; back-search must stay in-bounds.
         let seq = b"RYSWKMBDHVRYSWKMBDHVRYSWKMBDHVRY";
         let cfg = PolyXConfig {
             base: b'G',

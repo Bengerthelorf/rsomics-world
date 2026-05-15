@@ -38,7 +38,7 @@ impl From<std::str::Utf8Error> for RsomicsError {
     }
 }
 
-/// Attach a contextual prefix to a `Result`, turning it into `RsomicsError`.
+/// Attach a contextual prefix to a `Result`.
 pub trait Context<T> {
     #[allow(clippy::missing_errors_doc)]
     fn rs_context(self, msg: impl Into<String>) -> Result<T>;

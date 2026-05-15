@@ -50,8 +50,7 @@ pub fn decode(kmer: Kmer, k: usize) -> Vec<u8> {
 #[must_use]
 pub fn reverse_complement(kmer: Kmer, k: usize) -> Kmer {
     let mut bits = kmer;
-    // Complement = XOR each 2-bit with 0b11 (A<->T, C<->G); reverse = flip pairs.
-    let comp = bits ^ ((1u64 << (2 * k)) - 1);
+    let comp = bits ^ ((1u64 << (2 * k)) - 1); // XOR with all-1s per 2-bit pair: A↔T, C↔G
     let mut rc: u64 = 0;
     bits = comp;
     for _ in 0..k {
@@ -102,7 +101,6 @@ mod tests {
 
     #[test]
     fn rc_known_value() {
-        // RC of "AAAA" = "TTTT"; "ACGT" is its own RC.
         assert_eq!(
             decode(reverse_complement(encode(b"AAAA").unwrap(), 4), 4),
             b"TTTT".to_vec()
@@ -116,8 +114,7 @@ mod tests {
     #[test]
     fn canonical_picks_lex_min_of_pair() {
         let fwd = encode(b"GGGG").unwrap();
-        let rc = reverse_complement(fwd, 4);
-        // CCCC < GGGG in 2-bit encoding (01 < 10 per base).
+        let rc = reverse_complement(fwd, 4); // CCCC < GGGG in 2-bit (01 < 10)
         assert_eq!(canonical(fwd, 4), rc);
         assert_eq!(canonical(fwd, 4), canonical(rc, 4));
     }

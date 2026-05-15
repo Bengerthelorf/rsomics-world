@@ -13,10 +13,8 @@
 pub struct ScoreParams {
     pub match_score: i32,
     pub mismatch: i32,
-    /// Affine gap-open penalty (charged on the first gap byte; positive).
-    pub gap_open: i32,
-    /// Affine gap-extend penalty (charged per byte; positive).
-    pub gap_extend: i32,
+    pub gap_open: i32,   // charged on first gap byte; positive
+    pub gap_extend: i32, // charged per additional byte; positive
 }
 
 impl Default for ScoreParams {
@@ -43,9 +41,7 @@ pub enum Op {
 pub struct Alignment {
     pub score: i32,
     pub ops: Vec<Op>,
-    /// 0-based start index in query (a) after traceback.
     pub a_start: usize,
-    /// 0-based start index in reference (b) after traceback.
     pub b_start: usize,
 }
 
@@ -68,8 +64,7 @@ fn sub(a: u8, b: u8, p: &ScoreParams) -> i32 {
     }
 }
 
-/// Global affine-gap Needleman-Wunsch alignment. Gotoh DP with three
-/// matrices (M / X / Y) to handle affine gaps in O(n·m) time/space.
+/// Global alignment; Gotoh affine-gap DP (M/E/F), O(n·m).
 pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {
@@ -96,15 +91,12 @@ pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment
 
     for i in 1..=n {
         for j in 1..=m {
-            // E: gap in b (insert in a).
-            let e_open = h[(i - 1) * stride + j] - p.gap_open - p.gap_extend;
+            let e_open = h[(i - 1) * stride + j] - p.gap_open - p.gap_extend; // E: insert in a
             let e_ext = e[(i - 1) * stride + j] - p.gap_extend;
             e[i * stride + j] = e_open.max(e_ext);
-            // F: gap in a (delete from b).
-            let f_open = h[i * stride + j - 1] - p.gap_open - p.gap_extend;
+            let f_open = h[i * stride + j - 1] - p.gap_open - p.gap_extend; // F: delete from a
             let f_ext = f[i * stride + j - 1] - p.gap_extend;
             f[i * stride + j] = f_open.max(f_ext);
-            // H: best of diag, E, F.
             let diag = h[(i - 1) * stride + j - 1] + sub(a[i - 1], b[j - 1], p);
             h[i * stride + j] = diag.max(e[i * stride + j]).max(f[i * stride + j]);
         }
@@ -141,9 +133,7 @@ pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment
     })
 }
 
-/// Local Smith-Waterman alignment with affine gaps. Returns the best
-/// local alignment; ties broken by first-encountered. Score is always
-/// ≥ 0 because cells reset to zero when they'd otherwise go negative.
+/// Local alignment; Smith-Waterman affine-gap DP, score ≥ 0.
 pub fn smith_waterman(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {
@@ -180,7 +170,6 @@ pub fn smith_waterman(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> 
         }
     }
 
-    // Traceback from (best_i, best_j) until cell hits 0.
     let mut ops = Vec::new();
     let (mut i, mut j) = (best_i, best_j);
     while i > 0 && j > 0 && h[i * stride + j] > 0 {
@@ -225,7 +214,6 @@ mod tests {
     #[test]
     fn nw_mismatch_subtracts_correctly() {
         let p = ScoreParams::default();
-        // 1 mismatch in 4-bp pair: 3 matches - 1 mismatch = 2.
         let aln = needleman_wunsch(b"ACGT", b"ACCT", &p).unwrap();
         assert_eq!(aln.score, 2);
         let mismatches = aln.ops.iter().filter(|o| **o == Op::Mismatch).count();
@@ -235,8 +223,6 @@ mod tests {
     #[test]
     fn nw_gap_penalty_applied() {
         let p = ScoreParams::default();
-        // 5-bp vs 4-bp — best alignment has 4 matches + 1 gap.
-        // Score = 4*1 - (5 + 1) = -2.
         let aln = needleman_wunsch(b"ACGTA", b"ACGT", &p).unwrap();
         assert_eq!(aln.score, -2);
         let gaps = aln
@@ -250,7 +236,6 @@ mod tests {
     #[test]
     fn sw_finds_embedded_match() {
         let p = ScoreParams::default();
-        // "ACGT" embedded inside a longer reference; SW should find it.
         let aln = smith_waterman(b"ACGT", b"TTTACGTTTT", &p).unwrap();
         assert_eq!(aln.score, 4);
         assert!(aln.ops.iter().all(|o| *o == Op::Match));
@@ -262,7 +247,6 @@ mod tests {
     fn sw_zero_on_no_similarity() {
         let p = ScoreParams::default();
         let aln = smith_waterman(b"AAAA", b"TTTT", &p).unwrap();
-        // 4 mismatches × -1 = -4; SW clamps to 0; best=0.
         assert_eq!(aln.score, 0);
     }
 
@@ -283,7 +267,6 @@ mod tests {
     fn nw_traceback_op_count_equals_alignment_length() {
         let p = ScoreParams::default();
         let aln = needleman_wunsch(b"ACGTACGT", b"ACTACGT", &p).unwrap();
-        // Ops cover both seqs after alignment — count should be max(n,m)+gaps.
         let n_ops = aln.ops.len();
         let n_aligned_a = aln
             .ops

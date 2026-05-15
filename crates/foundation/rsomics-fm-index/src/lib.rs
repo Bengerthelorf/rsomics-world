@@ -24,19 +24,13 @@ const OCC_STRIDE: usize = 32;
 
 #[derive(Debug, Clone)]
 pub struct FmIndex {
-    /// BWT bytes — `text + 0x00` rotated, T[SA[i] - 1].
     pub bwt: Vec<u8>,
-    /// Suffix array over `text + 0x00`. `sa[0]` always points at the sentinel.
     pub sa: Vec<i32>,
-    /// Cumulative count of bytes lexicographically smaller than each byte.
-    c: [usize; 256],
-    /// Sparse rank table indexed by `(byte, i / OCC_STRIDE)` → count of
-    /// `byte` in `bwt[..i]` at rank-table positions.
-    occ: Vec<[u32; 256]>,
+    c: [usize; 256],      // C[c] = count of bytes < c in bwt
+    occ: Vec<[u32; 256]>, // sparse rank table, stride = OCC_STRIDE
 }
 
 impl FmIndex {
-    /// Build over `text`. The text must not contain the 0x00 sentinel.
     pub fn build(text: &[u8]) -> Result<Self> {
         if text.is_empty() {
             return Err(FmError::Empty);
@@ -48,19 +42,15 @@ impl FmIndex {
         t.extend_from_slice(text);
         t.push(SENTINEL);
 
-        // Suffix array over the sentinel-terminated text.
         let mut sa = vec![0_i32; t.len()];
         divsufsort::sort_in_place(&t, &mut sa);
 
-        // BWT: bwt[i] = t[sa[i] - 1], with the sentinel position emitting
-        // the last char of t (which is the sentinel itself).
         let mut bwt = vec![0_u8; t.len()];
         for i in 0..t.len() {
             let pos = sa[i] as usize;
             bwt[i] = if pos == 0 { t[t.len() - 1] } else { t[pos - 1] };
         }
 
-        // C[c] = count of bytes strictly less than c in BWT.
         let mut counts = [0_usize; 256];
         for &b in &bwt {
             counts[b as usize] += 1;
@@ -72,7 +62,6 @@ impl FmIndex {
             acc += counts[i];
         }
 
-        // Sparse Occ table at every OCC_STRIDE position.
         let n_blocks = bwt.len().div_ceil(OCC_STRIDE) + 1;
         let mut occ = vec![[0_u32; 256]; n_blocks];
         let mut running = [0_u32; 256];
@@ -87,7 +76,6 @@ impl FmIndex {
         Ok(Self { bwt, sa, c, occ })
     }
 
-    /// Count occurrences of `bwt[..i]` byte `b`. O(`OCC_STRIDE`).
     #[must_use]
     pub fn occ(&self, b: u8, i: usize) -> usize {
         let block = i / OCC_STRIDE;
@@ -102,9 +90,7 @@ impl FmIndex {
         acc
     }
 
-    /// Backward search over `pattern`. Returns the SA interval `[lo, hi)`
-    /// of suffixes that start with `pattern`, or `None` when the pattern
-    /// is absent.
+    /// SA interval `[lo, hi)` of suffixes starting with `pattern`, or `None`.
     #[must_use]
     pub fn backward_search(&self, pattern: &[u8]) -> Option<(usize, usize)> {
         if pattern.is_empty() {
@@ -123,15 +109,11 @@ impl FmIndex {
         Some((lo, hi))
     }
 
-    /// Count occurrences of `pattern` in the indexed text.
     #[must_use]
     pub fn count(&self, pattern: &[u8]) -> usize {
         self.backward_search(pattern).map_or(0, |(lo, hi)| hi - lo)
     }
 
-    /// Locate every occurrence of `pattern`. O(matches) — the full SA
-    /// is stored so each match's text position is one indirection away.
-    /// (Sparse-SA compression is 0.2 work.)
     #[must_use]
     pub fn locate(&self, pattern: &[u8]) -> Vec<usize> {
         match self.backward_search(pattern) {
@@ -202,7 +184,6 @@ mod tests {
 
     #[test]
     fn dna_pattern_search() {
-        // Two GATCs in a longer DNA sequence.
         let fm = FmIndex::build(b"AAGATCAATGATCAAAA").unwrap();
         assert_eq!(fm.count(b"GATC"), 2);
         let mut p = fm.locate(b"GATC");

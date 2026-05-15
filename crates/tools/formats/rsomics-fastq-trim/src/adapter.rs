@@ -1,6 +1,3 @@
-// Hamming-distance only — fastp's one-insertion and one-deletion fallback
-// phases are not implemented.
-
 #[derive(Debug, Clone)]
 pub struct AdapterConfig {
     pub sequence: Vec<u8>,

@@ -53,9 +53,6 @@ mod tests {
 
     #[test]
     fn bh_matches_textbook_step_up() {
-        // BH on sorted ps [0.01, 0.02, 0.04, 0.10, 0.50], n=5:
-        // raw p*n/rank = [0.05, 0.05, 0.0667, 0.125, 0.5]; monotone step-up
-        // from the right keeps it the same here.
         let adj = bh_adjust(&[0.01, 0.02, 0.04, 0.10, 0.50]).unwrap();
         let expected = [0.05, 0.05, 0.066_666_67, 0.125, 0.5];
         assert!(approx_vec(&adj, &expected, 1e-4), "{adj:?}");
@@ -64,7 +61,6 @@ mod tests {
     #[test]
     fn bh_preserves_input_order() {
         let adj = bh_adjust(&[0.5, 0.01, 0.1]).unwrap();
-        // Verify positions: position-0 carried 0.5 → still last in sorted order → adj ~0.5
         assert!(adj[0] > adj[2] && adj[2] > adj[1]);
     }
 
@@ -72,7 +68,6 @@ mod tests {
     fn bh_monotone_after_correction() {
         let ps = [0.001, 0.002, 0.003, 0.20, 0.21];
         let adj = bh_adjust(&ps).unwrap();
-        // BH must be non-decreasing in the rank order.
         let mut order: Vec<usize> = (0..adj.len()).collect();
         order.sort_by(|&i, &j| ps[i].partial_cmp(&ps[j]).unwrap());
         for w in order.windows(2) {

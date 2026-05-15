@@ -149,7 +149,6 @@ mod tests {
 
     #[test]
     fn short_banner_renders_with_color_when_requested() {
-        // "rs" easily fits even in narrow terminals.
         let b = Banner::family("rs");
         let rich = b.render(true);
         let plain = b.render(false);

@@ -91,10 +91,8 @@ impl Dbg {
     /// Extract unitigs: maximal non-branching paths. Each unitig is a
     /// vector of (k-1)-mer keys; downstream tools materialise them as
     /// sequences by joining via the shared (k-2)-suffix/prefix overlap.
-    /// (Same definition as megahit / spades.)
     #[must_use]
     pub fn unitigs(&self) -> Vec<Vec<Kmer>> {
-        // Map per-node successors / predecessors derived from edges.
         let mut succ: HashMap<Kmer, Vec<Kmer>> = HashMap::new();
         let mut pred: HashMap<Kmer, Vec<Kmer>> = HashMap::new();
         for &(a, b) in &self.edges {
@@ -109,7 +107,6 @@ impl Dbg {
 
         let mut visited: HashSet<Kmer> = HashSet::new();
         let mut out: Vec<Vec<Kmer>> = Vec::new();
-        // Branching / tip starts.
         for &start in self.nodes.keys() {
             if visited.contains(&start) || !is_branching(&start) {
                 continue;
@@ -136,7 +133,7 @@ impl Dbg {
                 out.push(path);
             }
         }
-        // Pure cycles (no branching node anywhere) — pick any start.
+        // pure cycles: no branching node, pick any start
         for &n in self.nodes.keys() {
             if visited.contains(&n) {
                 continue;
@@ -159,12 +156,10 @@ impl Dbg {
 }
 
 fn prefix_kminus1(kmer: Kmer, _k: usize) -> Kmer {
-    // Drop the last 2-bit base.
     kmer >> 2
 }
 
 fn suffix_kminus1(kmer: Kmer, k: usize) -> Kmer {
-    // Keep only the bottom (k-1) bases.
     let mask: u64 = if k == 1 {
         0
     } else {
@@ -179,20 +174,15 @@ mod tests {
 
     #[test]
     fn build_linear_seq_yields_n_minus_k_plus_1_edges() {
-        // Seq "ACGTACGT" (8bp) with k=4 → 5 k-mers → 5 edges.
         let seqs: &[&[u8]] = &[b"ACGTACGT"];
         let dbg = Dbg::build(seqs, 4).unwrap();
-        // With canonical-folding, palindromic k-mers may coalesce; just
-        // check we got at least k-mer-count - 1 edges.
+        // canonical-folding may coalesce palindromic k-mers; check floor counts
         assert!(dbg.n_edges() >= 1);
         assert!(dbg.n_nodes() >= 2);
     }
 
     #[test]
     fn build_skips_n_kmers() {
-        // "ACGTNACGT" with k=4: only windows at offsets 0 and 5 are N-free,
-        // both `ACGT`. After canonical-folding their prefix/suffix collapse
-        // to a single (k-1)-mer node with a self-loop edge.
         let seqs: &[&[u8]] = &[b"ACGTNACGT"];
         let dbg = Dbg::build(seqs, 4).unwrap();
         assert!(dbg.n_edges() >= 1);
@@ -220,11 +210,9 @@ mod tests {
 
     #[test]
     fn unitigs_collapse_linear_paths() {
-        // Long random-looking seq → 1+ linear paths from non-branching nodes.
         let seq: &[u8] = b"ACGTAGCTAGCTGATCGATCAGCT";
         let dbg = Dbg::build(&[seq], 5).unwrap();
         let unitigs = dbg.unitigs();
-        // The unitig count should be ≥ 1 and total length should equal n_nodes.
         let total_visited: usize = unitigs.iter().map(Vec::len).sum();
         assert!(
             total_visited >= dbg.n_nodes(),

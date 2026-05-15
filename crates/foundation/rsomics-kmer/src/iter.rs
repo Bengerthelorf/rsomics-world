@@ -72,7 +72,6 @@ mod tests {
 
     #[test]
     fn iter_canonical_is_idempotent_under_rc() {
-        // Same sequence reversed-complemented should yield same canonical set.
         let fwd: Vec<u64> = KmerIter::new(b"ACGTACGT", 4, true)
             .unwrap()
             .collect::<Result<_>>()
@@ -101,7 +100,6 @@ mod tests {
     fn iter_propagates_non_acgt_error() {
         let seq = b"ACGTNAC";
         let mut it = KmerIter::new(seq, 4, false).unwrap();
-        // First two kmers OK; third hits the N.
         assert!(it.next().unwrap().is_ok());
         let third = it.next().unwrap();
         assert!(matches!(third, Err(KmerError::NonAcgt { .. })));

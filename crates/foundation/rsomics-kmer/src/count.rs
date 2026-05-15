@@ -67,22 +67,15 @@ mod tests {
     #[test]
     fn count_canonical_collapses_rc_pairs() {
         let mut c = KmerCounts::new(4, true);
-        // ACGT is its own RC; AAAA and TTTT collapse to canonical AAAA.
         c.count_seq(b"AAAATTTT").unwrap();
-        // 4-mers: AAAA, AAAT, AATT, ATTT, TTTT
-        // Canonical: AAAA, AAAT/ATTT→AATT/ATTT/AATT… need to think; each is canonicalised.
-        // But the key point: TTTT → AAAA via RC, so TTTT counts double on AAAA.
         let entries: Vec<_> = c.counts.iter().collect();
         assert!(!entries.is_empty());
     }
 
     #[test]
     fn count_skips_n_kmers_silently() {
-        // NonAcgt windows are skipped (not propagated) so a contig with one N
-        // doesn't kill the whole count.
         let mut c = KmerCounts::new(4, false);
         c.count_seq(b"ACGTNACGT").unwrap();
-        // Valid 4-mers: ACGT (pos 0), and ACGT (pos 5). Total 2.
         assert_eq!(c.total(), 2);
     }
 

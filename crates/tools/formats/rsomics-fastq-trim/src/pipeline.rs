@@ -14,11 +14,8 @@ use crate::overlap::{
 use crate::parallel_gz::ChunkedWriter;
 use crate::polyx::{PolyXConfig, find_dominant_polyx_3p, find_polyx_3p};
 
-// 8192 records ≈ 12 MB per chunk at 150 bp read length — amortises rayon
-// dispatch overhead while keeping memory peak modest.
-const CHUNK_RECORDS: usize = 8192;
+const CHUNK_RECORDS: usize = 8192; // ≈12 MB per chunk at 150 bp; amortises rayon dispatch
 
-/// One FASTQ record decoupled from needletail's borrowed buffers.
 struct OwnedRecord {
     id: Vec<u8>,
     seq: Vec<u8>,
@@ -228,9 +225,8 @@ impl<'cfg> Pipeline<'cfg> {
     }
 }
 
-/// `[start, end)` window into the original `Vec`s — avoids the O(n)
-/// shift that `Vec::drain(..start)` forces on every front-trimmed record.
 struct TrimmedRecord {
+    // [start, end) window avoids O(n) shift from Vec::drain(..start)
     id: Vec<u8>,
     seq: Vec<u8>,
     qual: Vec<u8>,
@@ -342,7 +338,6 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
     };
     delta.fixed_trimmed_bases = (s1 + (orig1 - e1) + s2 + (orig2 - e2)) as u64;
 
-    // PolyG must run BEFORE overlap analysis (fastp PE order).
     if let Some(pg) = cfg.poly_g {
         if let Some(cut) = find_polyx_3p(&r1.seq[s1..e1], pg) {
             delta.poly_g_trimmed_reads += 1;

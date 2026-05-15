@@ -1,11 +1,3 @@
-//! Byte-level compat tests vs upstream fastp.
-//!
-//! Each test runs both binaries on the same input with semantically
-//! equivalent flag combinations and diffs the resulting FASTQ. fastp's
-//! quality / length / polyG filters are explicitly disabled where they
-//! aren't the test's subject, so the comparison isolates the trim layer
-//! under test.
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -215,15 +207,10 @@ fn write_pe_record(w: &mut impl Write, id: &str, seq: &[u8]) {
     w.write_all(b"\n").unwrap();
 }
 
-/// Deterministic PE fixture: each pair has a known insert + Illumina-style
-/// 3' adapter pair. Inserts vary in length so overlap geometry differs
-/// across pairs (some shorter than read length → adapter visible, some
-/// long enough that adapter sits past the read end).
 fn make_pe_overlap_fixture(in1: &Path, in2: &Path) {
-    // Inserts ≥ 30 bp (≥ fastp's `overlap_len_require` default) with
-    // non-repetitive, non-homopolymer content. Tandem repeats produce
-    // coincidental near-matches and trailing G/C runs interact with
-    // fastp's adapter heuristics in ways that diverge from ours.
+    // Inserts ≥30 bp (fastp's overlap_len_require default), non-repetitive,
+    // no homopolymer: tandem repeats cause near-matches; trailing G/C runs
+    // interact with fastp's adapter heuristics in ways that diverge from ours.
     let inserts: &[&[u8]] = &[
         b"GCATATCAGTGCATATCAGTAATGCATGCAT",
         b"CGCGCATGCATGCATGCATTAGTCAGGACGT",
@@ -277,11 +264,6 @@ fn pe_overlap_detect_matches_fastp() {
             "-L",
         ],
     );
-    // fastp's `-A` would disable ALL adapter trimming including
-    // overlap-based — so we leave it off; both sides run overlap +
-    // default Illumina TruSeq static-adapter fallback. `-G` / `-Q` / `-L`
-    // disable polyG / quality / length filters so the comparison
-    // isolates the adapter+overlap layer.
     run_to_path(
         std::path::Path::new("fastp"),
         &[

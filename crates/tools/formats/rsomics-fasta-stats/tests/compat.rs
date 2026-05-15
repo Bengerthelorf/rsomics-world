@@ -1,11 +1,3 @@
-//! Byte-level compatibility check against upstream `seqkit stats --tabular`.
-//!
-//! Mechanism: run both binaries on the same golden FASTA, parse the
-//! tabular output into a numeric per-column comparison. We do NOT diff
-//! the raw bytes — the `file` column always differs (display path) and a
-//! literal byte-diff would also pin us to seqkit's exact whitespace
-//! handling. Numeric/categorical fields are what matter.
-
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -20,7 +12,6 @@ fn rsomics_bin() -> PathBuf {
 }
 
 fn seqkit_available() -> bool {
-    // seqkit uses `version` (subcommand), not `--version` (flag).
     Command::new("seqkit")
         .arg("version")
         .stdout(Stdio::null())
@@ -54,10 +45,7 @@ struct Row {
 }
 
 struct ExtRow {
-    // seqkit's `--all` may emit fractional quartiles for small inputs
-    // (e.g. an even split), so parse as f64 even though our own output
-    // rounds to %.0f for the tabular surface.
-    q1: f64,
+    q1: f64, // seqkit may emit fractional quartiles; parse as f64 regardless of our %.0f output
     q2: f64,
     q3: f64,
     sum_gap: u64,
@@ -68,10 +56,8 @@ struct ExtRow {
 }
 
 fn parse_tabular(out: &str) -> Row {
-    // Header-driven parsing: seqkit's `--all` output for a FASTA input
-    // includes the FASTQ-only columns Q20(%) / Q30(%) / AvgQual (all
-    // zero), giving 19 cells instead of our 16. Index by name rather
-    // than position so both layouts decode the same way.
+    // seqkit --all on FASTA emits extra FASTQ-only columns (Q20/Q30/AvgQual);
+    // index by name so both 16-col and 19-col layouts decode correctly.
     let mut lines = out.lines();
     let header = lines.next().expect("header line");
     let data = lines.next().expect("data line");

@@ -33,7 +33,6 @@ fn sorts_within_chrom_by_start() {
 
 #[test]
 fn lexicographic_chrom_order_matches_bedtools() {
-    // bedtools' default sort is lexicographic, so "chr10" sorts before "chr2".
     let tmp = tempfile::tempdir().unwrap();
     let inp = tmp.path().join("in.bed");
     let out = tmp.path().join("out.bed");

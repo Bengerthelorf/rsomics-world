@@ -45,7 +45,6 @@ fn complement_matches_bedtools() {
         .unwrap();
     assert!(status.success());
     let ours_bytes = std::fs::read(&out).unwrap();
-    // bedtools complement requires the input to be sorted.
     let sorted = Command::new("bedtools")
         .args(["sort", "-i", inp.to_str().unwrap()])
         .output()

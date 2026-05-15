@@ -1,13 +1,4 @@
-//! Tier-2 fixture management: declarative manifest at the workspace root
-//! (`tests/fixtures-manifest.toml`), on-demand download into a cache dir,
-//! sha256 verification, idempotent re-use.
-//!
-//! Designed for integration tests + benches that need a real-world input
-//! (HG002 chr22 subset, 1000G chr20 BAM, etc.) bigger than what we'd
-//! commit to git. The manifest entries are version-pinned by sha256, so
-//! a future URL change doesn't break reproducibility — the verifier
-//! catches a mismatch loudly.
-//!
+//! Tier-2 fixture management: manifest-driven download + sha256 verification.
 //! Behind the `tier2` Cargo feature so production binaries don't carry
 //! `ureq` / `sha2` / `toml`.
 
@@ -20,8 +11,6 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Context, Result, RsomicsError};
 
-/// One entry in the manifest. Schema documented in
-/// `tests/fixtures-manifest.toml`'s header comment.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Fixture {
     pub name: String,
@@ -39,18 +28,13 @@ struct Manifest {
     fixtures: Vec<Fixture>,
 }
 
-/// Resolve the cache directory for Tier-2 fixtures. Precedence:
-///   1. `RSOMICS_TIER2_CACHE` env var (explicit override).
-///   2. `${CARGO_TARGET_DIR}/tier2-cache/` (per-workspace, gitignored).
-///   3. `~/.cache/rsomics-fixtures/` (user-global fallback).
+/// Resolve the Tier-2 cache directory, creating it if absent.
 ///
-/// The directory is created if missing.
+/// Precedence: `RSOMICS_TIER2_CACHE` > `$CARGO_TARGET_DIR/tier2-cache` > `~/.cache/rsomics-fixtures`.
 ///
 /// # Errors
 ///
-/// Returns `RsomicsError::Io` if mkdir fails on the resolved path,
-/// or `RsomicsError::ConfigError` if `HOME` is unset and no override
-/// was provided.
+/// `RsomicsError::Io` if mkdir fails; `RsomicsError::ConfigError` if `HOME` is unset.
 pub fn cache_dir() -> Result<PathBuf> {
     resolve_cache_dir(
         std::env::var("RSOMICS_TIER2_CACHE").ok().as_deref(),
@@ -59,8 +43,6 @@ pub fn cache_dir() -> Result<PathBuf> {
     )
 }
 
-/// Pure helper: same precedence as [`cache_dir`] but takes the inputs
-/// explicitly so tests can exercise it without mutating process env.
 fn resolve_cache_dir(
     override_dir: Option<&str>,
     cargo_target: Option<&str>,
@@ -81,13 +63,9 @@ fn resolve_cache_dir(
     Ok(dir)
 }
 
-/// Load and parse the manifest at `path`. Typically the workspace root's
-/// `tests/fixtures-manifest.toml`.
-///
 /// # Errors
 ///
-/// Returns `Err` if the file can't be read or doesn't parse as the
-/// documented schema.
+/// `Err` if the file can't be read or doesn't parse.
 pub fn load_manifest(path: &Path) -> Result<Vec<Fixture>> {
     let mut buf = String::new();
     File::open(path)
@@ -99,19 +77,12 @@ pub fn load_manifest(path: &Path) -> Result<Vec<Fixture>> {
     Ok(m.fixtures)
 }
 
-/// Locate fixture `name` in `manifest_path` and ensure it is present in
-/// the cache directory with the manifest's expected sha256.
-///
-/// If the cached file's sha256 matches the manifest, returns the cached
-/// path without touching the network. Otherwise downloads from
-/// `fixture.url`, verifies sha256, and only then writes to the final
-/// cache path. A partial download cannot become a poisoned cache —
-/// verification happens before the rename.
+/// Ensure fixture `name` is present and sha256-verified in the cache, downloading if needed.
+/// Verification happens before the rename — a partial download cannot poison the cache.
 ///
 /// # Errors
 ///
-/// Returns `Err` if: name not found in manifest, download fails, sha256
-/// mismatches, or filesystem ops fail.
+/// `Err` if not found in manifest, download fails, sha256 mismatches, or filesystem ops fail.
 pub fn fetch(manifest_path: &Path, name: &str) -> Result<PathBuf> {
     let fixtures = load_manifest(manifest_path)?;
     let fx = fixtures.iter().find(|f| f.name == name).ok_or_else(|| {

@@ -3,9 +3,8 @@ pub mod tier2;
 
 use std::process::{Command, Output, Stdio};
 
-/// Build a `PathBuf` pointing to `tests/golden/<rel>` under the **caller's**
-/// crate manifest directory. Must be a macro so `env!("CARGO_MANIFEST_DIR")`
-/// resolves at the call site.
+/// `PathBuf` pointing to `tests/golden/<rel>` under the caller's crate.
+/// Macro so `env!("CARGO_MANIFEST_DIR")` resolves at the call site.
 #[macro_export]
 macro_rules! fixture_path {
     ($rel:expr) => {{
@@ -21,10 +20,9 @@ macro_rules! fixture_path {
 macro_rules! tier2_manifest_path {
     () => {{
         let mut p = ::std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        // CARGO_MANIFEST_DIR = <root>/crates/{foundation,tools}/<crate>
-        p.pop(); // <root>/crates/{foundation,tools}
-        p.pop(); // <root>/crates
-        p.pop(); // <root>
+        p.pop(); // crates/{foundation,tools}/<crate> → crates/{foundation,tools}
+        p.pop(); // → crates
+        p.pop(); // → workspace root
         p.push("tests");
         p.push("fixtures-manifest.toml");
         p
@@ -64,12 +62,6 @@ mod tests {
 
     #[test]
     fn tool_on_path_finds_cargo() {
-        // `cargo` is universally present during `cargo test` and supports
-        // `--version`. POSIX `sh` does not — on Debian/Ubuntu `sh` is
-        // `dash`, which exits non-zero on `--version`. The predicate is
-        // intentionally aimed at tools that follow the `--version`
-        // convention (samtools, fastp, bcftools, …); using a shell that
-        // doesn't would falsely report it absent.
         assert!(
             tool_on_path("cargo"),
             "cargo must be on PATH for cargo test"

@@ -13,12 +13,8 @@ use crate::report::DedupReport;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DedupMode {
-    /// fastp -D semantics: hash a single k-mer drawn from the 3' tail; reads
-    /// that share the same hash-bin are treated as duplicates. Fast, lossy.
-    KmerBin,
-    /// seqkit rmdup -s semantics: hash the full read sequence; only exact
-    /// matches dedupe. Slower, exact.
-    FullSeq,
+    KmerBin, // fastp -D: hash a 3'-tail k-mer; fast, lossy
+    FullSeq, // seqkit rmdup -s: hash full sequence; exact
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -75,17 +71,12 @@ fn full_seq_key(seq: &[u8]) -> u128 {
     murmur3_x64_128(seq, 0)
 }
 
-/// Picks a single 12-mer from the read's 3' tail (matching fastp's `-D` mode,
-/// which fingerprints reads by their tail to bucket similar sequences fast).
-/// Falls back to the first k-mer when the read is too short.
 fn kmer_bin_key(seq: &[u8], k: usize, tail_offset: usize) -> Result<u128> {
     if seq.len() < k {
         return Ok(murmur3_x64_128(seq, 0));
     }
     let start = seq.len().saturating_sub(k + tail_offset);
     let window = &seq[start..start + k];
-    // Loop the KmerIter so we get a single canonical kmer for the slot. If the
-    // window contains N, fall back to hashing the whole read.
     let mut it = KmerIter::new(window, k, true)
         .map_err(|e| RsomicsError::InvalidInput(format!("k-mer window: {e}")))?;
     match it.next() {
@@ -168,8 +159,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let inp = tmp.path().join("in.fq");
         let out = tmp.path().join("out.fq");
-        // r1 and r2 share the last 12 bp; r3 differs there.
-        let common_tail = "AAACCCGGGTTT"; // 12bp
+        let common_tail = "AAACCCGGGTTT"; // 12 bp — r1 and r2 share this tail; r3 differs
         write_fixture(
             &inp,
             &[
@@ -216,7 +206,6 @@ mod tests {
             },
         )
         .unwrap();
-        // 4bp reads, k=12 → fallback to full-seq murmur. r1 == r2 dedupe.
         assert_eq!(r.reads_out, 2);
     }
 }

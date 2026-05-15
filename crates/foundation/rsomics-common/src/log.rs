@@ -3,17 +3,15 @@ use std::io::{self, Write};
 
 use crate::flags::CommonFlags;
 
-/// Stderr sink that respects `--quiet` / `--verbose`. `error` always prints;
+/// Stderr sink respecting `--quiet` / `--verbose`. `error` always prints;
 /// `info` respects quiet; `debug` requires verbose.
 ///
-/// No `log`/`tracing` indirection — avoids name collision with the `log` crate
-/// macros in dependent crates' preludes.
+/// Avoids `log`/`tracing` indirection — prevents name collision with the
+/// `log` crate macros in dependent crates' preludes.
 #[derive(Debug, Clone, Copy)]
 pub struct StderrLog {
     pub quiet: bool,
     pub verbose: bool,
-    /// When true, suppress human-friendly stdout output that would interleave
-    /// with the JSON envelope emitted by `rsomics_common::run`.
     pub json: bool,
 }
 
@@ -72,8 +70,6 @@ mod tests {
         let f = flags(true, false);
         let log = StderrLog::from_flags(&f);
         assert!(log.quiet);
-        // The writer side-effects to stderr; we don't capture here. The
-        // contract is: quiet=true ⇒ info() returns without touching stderr.
         log.info(format_args!("should not print"));
     }
 

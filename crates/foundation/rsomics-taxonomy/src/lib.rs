@@ -81,7 +81,8 @@ impl Taxonomy {
                     reason: "fewer than 4 fields".into(),
                 });
             }
-            if fields[3] != "scientific name" { // names.dmp also carries synonym/common; skip those
+            if fields[3] != "scientific name" {
+                // names.dmp also carries synonym/common; skip those
                 continue;
             }
             let tax_id: TaxId = fields[0].parse().map_err(|_| TaxonomyError::Malformed {
@@ -131,7 +132,8 @@ impl Taxonomy {
     pub fn resolve(&self, id: TaxId) -> TaxId {
         let mut cur = id;
         let mut hops = 0;
-        while hops < 16 { // cap against circular merged.dmp
+        while hops < 16 {
+            // cap against circular merged.dmp
             match self.merged.get(&cur) {
                 Some(&next) if next != cur => {
                     cur = next;
@@ -173,7 +175,8 @@ impl Taxonomy {
         for &id in ids {
             paths.push(self.lineage(id)?);
         }
-        for p in &mut paths { // reverse so index 0 = root, then walk forward
+        for p in &mut paths {
+            // reverse so index 0 = root, then walk forward
             p.reverse();
         }
         let mut idx = 0;

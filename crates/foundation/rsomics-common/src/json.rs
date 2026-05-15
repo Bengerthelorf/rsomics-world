@@ -5,7 +5,6 @@ use serde::Serialize;
 use crate::error::RsomicsError;
 use crate::exit::ExitCode;
 
-/// Schema version: MINOR bumps add optional fields; MAJOR bumps are breaking.
 pub const SCHEMA_VERSION: &str = "1.0";
 
 #[derive(Debug, Clone, Copy)]

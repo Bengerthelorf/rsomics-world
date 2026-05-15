@@ -1,8 +1,6 @@
-// Hamming-distance only — fastp's `--allow_gap_overlap_trimming` path is not
-// implemented. Trim geometry: negative offset = adapter present; non-negative
-// = no adapter trim needed.
+// Hamming-distance only; fastp's --allow_gap_overlap_trimming is not implemented.
+// Trim geometry: negative offset = adapter present, non-negative = no adapter trim.
 
-/// `diff_percent_limit` is clamped to `[0.0, 1.0]` at `sanitised` construction.
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapConfig {
     pub overlap_require: usize,
@@ -39,8 +37,7 @@ impl Default for OverlapConfig {
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapResult {
     pub overlapped: bool,
-    /// Positive = R2-RC starts inside R1; negative = adapter-present geometry.
-    pub offset: i64,
+    pub offset: i64, // positive = R2-RC inside R1; negative = adapter-present
     pub overlap_len: usize,
     pub diff: usize,
 }
@@ -89,7 +86,6 @@ pub fn analyze(r1: &[u8], r2_rc: &[u8], cfg: OverlapConfig) -> OverlapResult {
         return OverlapResult::none();
     }
 
-    // Forward scan: offset in [0, len1 - overlap_require].
     let max_fwd = len1 - cfg.overlap_require;
     for offset in 0..=max_fwd {
         let overlap_len = (len1 - offset).min(len2);
@@ -109,7 +105,6 @@ pub fn analyze(r1: &[u8], r2_rc: &[u8], cfg: OverlapConfig) -> OverlapResult {
         }
     }
 
-    // Reverse scan: offset in [-1, -(len2 - overlap_require)].
     let max_rev = len2 - cfg.overlap_require;
     for shift in 1..=max_rev {
         let overlap_len = len1.min(len2 - shift);
@@ -158,8 +153,6 @@ fn count_mismatches_bounded(a: &[u8], b: &[u8], limit: usize) -> usize {
     diff
 }
 
-/// `front_trimmed1`/`front_trimmed2` are already-applied fixed-front trims —
-/// required to keep overlap-derived lengths consistent with the original read frame.
 #[must_use]
 pub fn trim_lengths(
     ov: OverlapResult,
@@ -197,7 +190,6 @@ mod tests {
 
     #[test]
     fn perfect_full_overlap_at_offset_zero() {
-        // 30 bp R1, R2-RC equals R1 → full overlap at offset 0, no adapter.
         let r1 = b"ACGTACGTACGTACGTACGTACGTACGTAC";
         let r2_rc = r1;
         let ov = analyze(r1, r2_rc, OverlapConfig::default());

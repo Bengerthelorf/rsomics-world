@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn fisher_combine_two_significant() {
-        // stat = -2(2·ln(0.05)) = 11.98; survival χ²(4)(11.98) ≈ 0.0175.
+        // -2·2·ln(0.05) = 11.98; χ²(4) survival ≈ 0.0175
         let p = fisher_combine(&[0.05, 0.05]).unwrap();
         assert!(approx(p, 0.0175, 1e-3), "p={p}");
     }
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn stouffer_unit_weights_two_signif() {
-        // z = 2·Φ̄⁻¹(0.95)/√2 = 2.326; Φ̄(2.326) ≈ 0.0100.
+        // z = Φ̄⁻¹(0.95)·√2 ≈ 2.326 → p ≈ 0.0100
         let p = stouffer_combine(&[0.05, 0.05], None).unwrap();
         assert!(approx(p, 0.0100, 1e-3), "p={p}");
     }

@@ -11,12 +11,9 @@
 pub struct Hmm {
     pub n_states: usize,
     pub n_symbols: usize,
-    /// Initial state distribution, indexed by state. `pi[s]`.
-    pub pi: Vec<f64>,
-    /// Transition matrix, row-major. `trans[s_from * n_states + s_to]`.
-    pub trans: Vec<f64>,
-    /// Emission matrix, row-major. `emit[s * n_symbols + sym]`.
-    pub emit: Vec<f64>,
+    pub pi: Vec<f64>,    // pi[s]
+    pub trans: Vec<f64>, // row-major: trans[s_from * n_states + s_to]
+    pub emit: Vec<f64>,  // row-major: emit[s * n_symbols + sym]
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -67,8 +64,7 @@ impl Hmm {
         })
     }
 
-    /// Most-likely state sequence given observations. Standard log-space
-    /// Viterbi to avoid underflow on long sequences.
+    /// Most-likely state path via log-space Viterbi.
     pub fn viterbi(&self, obs: &[usize]) -> Result<Vec<usize>> {
         if obs.is_empty() {
             return Err(HmmError::Empty);
@@ -126,8 +122,7 @@ impl Hmm {
         Ok(path)
     }
 
-    /// Forward log-likelihood `ln P(obs | model)`. Scaled-alpha
-    /// implementation to avoid underflow.
+    /// `ln P(obs | model)` via scaled forward algorithm.
     pub fn log_likelihood(&self, obs: &[usize]) -> Result<f64> {
         if obs.is_empty() {
             return Err(HmmError::Empty);
@@ -182,12 +177,9 @@ mod tests {
     use super::*;
 
     fn weather_hmm() -> Hmm {
-        // Classic Russell-Norvig umbrella HMM. States: 0=Rain, 1=Sun.
-        // Symbols: 0=Umbrella, 1=NoUmbrella.
+        // Russell-Norvig umbrella HMM; 0=Rain 1=Sun, 0=Umbrella 1=NoUmbrella.
         let pi = vec![0.5, 0.5];
-        // trans: Rain→Rain 0.7, Rain→Sun 0.3, Sun→Rain 0.3, Sun→Sun 0.7
         let trans = vec![0.7, 0.3, 0.3, 0.7];
-        // emit: Rain emits Umbrella 0.9, NoUmbrella 0.1; Sun 0.2 / 0.8.
         let emit = vec![0.9, 0.1, 0.2, 0.8];
         Hmm::new(pi, trans, emit, 2).unwrap()
     }
@@ -195,8 +187,6 @@ mod tests {
     #[test]
     fn viterbi_umbrella_sequence_picks_rain_first_then_sun() {
         let hmm = weather_hmm();
-        // Saw umbrella, then no umbrella, then no umbrella — most likely
-        // sequence starts in Rain and transitions to Sun.
         let path = hmm.viterbi(&[0, 1, 1]).unwrap();
         assert_eq!(path, vec![0, 1, 1]);
     }
@@ -218,8 +208,6 @@ mod tests {
 
     #[test]
     fn log_likelihood_increases_with_consistent_obs() {
-        // ll(rain-pattern observation) should be higher than ll of an
-        // unlikely pattern that violates transition probabilities.
         let hmm = weather_hmm();
         let ll_consistent = hmm.log_likelihood(&[0, 0, 0, 0]).unwrap();
         let ll_random = hmm.log_likelihood(&[0, 1, 0, 1]).unwrap();
@@ -231,7 +219,6 @@ mod tests {
 
     #[test]
     fn shape_mismatch_rejected() {
-        // 2 states, but trans only has 3 elements.
         let r = Hmm::new(
             vec![0.5, 0.5],
             vec![0.7, 0.3, 0.3],

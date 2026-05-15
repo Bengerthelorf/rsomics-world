@@ -9,15 +9,10 @@ use crate::error::Result;
 #[cfg(feature = "rayon")]
 use crate::error::RsomicsError;
 
-/// Common flags flattened into every tool's top-level `clap::Parser` via
-/// `#[command(flatten)]`. Each flag carries `global = true` so clap
-/// propagates it through subcommands — flatten at the top level only.
+/// Common flags for every tool. Flatten with `#[command(flatten)]` at the top level only.
 #[derive(Debug, Clone, Args)]
 pub struct CommonFlags {
-    /// Number of worker threads to use. Defaults to available parallelism.
-    /// Sets the global rayon pool size; whether a tool actually parallelises
-    /// over it depends on the tool — check its `--help` for which paths
-    /// consume the pool.
+    /// Number of worker threads (default: available parallelism).
     #[arg(short = 't', long = "threads", global = true)]
     pub threads: Option<usize>,
 
