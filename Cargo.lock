@@ -920,6 +920,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-bed-sort"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-intervals",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-common"
 version = "0.5.1"
 dependencies = [
