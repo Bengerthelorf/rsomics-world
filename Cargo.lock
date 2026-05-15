@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-bed-intersect"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -961,7 +961,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-bed-subtract"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1074,7 +1074,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-intervals"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "coitrees",
  "rayon",
