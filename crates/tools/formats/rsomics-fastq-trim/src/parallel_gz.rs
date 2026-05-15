@@ -78,6 +78,22 @@ pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>, level: i32) 
     Ok(())
 }
 
+/// Write one record in `@id\nseq\n+\nqual\n` form. `id` carries no leading `@`.
+fn write_plain_fastq_record<W: Write>(
+    w: &mut W,
+    id: &[u8],
+    seq: &[u8],
+    qual: &[u8],
+) -> std::io::Result<()> {
+    w.write_all(b"@")?;
+    w.write_all(id)?;
+    w.write_all(b"\n")?;
+    w.write_all(seq)?;
+    w.write_all(b"\n+\n")?;
+    w.write_all(qual)?;
+    w.write_all(b"\n")
+}
+
 /// Append-style writer that buffers plain bytes until a chunk fills, then
 /// emits the chunk via the parallel-gz pipeline. Used by `pipeline.rs`'s
 /// SE/PE write paths. Wraps a `BufWriter` so plain-text output stays
@@ -140,7 +156,7 @@ impl ChunkedWriter {
                 }
             }
         } else {
-            rsomics_common::fastq::write_record(&mut self.inner, id, seq, qual)
+            write_plain_fastq_record(&mut self.inner, id, seq, qual)
                 .rs_context("writing plain FASTQ record")?;
         }
         Ok(())
