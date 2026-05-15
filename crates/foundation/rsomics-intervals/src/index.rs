@@ -5,6 +5,23 @@ use std::collections::HashMap;
 
 use coitrees::{COITree, Interval as CoitInterval, IntervalTree};
 
+// coitrees swaps the query-callback's node type by backend:
+//   neon / avx2  → &Interval<&'a usize>     (metadata field is `&usize`)
+//   basic        → &IntervalNode<usize, u32> (metadata field is `usize`)
+// Tip-toe around it with a macro so both paths type-check.
+#[cfg(any(target_feature = "avx2", target_feature = "neon"))]
+macro_rules! meta_id {
+    ($n:ident) => {
+        *$n.metadata
+    };
+}
+#[cfg(not(any(target_feature = "avx2", target_feature = "neon")))]
+macro_rules! meta_id {
+    ($n:ident) => {
+        $n.metadata
+    };
+}
+
 use crate::interval::Interval;
 use crate::set::IntervalSet;
 
@@ -55,7 +72,7 @@ impl IntervalIndex {
         };
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         tree.query(start as i32, (end - 1) as i32, |node| {
-            f(&self.intervals[*node.metadata]);
+            f(&self.intervals[meta_id!(node)]);
         });
     }
 
@@ -70,7 +87,7 @@ impl IntervalIndex {
         let mut hits: Vec<&Interval> = Vec::new();
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
         tree.query(start as i32, (end - 1) as i32, |node| {
-            hits.push(&self.intervals[*node.metadata]);
+            hits.push(&self.intervals[meta_id!(node)]);
         });
         hits
     }
