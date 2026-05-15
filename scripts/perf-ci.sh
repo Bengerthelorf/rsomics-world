@@ -24,7 +24,11 @@ case "$manifest" in
 esac
 
 cls=$(python3 - "$CRATE" <<'PY'
-import sys, tomllib, pathlib
+import sys, pathlib
+try:
+    import tomllib            # py3.11+
+except ModuleNotFoundError:
+    import tomli as tomllib   # py3.10 (4090): pip install --user tomli
 crate = sys.argv[1]
 m = tomllib.loads(pathlib.Path("scripts/perf-manifest.toml").read_text())
 if crate in m.get("exempt", {}):
