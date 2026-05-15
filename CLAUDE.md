@@ -8,6 +8,25 @@ Plan and build a **monorepo cargo workspace** of `rsomics-<name>` single-binary 
 
 Quality bar per tool: **fail-fast, fail-loud, single binary, easy to install (`cargo install rsomics-<name>`), zero defensive programming, self-explaining code**.
 
+### Scale + cadence (this is an indefinite campaign, not a project)
+
+The upstream reference set being reconstructed is **300+ packages**. After
+deduping overlapping functions but applying the per-function partition
+rule (one operation = one crate) — and exploding swiss-army-knife
+upstreams like `samtools`/`bedtools`/`bcftools`/`picard` into their many
+constituent operations — the rsomics-* crate count is **necessarily far
+larger than 300**, plausibly multiple thousands. This is a long
+autonomous campaign with no fixed end date.
+
+**Time does not matter; correctness and the perf contract do. Take your
+time.** Never trade a verification gate, a FreshEye review, or the
+strict `>1.0×` perf gate for speed. Run **24×7 and autonomously**: do
+not pause for permission at phase/domain/crate boundaries, do not
+courtesy-halt, do not ask "should I continue". The campaign only stops
+for the universal correctness halts or a genuine only-user decision —
+and those are raised out-of-band via Telegram (see
+`feedback-telegram-alerts` memory), not by stopping and waiting in chat.
+
 ## Architecture (2 layers, monorepo)
 
 ```
@@ -110,6 +129,34 @@ For every adopted external crate, classify and document in its TODO entry:
 | ④ Pure Rust, non-hot, edge utility | clap, serde, anyhow, regex | Adopt freely | Doesn't matter |
 
 When adopting, the TODO entry's `Existing Rust kind` field records ①②③④ explicitly.
+
+## Autonomous campaign continuity (heartbeat)
+
+A multi-thousand-crate 24×7 campaign cannot depend on one chat session
+staying alive. A **cron heartbeat** (CronCreate, autonomous-loop mode)
+re-invokes the campaign on an interval so it self-resumes after a stall,
+crash, context exhaustion, or session death — the openclaw-style
+watchdog. Operating rules:
+
+- The heartbeat is the survival net, **not** the work pace. Within an
+  active wake-up, do as much bounded, gate-passing work as is sound,
+  then end; the next firing continues from task state.
+- **Task list is the durable campaign state.** Every wake-up: read the
+  task list, pick up the lowest-id unblocked task, advance it. Never
+  rely on in-context memory surviving across firings — write progress to
+  tasks / `.autopilot/state` / memory.
+- **Idempotent & re-entrant.** A firing may overlap a still-running one
+  or restart mid-crate. Check git/crates.io/task state before acting;
+  never double-publish, double-tag, or double-yank (all are immutable or
+  loud-fail anyway, but check first).
+- A firing that finds nothing actionable (waiting on CI, on a
+  background agent, on `ssh 4090`) does a cheap status check and ends —
+  it does not busy-spin.
+- The heartbeat never courtesy-pings the user. Telegram is only for the
+  three escalation cases (genuine only-user decision, unresolvable
+  correctness halt, real milestone).
+- If the heartbeat itself cannot be (re)created or is lost, that is a
+  Telegram-worthy correctness event — surface it.
 
 ## Operating mode
 
