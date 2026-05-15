@@ -81,10 +81,7 @@ impl Taxonomy {
                     reason: "fewer than 4 fields".into(),
                 });
             }
-            // The "scientific name" is the canonical display name; other name
-            // classes (synonym, common name, equivalent name) are ignored at
-            // this layer.
-            if fields[3] != "scientific name" {
+            if fields[3] != "scientific name" { // names.dmp also carries synonym/common; skip those
                 continue;
             }
             let tax_id: TaxId = fields[0].parse().map_err(|_| TaxonomyError::Malformed {
@@ -128,14 +125,13 @@ impl Taxonomy {
         Ok(self)
     }
 
-    /// Walk merged-redirects until a live node is reached. Returns the input
-    /// when the id has no merge entry.
+    /// Walk merged-redirects until a live node is reached; returns `id` when
+    /// no merge entry exists.
     #[must_use]
     pub fn resolve(&self, id: TaxId) -> TaxId {
         let mut cur = id;
         let mut hops = 0;
-        // Cap hops to avoid infinite loops on circular merged.dmp data.
-        while hops < 16 {
+        while hops < 16 { // cap against circular merged.dmp
             match self.merged.get(&cur) {
                 Some(&next) if next != cur => {
                     cur = next;
@@ -147,8 +143,7 @@ impl Taxonomy {
         cur
     }
 
-    /// Return the path from `id` to the root, in ascending order
-    /// (id first, root last). Errors when `id` is unknown.
+    /// Path from `id` to root (id first, root last).
     pub fn lineage(&self, id: TaxId) -> Result<Vec<TaxId>> {
         let resolved = self.resolve(id);
         if !self.nodes.contains_key(&resolved) {
@@ -169,8 +164,7 @@ impl Taxonomy {
         Ok(path)
     }
 
-    /// Lowest common ancestor of two or more `tax_ids`. Returns the deepest
-    /// node that is an ancestor of every input.
+    /// Lowest common ancestor of two or more `tax_ids`.
     pub fn lca(&self, ids: &[TaxId]) -> Result<TaxId> {
         if ids.is_empty() {
             return Err(TaxonomyError::Unknown(0));
@@ -179,8 +173,7 @@ impl Taxonomy {
         for &id in ids {
             paths.push(self.lineage(id)?);
         }
-        // Reverse so root is index 0; walk forward across all paths.
-        for p in &mut paths {
+        for p in &mut paths { // reverse so index 0 = root, then walk forward
             p.reverse();
         }
         let mut idx = 0;
@@ -200,8 +193,7 @@ impl Taxonomy {
 }
 
 fn parse_dump_line(line: &str) -> Vec<&str> {
-    // Lines end with `\t|` and fields are separated by `\t|\t`. Strip the
-    // trailing `\t|` first, then split on `\t|\t`.
+    // NCBI taxdump: fields separated by `\t|\t`, trailing `\t|`.
     let trimmed = line.strip_suffix("\t|").unwrap_or(line);
     trimmed.split("\t|\t").collect()
 }
@@ -216,10 +208,6 @@ mod tests {
         let nodes_path = dir.path().join("nodes.dmp");
         let names_path = dir.path().join("names.dmp");
         let mut nodes = std::fs::File::create(&nodes_path).unwrap();
-        // tax_id | parent | rank | ...
-        // Build: 1 (root) → 2 (Bacteria) → 1224 (Proteo) → 28211 (Alpha) →
-        //                              \→ 1236 (Gamma)
-        //                  → 2157 (Archaea) → 28890 (Eury)
         writeln!(nodes, "1\t|\t1\t|\tno rank\t|").unwrap();
         writeln!(nodes, "2\t|\t1\t|\tsuperkingdom\t|").unwrap();
         writeln!(nodes, "2157\t|\t1\t|\tsuperkingdom\t|").unwrap();
@@ -229,7 +217,6 @@ mod tests {
         writeln!(nodes, "28890\t|\t2157\t|\tphylum\t|").unwrap();
 
         let mut names = std::fs::File::create(&names_path).unwrap();
-        // tax_id | name | unique_name | class
         writeln!(names, "1\t|\troot\t|\t\t|\tscientific name\t|").unwrap();
         writeln!(names, "2\t|\tBacteria\t|\t\t|\tscientific name\t|").unwrap();
         writeln!(names, "2\t|\tEubacteria\t|\t\t|\tcommon name\t|").unwrap();
@@ -271,7 +258,6 @@ mod tests {
     fn lca_within_phylum() {
         let (_d, nodes, names) = tax_fixture();
         let tax = Taxonomy::from_dump(&nodes, &names).unwrap();
-        // Both classes under Proteobacteria.
         assert_eq!(tax.lca(&[28211, 1236]).unwrap(), 1224);
     }
 
@@ -279,7 +265,6 @@ mod tests {
     fn lca_across_kingdoms_is_root() {
         let (_d, nodes, names) = tax_fixture();
         let tax = Taxonomy::from_dump(&nodes, &names).unwrap();
-        // Bacteria vs Archaea phylum.
         assert_eq!(tax.lca(&[28211, 28890]).unwrap(), 1);
     }
 

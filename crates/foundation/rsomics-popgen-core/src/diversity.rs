@@ -1,12 +1,8 @@
 use crate::{PopgenError, Result};
 
-/// Nucleotide diversity π: average pairwise difference per site across `n`
-/// chromosomes, given the per-site **derived allele count** vector.
-///
-/// `derived_counts[i]` is the count of the derived/minor allele at site i;
-/// `n` is the constant sample size (homozygous diploid samples count as 2).
-/// Sites with derived count `0` or `n` are non-segregating — their
-/// contribution is 0, so they're cheap but counted.
+/// Nucleotide diversity π (average pairwise difference per site).
+/// `derived_counts[i]` = derived/minor allele count at site i; `n` = sample
+/// size (haploid chromosomes; diploid samples contribute 2).
 pub fn theta_pi(derived_counts: &[u64], n: u64) -> Result<f64> {
     if derived_counts.is_empty() {
         return Err(PopgenError::Empty);
@@ -26,15 +22,13 @@ pub fn theta_pi(derived_counts: &[u64], n: u64) -> Result<f64> {
                 max: n,
             });
         }
-        // Number of segregating pairs at this site = k * (n - k).
         let segregating_pairs = (k * (n - k)) as f64;
         total += segregating_pairs / pairs;
     }
     Ok(total / derived_counts.len() as f64)
 }
 
-/// Watterson's θ: expected number of segregating sites under neutrality,
-/// normalised per site. `s = segregating sites in the window`, `n = sample size`.
+/// Watterson's θ per site. `s` = segregating sites, `n` = sample size, `sites` = window length.
 pub fn watterson_theta(s: u64, n: u64, sites: u64) -> Result<f64> {
     if n < 2 {
         return Err(PopgenError::SampleTooSmall {
@@ -49,9 +43,7 @@ pub fn watterson_theta(s: u64, n: u64, sites: u64) -> Result<f64> {
     Ok(s as f64 / (a1 * sites as f64))
 }
 
-/// Tajima's D over a window. `derived_counts` is the per-site derived allele
-/// count vector; `n` is sample size. Returns `NoSegregating` when there are
-/// zero segregating sites (D is undefined).
+/// Tajima's D over a window; `n` = sample size.
 pub fn tajimas_d(derived_counts: &[u64], n: u64) -> Result<f64> {
     if derived_counts.is_empty() {
         return Err(PopgenError::Empty);
@@ -98,16 +90,14 @@ mod tests {
 
     #[test]
     fn theta_pi_one_segregating_singleton() {
-        // 1 site, derived count 1 out of 10 chromosomes:
-        // segregating pairs = 1*9 = 9, total pairs = 45, π/site = 9/45 = 0.2.
+        // k=1, n=10: pairs = 1×9 = 9, total = 45, π = 9/45 = 0.2
         let p = theta_pi(&[1], 10).unwrap();
         assert!(approx(p, 0.2, 1e-9), "{p}");
     }
 
     #[test]
     fn theta_pi_balanced_50_50() {
-        // 1 site, 5/10 chromosomes carry derived:
-        // segregating pairs = 5*5 = 25, total = 45, π = 25/45 ≈ 0.5556.
+        // k=5, n=10: pairs = 5×5 = 25, total = 45, π = 25/45
         let p = theta_pi(&[5], 10).unwrap();
         assert!(approx(p, 25.0 / 45.0, 1e-9), "{p}");
     }
@@ -120,17 +110,14 @@ mod tests {
 
     #[test]
     fn watterson_known_value() {
-        // n=10 → a1 = sum(1/1..1/9) ≈ 2.828968. s=5 sites in 1000 bp window:
-        // θw = 5 / (2.828968 * 1000) ≈ 0.001767.
+        // n=10: a1 ≈ 2.828968; θw = 5 / (a1 × 1000)
         let t = watterson_theta(5, 10, 1000).unwrap();
         assert!(approx(t, 5.0 / (2.828_968_3 * 1000.0), 1e-5), "{t}");
     }
 
     #[test]
     fn tajimas_d_zero_when_pi_equals_theta_w() {
-        // Construct a vector where every segregating site has count 1 (a
-        // singleton). For singletons, π/site has a known relation to θw and D
-        // is negative; just check finite + non-NaN here.
+        // All singletons → D negative; just verify finite + non-NaN.
         let counts = vec![0_u64, 1, 0, 1, 0, 0, 1];
         let d = tajimas_d(&counts, 8).unwrap();
         assert!(d.is_finite());
@@ -155,7 +142,6 @@ mod tests {
 
     #[test]
     fn invalid_allele_count_errors() {
-        // k=12 > n=10 → invalid.
         assert!(matches!(
             theta_pi(&[12], 10),
             Err(PopgenError::InvalidAlleleCount { .. })

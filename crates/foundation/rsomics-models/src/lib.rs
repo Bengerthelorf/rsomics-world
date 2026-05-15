@@ -53,8 +53,8 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// User-default cache directory, e.g. `~/.cache/rsomics/models` on Linux,
-    /// `~/Library/Caches/rsomics/models` on macOS.
+    /// Platform cache root, e.g. `~/.cache/rsomics/models` (Linux) or
+    /// `~/Library/Caches/rsomics/models` (macOS).
     #[must_use]
     pub fn default_root() -> PathBuf {
         if let Some(home) = std::env::var_os("HOME") {
@@ -79,8 +79,7 @@ impl Cache {
         Ok(())
     }
 
-    /// Absolute path to where `model` lives in this cache (whether present
-    /// or not).
+    /// Absolute path to `model` in this cache (present or not).
     #[must_use]
     pub fn path_for(&self, model: &Model) -> PathBuf {
         let ext = match model.format {
@@ -91,9 +90,8 @@ impl Cache {
         self.root.join(format!("{}.{ext}", model.stem))
     }
 
-    /// Return `Some(path)` if the model is cached and its sha256 matches
-    /// the registry entry. Returns `None` when the file is absent;
-    /// `Err(ChecksumMismatch)` when it's present but corrupted.
+    /// `Some(path)` if cached and sha256 matches; `None` if absent;
+    /// `Err(ChecksumMismatch)` if present but corrupted.
     pub fn lookup(&self, model: &Model) -> Result<Option<PathBuf>> {
         let p = self.path_for(model);
         if !p.exists() {
@@ -112,9 +110,7 @@ impl Cache {
         }
     }
 
-    /// Lookup-or-error: the consumer-friendly signature for tools that
-    /// expect the model to already exist (e.g. when an installer ran
-    /// before the CLI binary).
+    /// Like `lookup` but errors if the model is absent.
     pub fn require(&self, model: &Model) -> Result<PathBuf> {
         match self.lookup(model)? {
             Some(p) => Ok(p),

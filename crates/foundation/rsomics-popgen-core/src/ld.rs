@@ -1,8 +1,7 @@
 use crate::{PopgenError, Result};
 
-/// LD r² between two biallelic loci given the per-haplotype phased
-/// genotype matrix `gens[hap_index][locus_index] ∈ {0, 1}` (0 = major,
-/// 1 = minor). Returns NaN-free `r² ∈ [0, 1]`.
+/// LD r² between two biallelic loci. `genotypes[hap_index] = [allele_A, allele_B]`,
+/// values ∈ {0, 1} (0 = major, 1 = minor).
 pub fn r_squared(genotypes: &[[u8; 2]]) -> Result<f64> {
     if genotypes.is_empty() {
         return Err(PopgenError::Empty);
@@ -24,8 +23,7 @@ pub fn r_squared(genotypes: &[[u8; 2]]) -> Result<f64> {
     let d = pab - pa * pb;
     let denom = pa * (1.0 - pa) * pb * (1.0 - pb);
     if denom <= 0.0 {
-        // One locus is monomorphic — r² is undefined; report 0 (matches
-        // PLINK's behaviour for the no-variation case).
+        // One locus is monomorphic; r² undefined. PLINK reports 0 here.
         return Ok(0.0);
     }
     Ok((d * d / denom).clamp(0.0, 1.0))
@@ -41,7 +39,7 @@ mod tests {
 
     #[test]
     fn perfect_ld_pair() {
-        // Every haplotype carries both alleles together or neither →  r² = 1.
+        // Both alleles co-occur on every haplotype → r² = 1.
         let g = vec![[0, 0], [0, 0], [1, 1], [1, 1]];
         let r2 = r_squared(&g).unwrap();
         assert!(approx(r2, 1.0, 1e-9), "{r2}");
@@ -49,7 +47,7 @@ mod tests {
 
     #[test]
     fn no_ld_independent_loci() {
-        // 50/50 split, independent: r² ≈ 0.
+        // 50/50 split, independent → r² ≈ 0.
         let g = vec![[0, 0], [0, 1], [1, 0], [1, 1]];
         let r2 = r_squared(&g).unwrap();
         assert!(approx(r2, 0.0, 1e-9), "{r2}");
@@ -57,7 +55,6 @@ mod tests {
 
     #[test]
     fn monomorphic_locus_yields_zero() {
-        // Locus A monomorphic.
         let g = vec![[0, 0], [0, 1], [0, 1], [0, 0]];
         let r2 = r_squared(&g).unwrap();
         assert_eq!(r2, 0.0);

@@ -77,8 +77,7 @@ pub enum PgenError {
 pub type Result<T> = std::result::Result<T, PgenError>;
 
 impl Pgen {
-    /// Load a PLINK1 fileset by `prefix` — expects `<prefix>.bim`,
-    /// `<prefix>.fam`, and `<prefix>.bed` to exist.
+    /// Load a PLINK1 fileset by `prefix` (`<prefix>.bim`, `.fam`, `.bed`).
     pub fn load(prefix: &Path) -> Result<Self> {
         let bim = prefix.with_extension("bim");
         let fam = prefix.with_extension("fam");
@@ -102,9 +101,10 @@ impl Pgen {
         self.samples.len()
     }
 
-    /// Look up the genotype call for `(variant_idx, sample_idx)`. Panics
-    /// on out-of-range indices — the type system guarantees the matrix
-    /// is allocated with `n_variants × n_samples` entries at load time.
+    /// Genotype call for `(variant_idx, sample_idx)`.
+    ///
+    /// # Panics
+    /// Panics on out-of-range indices.
     #[must_use]
     pub fn get(&self, v: usize, s: usize) -> Genotype {
         self.gt[v * self.samples.len() + s]
@@ -213,7 +213,7 @@ fn parse_bed(path: &Path, n_variants: usize, n_samples: usize) -> Result<Vec<Gen
         f.read_exact(&mut buf)?;
         for s in 0..n_samples {
             let byte = buf[s / 4];
-            let code = (byte >> ((s % 4) * 2)) & 0b11;
+            let code = (byte >> ((s % 4) * 2)) & 0b11; // PLINK 2-bit little-endian
             out.push(match code {
                 0b00 => Genotype::HomA1,
                 0b01 => Genotype::Missing,
@@ -244,12 +244,11 @@ mod tests {
         writeln!(fam, "F2\tI2\t0\t0\t2\t-9").unwrap();
         writeln!(fam, "F3\tI3\t0\t0\t1\t-9").unwrap();
         writeln!(fam, "F4\tI4\t0\t0\t2\t-9").unwrap();
-        // .bed: magic + (3 variants × 1 byte per variant since ceil(4/4)=1).
-        // Variant 1: samples [HomA1, Het, HomA2, Missing] = [00,10,11,01] →
-        // packed little-endian-2-bit: bits 0..2 = HomA1, 2..4 = Het, 4..6 = HomA2,
-        // 6..8 = Missing → byte = 0b01_11_10_00 = 0x78.
-        // Variant 2: all HomA2 → byte = 0xFF.
-        // Variant 3: all HomA1 → byte = 0x00.
+        // .bed magic + 3 bytes (ceil(4 samples / 4) = 1 byte per variant).
+        // Variant 0: [HomA1=00, Het=10, HomA2=11, Missing=01] packed
+        //   little-endian 2-bit: byte = 0b01_11_10_00 = 0x78.
+        // Variant 1: all HomA2 (0b11) → 0xFF.
+        // Variant 2: all HomA1 (0b00) → 0x00.
         let mut bed = File::create(prefix.with_extension("bed")).unwrap();
         bed.write_all(&[0x6c, 0x1b, 0x01, 0x78, 0xFF, 0x00])
             .unwrap();
@@ -262,16 +261,13 @@ mod tests {
         let pgen = Pgen::load(&prefix).unwrap();
         assert_eq!(pgen.n_variants(), 3);
         assert_eq!(pgen.n_samples(), 4);
-        // Variant 0: [HomA1, Het, HomA2, Missing]
         assert_eq!(pgen.get(0, 0), Genotype::HomA1);
         assert_eq!(pgen.get(0, 1), Genotype::Het);
         assert_eq!(pgen.get(0, 2), Genotype::HomA2);
         assert_eq!(pgen.get(0, 3), Genotype::Missing);
-        // Variant 1: all HomA2
         for s in 0..4 {
             assert_eq!(pgen.get(1, s), Genotype::HomA2);
         }
-        // Variant 2: all HomA1
         for s in 0..4 {
             assert_eq!(pgen.get(2, s), Genotype::HomA1);
         }
@@ -313,7 +309,6 @@ mod tests {
     #[test]
     fn size_mismatch_rejected() {
         let (_d, prefix) = tiny_fixture();
-        // Truncate the .bed to wrong length.
         let mut bed = File::create(prefix.with_extension("bed")).unwrap();
         bed.write_all(&[0x6c, 0x1b, 0x01, 0x78]).unwrap();
         assert!(matches!(
