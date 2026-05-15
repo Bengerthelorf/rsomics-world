@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-bed-subtract"
-version = "0.1.0"
+version = "0.1.1"
 description = "Subtract one BED file's coverage from another, emitting residual regions. Rust reimplementation of `bedtools subtract`."
 edition.workspace = true
 rust-version.workspace = true

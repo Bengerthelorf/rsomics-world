@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-bed-intersect"
-version = "0.1.0"
+version = "0.1.1"
 description = "Intersect two BED files, emitting clipped overlap regions. Rust reimplementation of `bedtools intersect`."
 edition.workspace = true
 rust-version.workspace = true
