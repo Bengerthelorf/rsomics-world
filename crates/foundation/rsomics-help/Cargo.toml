@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-help"
-version = "0.1.1"
+version = "0.2.0"
 description = "Family-wide `--help` renderer for rsomics-* CLIs: figlet banner with gradient, section helpers, plain / JSON modes for AI consumers."
 edition.workspace = true
 rust-version.workspace = true

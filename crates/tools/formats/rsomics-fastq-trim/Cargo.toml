@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-fastq-trim"
-version = "0.3.2"
+version = "0.4.0"
 description = "FASTQ adapter / poly-G / poly-X / fixed-length trimming. Rust port of fastp's trim hot path with rayon-parallel SE + PE pipelines and AI-friendly --json output."
 edition.workspace = true
 rust-version.workspace = true
@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3" }
-rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.1" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.2" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
