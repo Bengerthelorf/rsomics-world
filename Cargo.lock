@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-common"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "clap",
  "flate2",
@@ -743,7 +743,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fasta-stats"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "bytecount",
@@ -760,10 +760,9 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fastq-trim"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
- "bytecount",
  "clap",
  "criterion",
  "flate2",
@@ -780,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-help"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "figlet-rs",
  "serde",

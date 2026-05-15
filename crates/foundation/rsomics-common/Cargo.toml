@@ -1,18 +1,19 @@
 [package]
 name = "rsomics-common"
-version = "0.5.0"
+version = "0.5.1"
 description = "Shared primitives for every rsomics-* crate (errors, CLI scaffold, runner, progress, exit codes)."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
 
 [features]
-# rayon is default-on so existing consumers (rsomics-fastp, rsomics-bam) keep
-# working unchanged. Single-threaded FFI-wrapper tools that don't touch the
-# global pool can opt out with `default-features = false` to skip rayon's
-# transitive deps and binary-size impact.
+# rayon is default-on because the dominant tool-crate shape is parallel
+# scatter/gather over records. Single-threaded FFI-wrapper tools that
+# don't touch the global pool can opt out with `default-features = false`
+# to skip rayon's transitive deps and binary-size impact.
 default = ["rayon"]
 rayon = ["dep:rayon"]
 # test-support: fixture-path macro, tool_on_path predicate, run_tool wrapper.

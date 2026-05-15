@@ -58,6 +58,16 @@ seqkit's test corpus.
 
 License: MIT OR Apache-2.0. Upstream credit: [seqkit] (MIT).
 
+### External-dep quadrant classification
+
+- `needletail`, `memchr`, `bytecount` — Quadrant ① (pure Rust + SIMD).
+- `rsomics-common`, `rsomics-help`, `clap`, `serde`, `serde_json`, `anyhow` — Quadrant ④ (edge utilities).
+
+No FFI wrappers (no Quadrant ② deps); no known single-threaded-in-hot-path
+deps (no Quadrant ③). The seqkit upstream is Go, single-threaded for
+this subcommand — the bench provenance file in `.autopilot/state/` records
+the measured ratio at one thread for fairness.
+
 [needletail]: https://crates.io/crates/needletail
 [seqkit]: https://github.com/shenwei356/seqkit
 

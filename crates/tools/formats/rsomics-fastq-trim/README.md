@@ -114,6 +114,37 @@ mode a single record-event on either mate counts once). `_pairs`
 counters count pair-events that fired together. `schema_version` is
 `MAJOR.MINOR` — pin against MAJOR.
 
+## Origin
+
+This crate is an independent Rust reimplementation of fastp's adapter +
+poly-G/X + fixed-length trim hot path, based on:
+
+- The fastp paper: Chen, S. et al. *fastp: an ultra-fast all-in-one
+  FASTQ preprocessor.* Bioinformatics 34.17 (2018), i884–i890
+  [doi:10.1093/bioinformatics/bty560].
+- The public FASTQ format specification.
+- Black-box behaviour comparison via byte-equal output against the
+  upstream `fastp` binary (see `tests/compat.rs`).
+
+fastp is MIT-licensed, so clean-room is not strictly required for
+licence purposes; we still document the methodology so the contract is
+explicit. The bundled operation set (adapter / poly-G / poly-X / fixed)
+is one record-loop with a fixed processing order — see the
+`partition-master` notes for the per-function rationale.
+
+License: MIT OR Apache-2.0. Upstream credit: [fastp] (MIT).
+
+### External-dep quadrant classification
+
+- `needletail`, `memchr` — Quadrant ① (pure Rust, SIMD).
+- `libdeflater` — Quadrant ② (FFI wrapper around the libdeflate C
+  library). Used for the parallel-chunk gzip output path; documented as
+  the one FFI dep in this crate. Future P2 may pure-Rust replace.
+- `rayon`, `flate2` (zlib-rs backend) — Quadrant ① (pure Rust + parallelism / SIMD).
+- `rsomics-common`, `rsomics-help`, `clap`, `serde`, `serde_json`, `anyhow` — Quadrant ④.
+
+[fastp]: https://github.com/OpenGene/fastp
+
 ## Performance
 
 The per-function perf hard rule: every release must show strictly

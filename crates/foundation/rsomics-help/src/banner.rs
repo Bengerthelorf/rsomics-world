@@ -63,22 +63,20 @@ impl<'a> Gradient<'a> {
     }
 }
 
-/// One of figlet-rs's built-in fonts.
+/// The figlet-rs built-in fonts the adaptive renderer picks from. Other
+/// built-ins (`standard`, `big`) overflow more often than they help; not
+/// exposed until a real need surfaces.
 #[derive(Debug, Clone, Copy)]
-pub enum Font {
-    Standard,
+pub(crate) enum Font {
     Slant,
     Small,
-    Big,
 }
 
 impl Font {
     fn load(self) -> FIGlet {
         match self {
-            Self::Standard => FIGlet::standard(),
             Self::Slant => FIGlet::slant(),
             Self::Small => FIGlet::small(),
-            Self::Big => FIGlet::big(),
         }
         .expect("built-in figlet font load is infallible")
     }

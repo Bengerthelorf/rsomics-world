@@ -5,11 +5,9 @@
 //! family palette is bound here so every binary's `--help` lands on the
 //! same hues.
 
-pub const RESET: &str = "\x1b[0m";
-pub const BOLD: &str = "\x1b[1m";
-pub const DIM: &str = "\x1b[2m";
-pub const ITALIC: &str = "\x1b[3m";
-pub const UNDERLINE: &str = "\x1b[4m";
+pub(crate) const RESET: &str = "\x1b[0m";
+pub(crate) const BOLD: &str = "\x1b[1m";
+pub(crate) const DIM: &str = "\x1b[2m";
 
 /// Returns `true` if the user has set `NO_COLOR` to any value. Per
 /// <https://no-color.org/>, that's an environment-wide opt-out.

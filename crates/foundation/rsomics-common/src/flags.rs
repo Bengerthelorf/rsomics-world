@@ -115,9 +115,8 @@ impl CommonFlags {
 /// Fold the process id, monotonic time, and a small bit of address-space
 /// entropy into a `u64`. The output isn't cryptographic but is good enough
 /// to seed downstream RNGs without pulling in a fresh `getrandom`
-/// dependency at this layer. Zero is a valid output — `seed_rng` no longer
-/// uses any sentinel value to detect "unset", so the prior non-zero
-/// invariant is gone.
+/// dependency at this layer. Zero is a valid output — callers must not
+/// treat any specific value as a sentinel.
 #[allow(clippy::cast_possible_truncation)]
 fn fresh_os_seed() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};

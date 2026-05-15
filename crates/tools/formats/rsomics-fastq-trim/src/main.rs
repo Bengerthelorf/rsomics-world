@@ -237,7 +237,12 @@ struct Cli {
     /// libdeflate gzip compression level for `.gz` output. Default 4
     /// (fastp default — best ratio/speed trade-off). 1 = fastest /
     /// largest, 12 = slowest / smallest.
-    #[arg(long = "compression", alias = "compression-level", default_value_t = 4)]
+    #[arg(
+        long = "compression",
+        alias = "compression-level",
+        default_value_t = 4,
+        value_parser = clap::value_parser!(i32).range(1..=12),
+    )]
     compression: i32,
 
     #[command(flatten)]
@@ -250,10 +255,12 @@ fn parse_base(s: &str) -> std::result::Result<u8, String> {
         return Err(format!("expected a single character, got {s:?}"));
     }
     let b = bytes[0].to_ascii_uppercase();
-    if matches!(b, b'A' | b'C' | b'G' | b'T' | b'N') {
+    // N is rejected — the forced-base poly-X scanner has no meaningful
+    // semantics when the target base is the ambiguity placeholder.
+    if matches!(b, b'A' | b'C' | b'G' | b'T') {
         Ok(b)
     } else {
-        Err(format!("expected one of A C G T N, got {s:?}"))
+        Err(format!("expected one of A C G T, got {s:?}"))
     }
 }
 

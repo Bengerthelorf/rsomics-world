@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-help"
-version = "0.3.0"
+version = "0.3.1"
 description = "Family-wide `--help` renderer for rsomics-* CLIs: figlet banner with gradient, section helpers, plain / JSON modes for AI consumers."
 edition.workspace = true
 rust-version.workspace = true
@@ -9,6 +9,7 @@ repository.workspace = true
 authors.workspace = true
 categories = ["command-line-interface"]
 keywords = ["help", "cli", "ansi", "figlet", "ascii-art"]
+readme = "README.md"
 
 [dependencies]
 figlet-rs = "1"
