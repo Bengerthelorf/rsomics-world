@@ -1095,6 +1095,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-models"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rsomics-pgen"
 version = "0.1.0"
 dependencies = [
