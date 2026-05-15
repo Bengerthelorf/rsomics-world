@@ -48,6 +48,14 @@ elif KIND == "bed":
     with open(OUT, "w") as f:
         f.writelines(f"{c}\t{s}\t{e}\n" for c, s, e in rows)
 
+elif KIND == "genome":
+    # A = n_chroms. Lexicographic chrom order matches the `bed` kind's
+    # sort so `bedtools complement -g` accepts the pairing. Size exceeds
+    # the bed kind's max coordinate (250M + 5k).
+    chroms = sorted(f"chr{i}" for i in range(1, A + 1))
+    with open(OUT, "w") as f:
+        f.writelines(f"{c}\t300000000\n" for c in chroms)
+
 else:
     sys.exit(f"unknown kind {KIND}")
 print(f"wrote {OUT}")
