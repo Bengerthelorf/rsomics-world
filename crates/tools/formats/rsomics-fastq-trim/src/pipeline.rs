@@ -177,8 +177,8 @@ impl<'cfg> Pipeline<'cfg> {
 
             for p in processed {
                 report += &p.delta;
-                if let Some((id, seq, qual)) = p.write {
-                    writer.write_record(&id, &seq, &qual)?;
+                if let Some(t) = p.write {
+                    writer.write_record(&t.id, t.seq_window(), t.qual_window())?;
                 }
             }
         }
@@ -243,9 +243,9 @@ impl<'cfg> Pipeline<'cfg> {
 
             for p in processed {
                 report += &p.delta;
-                if let Some((rec1, rec2)) = p.write {
-                    w1.write_record(&rec1.0, &rec1.1, &rec1.2)?;
-                    w2.write_record(&rec2.0, &rec2.1, &rec2.2)?;
+                if let Some((t1, t2)) = p.write {
+                    w1.write_record(&t1.id, t1.seq_window(), t1.qual_window())?;
+                    w2.write_record(&t2.id, t2.seq_window(), t2.qual_window())?;
                 }
             }
         }
@@ -255,16 +255,34 @@ impl<'cfg> Pipeline<'cfg> {
     }
 }
 
-type WriteRec = (Vec<u8>, Vec<u8>, Vec<u8>);
+/// A trimmed record kept in its original-allocation `Vec`s with a live
+/// `[start, end)` window. Skips the O(n) 5'-shift that `Vec::drain(..start)`
+/// would force on every front-trimmed record.
+struct TrimmedRecord {
+    id: Vec<u8>,
+    seq: Vec<u8>,
+    qual: Vec<u8>,
+    start: usize,
+    end: usize,
+}
+
+impl TrimmedRecord {
+    fn seq_window(&self) -> &[u8] {
+        &self.seq[self.start..self.end]
+    }
+    fn qual_window(&self) -> &[u8] {
+        &self.qual[self.start..self.end]
+    }
+}
 
 struct ProcessedSe {
     delta: TrimReport,
-    write: Option<WriteRec>,
+    write: Option<TrimmedRecord>,
 }
 
 struct ProcessedPe {
     delta: TrimReport,
-    write: Option<(WriteRec, WriteRec)>,
+    write: Option<(TrimmedRecord, TrimmedRecord)>,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -277,178 +295,166 @@ fn trim_se_record(rec: OwnedRecord, cfg: &PipelineConfig) -> ProcessedSe {
 
     let original_len = rec.seq.len();
 
-    let Some((start, end)) = apply_fixed(rec.seq.len(), cfg.fixed1) else {
+    // Operate on a sliding `[start, end)` window into rec.seq / rec.qual.
+    // Avoids the O(n) `Vec::drain(..start)` shift on every fixed-trim run.
+    let Some((start, mut end)) = apply_fixed(original_len, cfg.fixed1) else {
         delta.reads_too_short_after_trim = 1;
         return ProcessedSe { delta, write: None };
     };
     delta.fixed_trimmed_bases = (start + (original_len - end)) as u64;
 
-    let mut rec = rec;
-    rec.seq.truncate(end);
-    rec.qual.truncate(end);
-    if start > 0 {
-        rec.seq.drain(..start);
-        rec.qual.drain(..start);
-    }
-
-    let after_adapter = cfg
+    let window_len = end - start;
+    let cut_adapter = cfg
         .adapter1
         .as_ref()
-        .and_then(|a| find_adapter_3p(&rec.seq, a))
-        .unwrap_or(rec.seq.len());
-    if after_adapter < rec.seq.len() {
+        .and_then(|a| find_adapter_3p(&rec.seq[start..end], a))
+        .unwrap_or(window_len);
+    if cut_adapter < window_len {
         delta.adapter_trimmed_reads = 1;
-        delta.adapter_trimmed_bases = (rec.seq.len() - after_adapter) as u64;
-        rec.seq.truncate(after_adapter);
-        rec.qual.truncate(after_adapter);
+        delta.adapter_trimmed_bases = (window_len - cut_adapter) as u64;
+        end = start + cut_adapter;
     }
 
     if let Some(pg) = cfg.poly_g
-        && let Some(cut) = find_polyx_3p(&rec.seq, pg)
+        && let Some(cut) = find_polyx_3p(&rec.seq[start..end], pg)
     {
         delta.poly_g_trimmed_reads = 1;
-        delta.poly_g_trimmed_bases = (rec.seq.len() - cut) as u64;
-        rec.seq.truncate(cut);
-        rec.qual.truncate(cut);
+        delta.poly_g_trimmed_bases = ((end - start) - cut) as u64;
+        end = start + cut;
     }
 
     if let Some(px) = cfg.poly_x
-        && let Some(r) = find_dominant_polyx_3p(&rec.seq, px)
+        && let Some(r) = find_dominant_polyx_3p(&rec.seq[start..end], px)
     {
         delta.poly_x_trimmed_reads = 1;
-        delta.poly_x_trimmed_bases = (rec.seq.len() - r.trim_at) as u64;
-        rec.seq.truncate(r.trim_at);
-        rec.qual.truncate(r.trim_at);
+        delta.poly_x_trimmed_bases = ((end - start) - r.trim_at) as u64;
+        end = start + r.trim_at;
     }
 
-    if rec.seq.len() < cfg.min_length_required {
+    if end - start < cfg.min_length_required {
         delta.reads_too_short_after_trim = 1;
         return ProcessedSe { delta, write: None };
     }
 
     delta.reads_out = 1;
-    delta.bases_out = rec.seq.len() as u64;
+    delta.bases_out = (end - start) as u64;
 
     ProcessedSe {
         delta,
-        write: Some((rec.id, rec.seq, rec.qual)),
+        write: Some(TrimmedRecord {
+            id: rec.id,
+            seq: rec.seq,
+            qual: rec.qual,
+            start,
+            end,
+        }),
     }
 }
 
 #[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
     let OwnedPair { r1, r2 } = pair;
+    let orig1 = r1.seq.len();
+    let orig2 = r2.seq.len();
     let mut delta = TrimReport {
         reads_in: 2,
-        bases_in: (r1.seq.len() + r2.seq.len()) as u64,
+        bases_in: (orig1 + orig2) as u64,
         ..Default::default()
     };
 
-    let Some((s1, e1)) = apply_fixed(r1.seq.len(), cfg.fixed1) else {
+    let Some((s1, mut e1)) = apply_fixed(orig1, cfg.fixed1) else {
         delta.reads_too_short_after_trim = 2;
         return ProcessedPe { delta, write: None };
     };
-    let Some((s2, e2)) = apply_fixed(r2.seq.len(), cfg.fixed2) else {
+    let Some((s2, mut e2)) = apply_fixed(orig2, cfg.fixed2) else {
         delta.reads_too_short_after_trim = 2;
         return ProcessedPe { delta, write: None };
     };
-    delta.fixed_trimmed_bases = (s1 + (r1.seq.len() - e1) + s2 + (r2.seq.len() - e2)) as u64;
-
-    let mut r1 = r1;
-    let mut r2 = r2;
-    r1.seq.truncate(e1);
-    r1.qual.truncate(e1);
-    if s1 > 0 {
-        r1.seq.drain(..s1);
-        r1.qual.drain(..s1);
-    }
-    r2.seq.truncate(e2);
-    r2.qual.truncate(e2);
-    if s2 > 0 {
-        r2.seq.drain(..s2);
-        r2.qual.drain(..s2);
-    }
-    let mut seq1 = r1.seq;
-    let mut qual1 = r1.qual;
-    let mut seq2 = r2.seq;
-    let mut qual2 = r2.qual;
+    delta.fixed_trimmed_bases = (s1 + (orig1 - e1) + s2 + (orig2 - e2)) as u64;
 
     // PolyG must run BEFORE overlap analysis (fastp PE order).
     if let Some(pg) = cfg.poly_g {
-        if let Some(cut) = find_polyx_3p(&seq1, pg) {
+        if let Some(cut) = find_polyx_3p(&r1.seq[s1..e1], pg) {
             delta.poly_g_trimmed_reads += 1;
-            delta.poly_g_trimmed_bases += (seq1.len() - cut) as u64;
-            seq1.truncate(cut);
-            qual1.truncate(cut);
+            delta.poly_g_trimmed_bases += ((e1 - s1) - cut) as u64;
+            e1 = s1 + cut;
         }
-        if let Some(cut) = find_polyx_3p(&seq2, pg) {
+        if let Some(cut) = find_polyx_3p(&r2.seq[s2..e2], pg) {
             delta.poly_g_trimmed_reads += 1;
-            delta.poly_g_trimmed_bases += (seq2.len() - cut) as u64;
-            seq2.truncate(cut);
-            qual2.truncate(cut);
+            delta.poly_g_trimmed_bases += ((e2 - s2) - cut) as u64;
+            e2 = s2 + cut;
         }
     }
 
     let mut overlap_fired = false;
     if let Some(ov_cfg) = cfg.overlap {
-        let r2_rc = reverse_complement(&seq2);
-        let ov: OverlapResult = overlap_analyze(&seq1, &r2_rc, ov_cfg);
-        if let Some((new1, new2)) = overlap_trim_lengths(ov, seq1.len(), seq2.len(), s1, s2) {
+        let r2_rc = reverse_complement(&r2.seq[s2..e2]);
+        let ov: OverlapResult = overlap_analyze(&r1.seq[s1..e1], &r2_rc, ov_cfg);
+        if let Some((new1, new2)) = overlap_trim_lengths(ov, e1 - s1, e2 - s2, s1, s2) {
             delta.overlap_trimmed_pairs = 1;
-            delta.overlap_trimmed_bases += ((seq1.len() - new1) + (seq2.len() - new2)) as u64;
-            seq1.truncate(new1);
-            qual1.truncate(new1);
-            seq2.truncate(new2);
-            qual2.truncate(new2);
+            delta.overlap_trimmed_bases += (((e1 - s1) - new1) + ((e2 - s2) - new2)) as u64;
+            e1 = s1 + new1;
+            e2 = s2 + new2;
             overlap_fired = true;
         }
     }
 
     if !overlap_fired {
         if let Some(a1) = cfg.adapter1.as_ref()
-            && let Some(cut) = find_adapter_3p(&seq1, a1)
+            && let Some(cut) = find_adapter_3p(&r1.seq[s1..e1], a1)
         {
             delta.adapter_trimmed_reads += 1;
-            delta.adapter_trimmed_bases += (seq1.len() - cut) as u64;
-            seq1.truncate(cut);
-            qual1.truncate(cut);
+            delta.adapter_trimmed_bases += ((e1 - s1) - cut) as u64;
+            e1 = s1 + cut;
         }
         if let Some(a2) = cfg.adapter2.as_ref()
-            && let Some(cut) = find_adapter_3p(&seq2, a2)
+            && let Some(cut) = find_adapter_3p(&r2.seq[s2..e2], a2)
         {
             delta.adapter_trimmed_reads += 1;
-            delta.adapter_trimmed_bases += (seq2.len() - cut) as u64;
-            seq2.truncate(cut);
-            qual2.truncate(cut);
+            delta.adapter_trimmed_bases += ((e2 - s2) - cut) as u64;
+            e2 = s2 + cut;
         }
     }
 
     if let Some(px) = cfg.poly_x {
-        if let Some(r) = find_dominant_polyx_3p(&seq1, px) {
+        if let Some(r) = find_dominant_polyx_3p(&r1.seq[s1..e1], px) {
             delta.poly_x_trimmed_reads += 1;
-            delta.poly_x_trimmed_bases += (seq1.len() - r.trim_at) as u64;
-            seq1.truncate(r.trim_at);
-            qual1.truncate(r.trim_at);
+            delta.poly_x_trimmed_bases += ((e1 - s1) - r.trim_at) as u64;
+            e1 = s1 + r.trim_at;
         }
-        if let Some(r) = find_dominant_polyx_3p(&seq2, px) {
+        if let Some(r) = find_dominant_polyx_3p(&r2.seq[s2..e2], px) {
             delta.poly_x_trimmed_reads += 1;
-            delta.poly_x_trimmed_bases += (seq2.len() - r.trim_at) as u64;
-            seq2.truncate(r.trim_at);
-            qual2.truncate(r.trim_at);
+            delta.poly_x_trimmed_bases += ((e2 - s2) - r.trim_at) as u64;
+            e2 = s2 + r.trim_at;
         }
     }
 
-    if seq1.len() < cfg.min_length_required || seq2.len() < cfg.min_length_required {
+    if (e1 - s1) < cfg.min_length_required || (e2 - s2) < cfg.min_length_required {
         delta.reads_too_short_after_trim = 2;
         return ProcessedPe { delta, write: None };
     }
 
     delta.reads_out = 2;
-    delta.bases_out = (seq1.len() + seq2.len()) as u64;
+    delta.bases_out = ((e1 - s1) + (e2 - s2)) as u64;
 
     ProcessedPe {
         delta,
-        write: Some(((r1.id, seq1, qual1), (r2.id, seq2, qual2))),
+        write: Some((
+            TrimmedRecord {
+                id: r1.id,
+                seq: r1.seq,
+                qual: r1.qual,
+                start: s1,
+                end: e1,
+            },
+            TrimmedRecord {
+                id: r2.id,
+                seq: r2.seq,
+                qual: r2.qual,
+                start: s2,
+                end: e2,
+            },
+        )),
     }
 }
 
