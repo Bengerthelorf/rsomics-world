@@ -1,0 +1,111 @@
+name: Release binaries
+on:
+  push:
+    tags:
+      - 'rsomics-*-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to re-build binaries for (e.g. rsomics-fasta-stats-v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { runner: ubuntu-latest,     triple: x86_64-unknown-linux-gnu  }
+          - { runner: ubuntu-24.04-arm,  triple: aarch64-unknown-linux-gnu }
+          - { runner: macos-15-intel,    triple: x86_64-apple-darwin       }
+          - { runner: macos-15,          triple: aarch64-apple-darwin      }
+    runs-on: ${{ matrix.target.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Sanitize poisoned rustup binaries on macOS images
+        if: runner.os == 'macOS'
+        run: |
+          rm -rf "$HOME/.cargo/bin" "$HOME/.rustup"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Parse tag → crate + version
+        id: parse
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG##*-v}"
+          CRATE="${TAG%-v*}"
+          echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          BIN=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -type d -name bin 2>/dev/null | head -n 1)
+          CARGO=${BIN:+$BIN/cargo}
+          ${CARGO:-cargo} build --release -p ${{ steps.parse.outputs.crate }} --target ${{ matrix.target.triple }}
+
+      - name: Package archive
+        id: pack
+        shell: bash
+        run: |
+          CRATE=${{ steps.parse.outputs.crate }}
+          VERSION=${{ steps.parse.outputs.version }}
+          TRIPLE=${{ matrix.target.triple }}
+          STAGE=$(mktemp -d)
+          NAME="${CRATE}-v${VERSION}-${TRIPLE}"
+          mkdir "$STAGE/$NAME"
+          cp "target/${TRIPLE}/release/${CRATE}" "$STAGE/$NAME/"
+          # Per-crate README + LICENSE files travel with the binary for
+          # parity with `cargo install`'s consumer-visible artefact set.
+          MANIFEST=$(find crates -mindepth 3 -maxdepth 5 -path "*/${CRATE}/Cargo.toml" | head -n 1)
+          if [ -n "$MANIFEST" ]; then
+            CRATE_DIR=$(dirname "$MANIFEST")
+            [ -f "$CRATE_DIR/README.md" ] && cp "$CRATE_DIR/README.md" "$STAGE/$NAME/"
+          fi
+          [ -f LICENSE-MIT ]        && cp LICENSE-MIT        "$STAGE/$NAME/"
+          [ -f LICENSE-APACHE-2.0 ] && cp LICENSE-APACHE-2.0 "$STAGE/$NAME/"
+          ARCHIVE="${NAME}.tar.gz"
+          ( cd "$STAGE" && tar -czf "$ARCHIVE" "$NAME" )
+          mv "$STAGE/$ARCHIVE" .
+          shasum -a 256 "$ARCHIVE" > "${ARCHIVE}.sha256"
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artefact (for release step)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.archive }}
+          path: |
+            ${{ steps.pack.outputs.archive }}
+            ${{ steps.pack.outputs.archive }}.sha256
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artefacts
+          merge-multiple: true
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          # Create the release if it doesn't exist yet (idempotent).
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Auto-built binaries for $TAG"
+          gh release upload "$TAG" artefacts/*.tar.gz artefacts/*.sha256 --clobber
