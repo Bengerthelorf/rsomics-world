@@ -896,6 +896,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-bed-complement"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-intervals",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-bed-intersect"
 version = "0.1.0"
 dependencies = [
