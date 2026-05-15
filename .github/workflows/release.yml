@@ -28,13 +28,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
-      - name: Sanitize poisoned rustup binaries on macOS images
-        if: runner.os == 'macOS'
-        run: |
-          rm -rf "$HOME/.cargo/bin" "$HOME/.rustup"
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -48,14 +41,34 @@ jobs:
           echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Build release binary
+      - name: Detect binary target
+        id: hasbin
         shell: bash
         run: |
-          BIN=$(find "$HOME/.rustup/toolchains" -maxdepth 3 -type d -name bin 2>/dev/null | head -n 1)
-          CARGO=${BIN:+$BIN/cargo}
-          ${CARGO:-cargo} build --release -p ${{ steps.parse.outputs.crate }} --target ${{ matrix.target.triple }}
+          CRATE=${{ steps.parse.outputs.crate }}
+          MANIFEST=$(find crates -mindepth 3 -maxdepth 5 -path "*/${CRATE}/Cargo.toml" | head -n 1)
+          if [ -z "$MANIFEST" ]; then
+            echo "::error::no Cargo.toml found for $CRATE"
+            exit 1
+          fi
+          if grep -q '^\[\[bin\]\]' "$MANIFEST"; then
+            echo "has_bin=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_bin=no" >> "$GITHUB_OUTPUT"
+            echo "::notice::$CRATE is library-only — skipping binary build + package."
+          fi
+
+      - name: Build release binary
+        if: steps.hasbin.outputs.has_bin == 'yes'
+        shell: bash
+        # Native build only — each runner's host triple equals the target
+        # triple, so `--target` would trigger redundant component installs
+        # (rust-src in particular) that the runner image can't always
+        # satisfy reliably.
+        run: cargo build --release -p ${{ steps.parse.outputs.crate }}
 
       - name: Package archive
+        if: steps.hasbin.outputs.has_bin == 'yes'
         id: pack
         shell: bash
         run: |
@@ -65,16 +78,12 @@ jobs:
           STAGE=$(mktemp -d)
           NAME="${CRATE}-v${VERSION}-${TRIPLE}"
           mkdir "$STAGE/$NAME"
-          cp "target/${TRIPLE}/release/${CRATE}" "$STAGE/$NAME/"
-          # Per-crate README + LICENSE files travel with the binary for
-          # parity with `cargo install`'s consumer-visible artefact set.
+          cp "target/release/${CRATE}" "$STAGE/$NAME/"
           MANIFEST=$(find crates -mindepth 3 -maxdepth 5 -path "*/${CRATE}/Cargo.toml" | head -n 1)
-          if [ -n "$MANIFEST" ]; then
-            CRATE_DIR=$(dirname "$MANIFEST")
-            [ -f "$CRATE_DIR/README.md" ] && cp "$CRATE_DIR/README.md" "$STAGE/$NAME/"
-          fi
-          [ -f LICENSE-MIT ]        && cp LICENSE-MIT        "$STAGE/$NAME/"
-          [ -f LICENSE-APACHE-2.0 ] && cp LICENSE-APACHE-2.0 "$STAGE/$NAME/"
+          CRATE_DIR=$(dirname "$MANIFEST")
+          [ -f "$CRATE_DIR/README.md" ]      && cp "$CRATE_DIR/README.md"      "$STAGE/$NAME/"
+          [ -f "$CRATE_DIR/LICENSE-MIT" ]    && cp "$CRATE_DIR/LICENSE-MIT"    "$STAGE/$NAME/"
+          [ -f "$CRATE_DIR/LICENSE-APACHE-2.0" ] && cp "$CRATE_DIR/LICENSE-APACHE-2.0" "$STAGE/$NAME/"
           ARCHIVE="${NAME}.tar.gz"
           ( cd "$STAGE" && tar -czf "$ARCHIVE" "$NAME" )
           mv "$STAGE/$ARCHIVE" .
@@ -82,6 +91,7 @@ jobs:
           echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 
       - name: Upload artefact (for release step)
+        if: steps.hasbin.outputs.has_bin == 'yes'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pack.outputs.archive }}
@@ -104,8 +114,13 @@ jobs:
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          # Create the release if it doesn't exist yet (idempotent).
+          # Skip cleanly when no binaries were produced (library-only crate).
+          if [ -z "$(ls -A artefacts 2>/dev/null)" ]; then
+            echo "::notice::No artefacts to upload for $TAG (library-only crate?)."
+            exit 0
+          fi
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Auto-built binaries for $TAG"
           gh release upload "$TAG" artefacts/*.tar.gz artefacts/*.sha256 --clobber
