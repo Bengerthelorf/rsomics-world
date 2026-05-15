@@ -1,0 +1,58 @@
+# perfgate release manifest — the per-tool >1.0x contract, machine-readable.
+#
+# Every Layer-B tool crate MUST appear here as exactly one of:
+#   [spec.<crate>]    full perfgate spec; publish runs it and blocks if <=1.0x
+#   [exempt.<crate>]  reason = "..."; no single-binary upstream to bench
+# A Layer-B tool crate that is neither (or marked needs_spec) BLOCKS publish:
+# a port ships only once it is proven strictly faster than its reference.
+#
+# Placeholders in *_args: FIX = input fixture, FIX2 = second input,
+# OUT = scratch output. fixture/fixture2 = "<kind>:<a>:<b>" for
+# scripts/mkfixture.py (kind ∈ fasta|fastq|bed).
+
+[spec.rsomics-fasta-stats]
+fixture          = "fasta:50000:1000"
+ours_args        = "-t 1 FIX"
+upstream_bin     = "seqkit"
+upstream_args    = "stats -j 1 FIX"
+upstream_version = "seqkit version"
+
+[spec.rsomics-fastq-trim]
+fixture          = "fastq:300000:150"
+ours_args        = "-t 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC --in1 FIX --out1 OUT"
+upstream_bin     = "fastp"
+upstream_args    = "--thread 1 --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT --disable_quality_filtering --json /dev/null --html /dev/null"
+upstream_version = "fastp --version"
+
+[spec.rsomics-bed-merge]
+fixture          = "bed:2000000:24"
+ours_args        = "-i FIX"
+upstream_bin     = "bedtools"
+upstream_args    = "merge -i FIX"
+upstream_version = "bedtools --version"
+
+[spec.rsomics-bed-sort]
+# coreutils `sort` is the universal pre-sort idiom bedtools itself documents.
+fixture          = "bed:2000000:24"
+ours_args        = "-i FIX"
+upstream_bin     = "sort"
+upstream_args    = "-k1,1 -k2,2n FIX"
+upstream_version = "sort --version"
+
+[exempt.rsomics-pvalue-adjust]
+reason = "No standalone C/Python/R *binary* upstream — R's p.adjust is a library function, not a CLI tool. The perf contract targets ports of standalone binaries; covered instead by an in-crate criterion micro-bench."
+
+# --- needs_spec: publish BLOCKED until a verified spec lands + passes ---
+# CLI flags / upstream mapping not yet verified this session; authoring an
+# unverified spec would be inventing flags. Cleared in task #105 (backlog).
+[needs_spec.rsomics-fastq-dedup]
+note = "vs fastp --dedup; verify fastp dedup flag + rsomics-fastq-dedup CLI on 4090."
+
+[needs_spec.rsomics-bed-intersect]
+note = "vs `bedtools intersect -a A -b B`; needs FIX2; verify ours -a/-b CLI."
+
+[needs_spec.rsomics-bed-subtract]
+note = "vs `bedtools subtract -a A -b B`; needs FIX2; verify ours CLI."
+
+[needs_spec.rsomics-bed-complement]
+note = "vs `bedtools complement -i FIX -g GENOME`; needs a genome fixture; verify ours CLI."

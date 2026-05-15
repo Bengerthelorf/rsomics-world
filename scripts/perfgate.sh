@@ -24,11 +24,12 @@
 # optimisation pass is owed before any tag.
 set -euo pipefail
 
-NAME=  FIXTURE=  OURS_BIN=  OURS_ARGS=  UP_BIN=  UP_ARGS=  UP_VER=  WARMUP=3  MINRUNS=10
+NAME=  FIXTURE=  FIXTURE2=  OURS_BIN=  OURS_ARGS=  UP_BIN=  UP_ARGS=  UP_VER=  WARMUP=3  MINRUNS=10
 while [ $# -gt 0 ]; do
   case "$1" in
     --name)             NAME=$2; shift 2 ;;
     --fixture)          FIXTURE=$2; shift 2 ;;
+    --fixture2)         FIXTURE2=$2; shift 2 ;;
     --ours-bin)         OURS_BIN=$2; shift 2 ;;
     --ours-args)        OURS_ARGS=$2; shift 2 ;;
     --upstream-bin)     UP_BIN=$2; shift 2 ;;
@@ -50,6 +51,10 @@ repo_root=$(git rev-parse --show-toplevel); cd "$repo_root"
 work=$(mktemp -d /tmp/perfgate.XXXXXX)
 trap 'rm -rf "$work"' EXIT
 ln -s "$(cd "$(dirname "$FIXTURE")" && pwd)/$(basename "$FIXTURE")" "$work/fixture"
+if [ -n "$FIXTURE2" ]; then
+  [ -f "$FIXTURE2" ] || { echo "perfgate: fixture2 not found: $FIXTURE2" >&2; exit 2; }
+  ln -s "$(cd "$(dirname "$FIXTURE2")" && pwd)/$(basename "$FIXTURE2")" "$work/fixture2"
+fi
 ln -s "$(cd "$(dirname "$OURS_BIN")" && pwd)/$(basename "$OURS_BIN")" "$work/ours"
 up_abs=$(command -v "$UP_BIN" || echo "$UP_BIN")
 ln -s "$up_abs" "$work/upstream"
@@ -66,7 +71,8 @@ fix_size=$(wc -c < "$FIXTURE" | tr -d ' ')
 fix_sha=$(sha256 "$FIXTURE")
 up_ver_str=$([ -n "$UP_VER" ] && eval "$UP_VER" 2>&1 | head -1 || echo "n/a")
 
-subst() { local s=$1; s=${s//FIX/$work/fixture}; s=${s//OUT/$work/$2}; echo "$s"; }
+# FIX2 before FIX (FIX is a prefix of FIX2).
+subst() { local s=$1; s=${s//FIX2/$work/fixture2}; s=${s//FIX/$work/fixture}; s=${s//OUT/$work/$2}; echo "$s"; }
 ours_args=$(subst "$OURS_ARGS" out.ours)
 up_args=$(subst "$UP_ARGS" out.up)
 
@@ -99,6 +105,7 @@ mkdir -p "$(dirname "$out")"
   echo "- upstream: \`$UP_BIN $UP_ARGS <fixture>\` — version: ${up_ver_str}"
   echo "- machine: $(uname -sm) | $(cpu_id) | $(ncores) cores"
   echo "- fixture: $FIXTURE — ${fix_size} bytes — sha256 ${fix_sha}"
+  [ -n "$FIXTURE2" ] && echo "- fixture2: $FIXTURE2 — $(wc -c < "$FIXTURE2" | tr -d ' ') bytes — sha256 $(sha256 "$FIXTURE2")"
   echo "- hyperfine: warmup ${WARMUP}, min-runs ${MINRUNS}, shell=none"
   echo
   printf '| side | mean (s) | σ | min | max |\n|---|---|---|---|---|\n'

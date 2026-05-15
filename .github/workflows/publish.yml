@@ -59,12 +59,17 @@ jobs:
             "https://github.com/shenwei356/seqkit/releases/download/v2.13.0/seqkit_linux_${seqkit_arch}.tar.gz"
           tar -xzf /tmp/seqkit.tar.gz -C /tmp
           sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
+          sudo apt-get install -y --no-install-recommends hyperfine
           fastp --version
           seqkit version
           bedtools --version
+          hyperfine --version
 
       - name: cargo test
         run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features
+
+      - name: perf gate (>1.0x vs upstream — contract enforced)
+        run: scripts/perf-ci.sh ${{ steps.parse.outputs.crate }}
 
       - name: cargo publish (dry-run)
         run: cargo publish -p ${{ steps.parse.outputs.crate }} --dry-run
