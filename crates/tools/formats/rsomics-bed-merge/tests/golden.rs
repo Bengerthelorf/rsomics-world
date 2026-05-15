@@ -68,8 +68,8 @@ fn multi_chrom_independent_merge() {
         &inp,
         &[
             "chr1\t100\t200",
-            "chr2\t100\t200",
             "chr1\t150\t250",
+            "chr2\t100\t200",
             "chr2\t300\t400",
         ],
     );
@@ -80,4 +80,49 @@ fn multi_chrom_independent_merge() {
     assert!(status.success());
     let got = std::fs::read_to_string(out).unwrap();
     assert_eq!(got, "chr1\t100\t250\nchr2\t100\t200\nchr2\t300\t400\n");
+}
+
+#[test]
+fn unsorted_input_fails_loud() {
+    // bedtools merge contract: input must be pre-sorted. An out-of-order
+    // start on the same chrom is a malformed pipeline, not something to
+    // silently reorder — a wrong BED is worse than a loud exit.
+    let tmp = tempfile::tempdir().unwrap();
+    let inp = tmp.path().join("in.bed");
+    let out = tmp.path().join("out.bed");
+    write_bed(&inp, &["chr1\t300\t400", "chr1\t100\t200"]);
+    let result = Command::new(ours())
+        .args(["-i", inp.to_str().unwrap(), "-o", out.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("not sorted"),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+}
+
+#[test]
+fn reappearing_chrom_fails_loud() {
+    // chr1 -> chr2 -> chr1: bedtools errors ("out of order"); we must too,
+    // not silently emit an interleaved split that downstream set-algebra
+    // would mis-handle.
+    let tmp = tempfile::tempdir().unwrap();
+    let inp = tmp.path().join("in.bed");
+    let out = tmp.path().join("out.bed");
+    write_bed(
+        &inp,
+        &["chr1\t100\t200", "chr2\t100\t200", "chr1\t300\t400"],
+    );
+    let result = Command::new(ours())
+        .args(["-i", inp.to_str().unwrap(), "-o", out.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("not sorted"),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
 }

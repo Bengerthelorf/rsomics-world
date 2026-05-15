@@ -1,14 +1,14 @@
 use std::fs::File;
-use std::io::{self, BufWriter, Read};
+use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use std::process::{self, ExitCode};
 
 use clap::Parser;
-use rsomics_common::{CommonFlags, ExitCode as RsomicsExit, Result, ToolMeta, run};
+use rsomics_common::{CommonFlags, ExitCode as RsomicsExit, Result, RsomicsError, ToolMeta, run};
 use rsomics_help::{
     Example, FlagSpec, HelpSpec, Origin, Section, intercept_help, render as render_help,
 };
-use rsomics_intervals::{IntervalSet, bed, merge};
+use rsomics_intervals::bed;
 
 const META: ToolMeta = ToolMeta {
     name: env!("CARGO_PKG_NAME"),
@@ -18,7 +18,7 @@ const META: ToolMeta = ToolMeta {
 const HELP: HelpSpec = HelpSpec {
     name: META.name,
     version: META.version,
-    tagline: "Merge overlapping/touching intervals in a BED file (bedtools merge equivalent).",
+    tagline: "Merge overlapping/touching intervals in a pre-sorted BED (bedtools merge equivalent).",
     origin: Some(Origin {
         upstream: "bedtools",
         upstream_license: "MIT",
@@ -37,7 +37,7 @@ const HELP: HelpSpec = HelpSpec {
                 type_hint: Some("Path"),
                 required: false,
                 default: Some("-"),
-                description: "Input BED (default stdin; `-` is explicit stdin)",
+                description: "Input BED, pre-sorted by chrom then start (bedtools merge contract; pipe rsomics-bed-sort first). Default stdin",
                 why_default: None,
             },
             FlagSpec {
@@ -89,32 +89,16 @@ struct Cli {
 }
 
 fn pipeline(cli: &Cli) -> Result<()> {
-    let intervals = read_input(&cli.input)?;
-    let set: IntervalSet = intervals.into_iter().collect();
-    let merged = merge(&set);
-    write_output(&cli.output, &merged)
-}
-
-fn read_input(path: &str) -> Result<Vec<rsomics_intervals::Interval>> {
-    if path == "-" {
-        let mut buf = Vec::new();
-        io::stdin()
-            .read_to_end(&mut buf)
-            .map_err(rsomics_common::RsomicsError::Io)?;
-        bed::read_bytes(&buf)
+    let w: BufWriter<Box<dyn io::Write>> = BufWriter::new(if cli.output == "-" {
+        Box::new(io::stdout().lock())
     } else {
-        let f = File::open(PathBuf::from(path)).map_err(rsomics_common::RsomicsError::Io)?;
-        bed::read(f)
-    }
-}
-
-fn write_output(path: &str, set: &IntervalSet) -> Result<()> {
-    let ivs = set.iter().cloned();
-    if path == "-" {
-        bed::write_bed3(BufWriter::new(io::stdout().lock()), ivs)
+        Box::new(File::create(PathBuf::from(&cli.output)).map_err(RsomicsError::Io)?)
+    });
+    if cli.input == "-" {
+        bed::merge_sorted(io::stdin().lock(), w)
     } else {
-        let f = File::create(PathBuf::from(path)).map_err(rsomics_common::RsomicsError::Io)?;
-        bed::write_bed3(BufWriter::new(f), ivs)
+        let f = File::open(PathBuf::from(&cli.input)).map_err(RsomicsError::Io)?;
+        bed::merge_sorted(f, w)
     }
 }
 

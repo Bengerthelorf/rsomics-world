@@ -937,7 +937,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-bed-merge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1074,7 +1074,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-intervals"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "coitrees",
  "rayon",
