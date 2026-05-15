@@ -26,6 +26,7 @@ use std::io::IsTerminal;
 use crate::ansi::no_color_env;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HelpMode {
     Rich,
     Plain,

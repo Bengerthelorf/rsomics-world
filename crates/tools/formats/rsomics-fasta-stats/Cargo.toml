@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-fasta-stats"
-version = "0.4.0"
+version = "0.4.1"
 description = "Per-record statistics for FASTA files (num_seqs, sum_len, GC%, N50, …) — Rust port of `seqkit stats` (FASTA-only subset)."
 edition.workspace = true
 rust-version.workspace = true
@@ -16,8 +16,8 @@ name = "rsomics-fasta-stats"
 path = "src/main.rs"
 
 [dependencies]
-rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3" }
-rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.2" }
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.4" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -27,7 +27,7 @@ bytecount = { version = "0.6", features = ["runtime-dispatch-simd"] }
 memchr = "2"
 
 [dev-dependencies]
-rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.3", features = ["test-support", "rayon"] }
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.4", features = ["test-support", "rayon"] }
 tempfile = "3"
 
 [lints]

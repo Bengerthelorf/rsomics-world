@@ -8,6 +8,7 @@ use thiserror::Error;
 /// into one of these; we deliberately keep the variant count small so the
 /// [`crate::ExitCode`] mapping stays exhaustive without ceremony.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum RsomicsError {
     /// Any failure surfaced through `std::io::Error`. Note this also catches
     /// "user gave a non-existent path" cases — at this layer we can't tell
