@@ -1,0 +1,21 @@
+[package]
+name = "rsomics-taxonomy"
+version = "0.1.0"
+description = "NCBI taxdump parser + LCA + lineage helpers for the rsomics-* tool family. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["ncbi", "taxonomy", "bioinformatics", "lca", "taxdump"]
+
+[dependencies]
+rsomics-common = { path = "../rsomics-common", version = "0.5" }
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
