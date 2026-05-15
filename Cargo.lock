@@ -929,6 +929,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-fastq-dedup"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "flate2",
+ "needletail",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-kmer",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-fastq-trim"
 version = "0.4.4"
 dependencies = [
