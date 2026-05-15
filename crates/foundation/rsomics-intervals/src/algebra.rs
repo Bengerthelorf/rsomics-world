@@ -1,3 +1,4 @@
+use crate::index::IntervalIndex;
 use crate::interval::Interval;
 use crate::set::IntervalSet;
 
@@ -44,17 +45,21 @@ pub fn merge(input: &IntervalSet) -> IntervalSet {
 /// (duplicate overlaps retained when one interval in `a` hits multiple in `b`).
 #[must_use]
 pub fn intersect(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
+    // coitrees index over b → O(n_a·log n_b + output) regardless of how
+    // interval lengths are distributed. A hand-rolled active-set sweep
+    // collapses to O(n_a·n_b) on a long-a / many-short-a / dense-b shape
+    // (CNV vs SNP); the tree has no such cliff.
+    let bx = IntervalIndex::build(b);
     let mut out = IntervalSet::new();
     for (chrom, a_ivs) in a.iter_chroms() {
-        let Some(b_ivs) = b.get(chrom) else { continue };
         for ai in a_ivs {
-            for bi in b_ivs {
+            bx.for_each_overlap(chrom, ai.start, ai.end, |bi| {
                 let lo = ai.start.max(bi.start);
                 let hi = ai.end.min(bi.end);
                 if hi > lo {
                     out.push(mk(chrom, lo, hi));
                 }
-            }
+            });
         }
     }
     out.sort();
@@ -69,9 +74,18 @@ pub fn subtract(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
     let mut out = IntervalSet::new();
     for (chrom, a_ivs) in a.iter_chroms() {
         let b_ivs = b_merged.get(chrom).unwrap_or(&[]);
-        for ai in a_ivs {
-            for (lo, hi) in subtract_one(ai, b_ivs) {
-                out.push(mk(chrom, lo, hi));
+        let mut av: Vec<&Interval> = a_ivs.iter().collect();
+        av.sort_unstable_by_key(|x| (x.start, x.end));
+        // b_merged is sorted + disjoint ⇒ ends ascending. With a's starts
+        // ascending, the first b that can touch `ai` only moves forward —
+        // monotone `lo` makes this O(n+m) not O(n·m).
+        let mut lo = 0usize;
+        for ai in &av {
+            while lo < b_ivs.len() && b_ivs[lo].end <= ai.start {
+                lo += 1;
+            }
+            for (s, e) in subtract_one(ai, &b_ivs[lo..]) {
+                out.push(mk(chrom, s, e));
             }
         }
     }
@@ -186,6 +200,20 @@ mod tests {
         assert_eq!(v.len(), 2);
         assert_eq!((v[0].start, v[0].end), (150, 200));
         assert_eq!((v[1].start, v[1].end), (300, 350));
+    }
+
+    #[test]
+    fn intersect_long_a_then_short_a_dense_b() {
+        // The shape a tree handles but an active-set sweep degrades on:
+        // one spanning a, then a short a, against dense b.
+        let a = set([iv("chr1", 0, 100), iv("chr1", 10, 11)]);
+        let b = set([iv("chr1", 5, 15), iv("chr1", 50, 60)]);
+        let i = intersect(&a, &b);
+        let v = i.get("chr1").unwrap();
+        assert_eq!(
+            v.iter().map(|x| (x.start, x.end)).collect::<Vec<_>>(),
+            vec![(5, 15), (10, 11), (50, 60)]
+        );
     }
 
     #[test]
