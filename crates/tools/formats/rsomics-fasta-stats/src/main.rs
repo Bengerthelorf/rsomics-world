@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use rsomics_common::{CommonFlags, Context, Result, RsomicsError, ToolMeta, run};
 use rsomics_help::{HelpMode, intercept_help};
 
@@ -251,15 +251,72 @@ fn print_json_help() {
     println!();
 }
 
+fn print_plain_help() {
+    use rsomics_help::{FlagRowSpec, flag_table};
+    println!("{} {} — {}", META.name, META.version, TAGLINE);
+    println!();
+    println!("USAGE");
+    println!("  rsomics-fasta-stats [OPTIONS] <INPUTS>...");
+    println!();
+    println!("OPTIONS");
+    println!(
+        "{}",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('a'),
+                    long: "all",
+                    value: None,
+                    desc: "Emit extended stats (Q1/Q2/Q3, N50, GC%, sum_gap, sum_n)",
+                },
+                FlagRowSpec {
+                    short: Some('T'),
+                    long: "tabular",
+                    value: None,
+                    desc: "Tab-separated machine-readable output",
+                },
+                FlagRowSpec {
+                    short: Some('G'),
+                    long: "gap-letters",
+                    value: Some("<CHARS>"),
+                    desc: "Gap chars for --all (default \"- .\")",
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "json",
+                    value: None,
+                    desc: "Emit AI-friendly JSON envelope on stdout",
+                },
+                FlagRowSpec {
+                    short: Some('t'),
+                    long: "threads",
+                    value: Some("<N>"),
+                    desc: "Worker thread count",
+                },
+                FlagRowSpec {
+                    short: Some('h'),
+                    long: "help",
+                    value: None,
+                    desc: "Show this help (--help for rich, --help --json for AI)",
+                },
+            ],
+            false,
+        )
+    );
+    println!();
+    println!("EXAMPLES");
+    println!("  rsomics-fasta-stats genome.fa                       # Default stats");
+    println!("  rsomics-fasta-stats --tabular --all genome.fa.gz    # Extended, tabular");
+    println!("  rsomics-fasta-stats --json scaffolds.fa | jq .result  # JSON pipe");
+    println!();
+}
+
 fn main() -> ExitCode {
     let raw_args: Vec<String> = std::env::args().collect();
     if let Some(mode) = intercept_help(&raw_args) {
         match mode {
             HelpMode::Rich => print_rich_help(),
-            HelpMode::Plain => {
-                Cli::command().print_help().ok();
-                println!();
-            }
+            HelpMode::Plain => print_plain_help(),
             HelpMode::Json => print_json_help(),
         }
         return ExitCode::SUCCESS;

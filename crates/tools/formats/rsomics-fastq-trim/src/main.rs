@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use rsomics_common::{CommonFlags, Result, RsomicsError, ToolMeta, run};
 use rsomics_help::{HelpMode, intercept_help};
 
@@ -833,15 +833,206 @@ fn print_json_help() {
     println!();
 }
 
+#[allow(clippy::too_many_lines)]
+fn print_plain_help() {
+    use rsomics_help::{FlagRowSpec, flag_table};
+    println!("{} {} — {}", META.name, META.version, TAGLINE);
+    println!();
+    println!("USAGE");
+    println!("  rsomics-fastq-trim [OPTIONS] --in1 PATH --out1 PATH");
+    println!("  rsomics-fastq-trim [OPTIONS] --in1 R1 --in2 R2 --out1 O1 --out2 O2   (PE)");
+    println!();
+    println!("INPUT / OUTPUT");
+    println!(
+        "{}",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('i'),
+                    long: "in1",
+                    value: Some("<path>"),
+                    desc: "R1 input (gz/bz2/xz/zst autodetect)"
+                },
+                FlagRowSpec {
+                    short: Some('o'),
+                    long: "out1",
+                    value: Some("<path>"),
+                    desc: "R1 output (.gz parallel libdeflate)"
+                },
+                FlagRowSpec {
+                    short: Some('I'),
+                    long: "in2",
+                    value: Some("<path>"),
+                    desc: "R2 input (PE)"
+                },
+                FlagRowSpec {
+                    short: Some('O'),
+                    long: "out2",
+                    value: Some("<path>"),
+                    desc: "R2 output (PE)"
+                },
+            ],
+            false,
+        )
+    );
+    println!();
+    println!("ADAPTER TRIM");
+    println!(
+        "{}",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('a'),
+                    long: "adapter_sequence",
+                    value: Some("<seq>"),
+                    desc: "R1 adapter (default: TruSeq R1)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_sequence_r2",
+                    value: Some("<seq>"),
+                    desc: "R2 adapter (default: TruSeq R2)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_min_len",
+                    value: Some("<n>"),
+                    desc: "Min match length (default 5)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "adapter_max_mismatch_rate",
+                    value: Some("<f>"),
+                    desc: "Max mismatch fraction (default 0.20)"
+                },
+                FlagRowSpec {
+                    short: Some('A'),
+                    long: "disable_adapter_trimming",
+                    value: None,
+                    desc: "Skip static-seq adapter trim"
+                },
+                FlagRowSpec {
+                    short: Some('2'),
+                    long: "detect_adapter_for_pe",
+                    value: None,
+                    desc: "PE overlap-detect"
+                },
+            ],
+            false,
+        )
+    );
+    println!();
+    println!("POLY-G / POLY-X");
+    println!(
+        "{}",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('g'),
+                    long: "trim_poly_g",
+                    value: None,
+                    desc: "Force poly-G trim"
+                },
+                FlagRowSpec {
+                    short: Some('x'),
+                    long: "trim_poly_x",
+                    value: None,
+                    desc: "Dominant-base poly-X"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "poly_g_min_len",
+                    value: Some("<n>"),
+                    desc: "Poly-G min run length (default 10)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "polyx_max_mismatches",
+                    value: Some("<n>"),
+                    desc: "Hard cap on mismatches (default 5)"
+                },
+            ],
+            false,
+        )
+    );
+    println!();
+    println!("FIXED + OUTPUT");
+    println!(
+        "{}",
+        flag_table(
+            &[
+                FlagRowSpec {
+                    short: Some('f'),
+                    long: "trim_front1",
+                    value: Some("<n>"),
+                    desc: "Trim R1 5' bases (default 0)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "trim_tail1",
+                    value: Some("<n>"),
+                    desc: "Trim R1 3' bases (default 0)"
+                },
+                FlagRowSpec {
+                    short: Some('l'),
+                    long: "length_required",
+                    value: Some("<n>"),
+                    desc: "Discard reads shorter (default 15)"
+                },
+                FlagRowSpec {
+                    short: Some('L'),
+                    long: "disable_length_filtering",
+                    value: None,
+                    desc: "Disable length floor"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "compression",
+                    value: Some("<lvl>"),
+                    desc: "gz level 1-12 (default 4)"
+                },
+                FlagRowSpec {
+                    short: None,
+                    long: "json",
+                    value: None,
+                    desc: "AI-friendly JSON envelope"
+                },
+                FlagRowSpec {
+                    short: Some('t'),
+                    long: "threads",
+                    value: Some("<n>"),
+                    desc: "Worker threads"
+                },
+                FlagRowSpec {
+                    short: Some('h'),
+                    long: "help",
+                    value: None,
+                    desc: "Show this help (--help for rich, --help --json for AI)"
+                },
+            ],
+            false,
+        )
+    );
+    println!();
+    println!("EXAMPLES");
+    println!(
+        "  rsomics-fastq-trim -i in.fq.gz -o out.fq.gz                              # SE adapter trim"
+    );
+    println!(
+        "  rsomics-fastq-trim -i r1.fq.gz -I r2.fq.gz -o o1.fq.gz -O o2.fq.gz -2    # PE overlap-detect"
+    );
+    println!(
+        "  rsomics-fastq-trim -i in.fq.gz -o out.fq.gz -A -g                        # Poly-G only"
+    );
+    println!();
+}
+
 fn main() -> ExitCode {
     let raw_args: Vec<String> = std::env::args().collect();
     if let Some(mode) = intercept_help(&raw_args) {
         match mode {
             HelpMode::Rich => print_rich_help(),
-            HelpMode::Plain => {
-                Cli::command().print_help().ok();
-                println!();
-            }
+            HelpMode::Plain => print_plain_help(),
             HelpMode::Json => print_json_help(),
         }
         return ExitCode::SUCCESS;

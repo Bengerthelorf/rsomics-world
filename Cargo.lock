@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fasta-stats"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "bytecount",
@@ -604,7 +604,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fastq-trim"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "bytecount",
