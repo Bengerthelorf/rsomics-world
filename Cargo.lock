@@ -1020,6 +1020,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-pvalue-adjust"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-stats",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-stats"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,28 @@
+[package]
+name = "rsomics-pvalue-adjust"
+version = "0.1.0"
+description = "Multiple-testing correction for a column of p-values. BH FDR + Bonferroni; equivalent to R's p.adjust."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science", "command-line-utilities"]
+keywords = ["pvalue", "fdr", "bh", "bonferroni", "statistics"]
+
+[[bin]]
+name = "rsomics-pvalue-adjust"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+rsomics-stats = { path = "../../../foundation/rsomics-stats", version = "0.1" }
+clap = { workspace = true, features = ["derive"] }
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
