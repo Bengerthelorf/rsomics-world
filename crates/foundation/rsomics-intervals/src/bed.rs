@@ -261,7 +261,10 @@ mod tests {
     fn merge_sorted_collapses_overlapping_and_touching() {
         let input = "chr1\t100\t200\nchr1\t150\t250\nchr1\t250\t300\nchr1\t400\t500\n\
                      chr2\t10\t20\n";
-        assert_eq!(merged(input), "chr1\t100\t300\nchr1\t400\t500\nchr2\t10\t20\n");
+        assert_eq!(
+            merged(input),
+            "chr1\t100\t300\nchr1\t400\t500\nchr2\t10\t20\n"
+        );
     }
 
     #[test]
