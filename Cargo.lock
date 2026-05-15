@@ -972,6 +972,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-debruijn"
+version = "0.1.0"
+dependencies = [
+ "rsomics-kmer",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "rsomics-fasta-stats"
 version = "0.4.3"
 dependencies = [

@@ -1,0 +1,18 @@
+[package]
+name = "rsomics-debruijn"
+version = "0.1.0"
+description = "de Bruijn graph types + linear-path collapse + unitig extraction for the rsomics-* tool family. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["debruijn", "dbg", "assembly", "bioinformatics", "unitig"]
+
+[dependencies]
+rsomics-kmer = { path = "../rsomics-kmer", version = "0.1" }
+thiserror.workspace = true
+
+[lints]
+workspace = true
