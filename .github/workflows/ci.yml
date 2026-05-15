@@ -74,7 +74,7 @@ jobs:
           # seqkit's apt package is too old to emit the modern `--all`
           # column layout the compat test parses, so pull the upstream
           # static binary instead. Architecture-aware (amd64 / arm64).
-          sudo apt-get install -y --no-install-recommends fastp samtools
+          sudo apt-get install -y --no-install-recommends fastp samtools bedtools
           arch=$(uname -m)
           case "$arch" in
             x86_64)  seqkit_arch=amd64 ;;
@@ -88,13 +88,15 @@ jobs:
           fastp --version
           samtools --version | head -1
           seqkit version
+          bedtools --version
       - name: Install upstream binaries for compat tests (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install fastp seqkit samtools
+          brew install fastp seqkit samtools bedtools
           fastp --version
           samtools --version | head -1
           seqkit version
+          bedtools --version
       - name: Resolve toolchain cargo + rustc
         run: |
           # ~/.cargo/bin proxies on GH's macOS images intermittently
