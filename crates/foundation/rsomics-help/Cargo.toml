@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-help"
-version = "0.2.0"
+version = "0.2.1"
 description = "Family-wide `--help` renderer for rsomics-* CLIs: figlet banner with gradient, section helpers, plain / JSON modes for AI consumers."
 edition.workspace = true
 rust-version.workspace = true
@@ -14,6 +14,7 @@ keywords = ["help", "cli", "ansi", "figlet", "ascii-art"]
 figlet-rs = "1"
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+terminal_size = "0.4"
 
 [lints]
 workspace = true

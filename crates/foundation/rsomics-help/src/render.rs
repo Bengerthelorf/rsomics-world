@@ -19,8 +19,11 @@ pub fn render(spec: &HelpSpec, mode: HelpMode) {
 
 fn render_rich(spec: &HelpSpec) {
     let color = !no_color_env();
-    println!();
-    println!("{}", Banner::family(spec.name).render(color));
+    let banner = Banner::family(spec.name).render(color);
+    if !banner.is_empty() {
+        println!();
+        println!("{banner}");
+    }
     println!();
     println!(
         "  {}",
