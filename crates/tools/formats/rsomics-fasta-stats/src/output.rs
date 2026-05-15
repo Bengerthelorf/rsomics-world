@@ -1,4 +1,3 @@
-
 use std::fmt::Write as _;
 
 use crate::compute::{ExtendedStats, FastaStats};

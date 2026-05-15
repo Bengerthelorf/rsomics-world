@@ -1,0 +1,19 @@
+[package]
+name = "rsomics-stats"
+version = "0.1.0"
+description = "Statistical tests, FDR control, p-value combination for the rsomics-* tool family. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["statistics", "bioinformatics", "fdr", "t-test", "mann-whitney"]
+
+[dependencies]
+rsomics-common = { path = "../rsomics-common", version = "0.5" }
+statrs = "0.18"
+thiserror.workspace = true
+
+[lints]
+workspace = true

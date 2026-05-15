@@ -1,4 +1,3 @@
-
 use std::path::Path;
 
 use needletail::parse_fastx_file;

@@ -1,4 +1,3 @@
-
 pub mod ansi;
 pub mod banner;
 pub mod modes;

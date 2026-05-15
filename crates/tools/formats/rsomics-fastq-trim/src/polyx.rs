@@ -1,4 +1,3 @@
-
 use std::num::NonZeroUsize;
 
 #[derive(Debug, Clone, Copy)]

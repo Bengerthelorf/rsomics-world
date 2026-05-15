@@ -1,4 +1,3 @@
-
 use serde::Serialize;
 
 use crate::ansi::{Palette, bold, dim, no_color_env, rgb};

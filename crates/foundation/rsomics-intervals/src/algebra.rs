@@ -1,4 +1,3 @@
-
 use crate::interval::Interval;
 use crate::set::IntervalSet;
 

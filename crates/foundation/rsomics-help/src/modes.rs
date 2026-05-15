@@ -1,4 +1,3 @@
-
 use std::io::IsTerminal;
 
 use crate::ansi::no_color_env;

@@ -1,4 +1,3 @@
-
 use serde::Serialize;
 
 pub const HELP_SCHEMA_VERSION: &str = "1.0";

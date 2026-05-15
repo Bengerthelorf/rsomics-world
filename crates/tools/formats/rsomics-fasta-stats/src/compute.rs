@@ -1,4 +1,3 @@
-
 // `u64 as f64` casts here are intentional: lengths and base counts comfortably
 // fit in f64's 52-bit mantissa for any biologically realistic input (max
 // representable exactly is ~4.5 PB), and the cast happens only at the final

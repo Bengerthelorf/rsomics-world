@@ -1,4 +1,3 @@
-
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use rsomics_common::{Context, Result, RsomicsError};

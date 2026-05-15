@@ -1,4 +1,3 @@
-
 use figlet_rs::FIGlet;
 
 use crate::ansi::{Palette, rgb};
