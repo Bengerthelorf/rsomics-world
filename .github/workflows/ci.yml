@@ -142,8 +142,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install fastp seqkit samtools bedtools
-          # isal-sys (rsomics-igzip ② FFI) builds ISA-L from C+asm via autotools+nasm.
-          brew install nasm autoconf automake libtool
+          # No nasm/autotools on macOS: isal-sys is a Linux-only dep; seqio
+          # uses its pure-Rust backend off Linux (rsomics-igzip is a stub there).
           fastp --version
           samtools --version | head -1
           seqkit version
