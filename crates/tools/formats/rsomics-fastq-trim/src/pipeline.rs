@@ -1,8 +1,9 @@
 use std::path::Path;
 
-use needletail::parse_fastx_file;
 use rayon::prelude::*;
 use rsomics_common::{Result, RsomicsError};
+use rsomics_seqio::OwnedRecord;
+use rsomics_seqio::open_fastq;
 use serde::Serialize;
 
 use crate::adapter::{AdapterConfig, find_adapter_3p};
@@ -15,12 +16,6 @@ use crate::parallel_gz::ChunkedWriter;
 use crate::polyx::{PolyXConfig, find_dominant_polyx_3p, find_polyx_3p};
 
 const CHUNK_RECORDS: usize = 8192; // ≈12 MB per chunk at 150 bp; amortises rayon dispatch
-
-struct OwnedRecord {
-    id: Vec<u8>,
-    seq: Vec<u8>,
-    qual: Vec<u8>,
-}
 
 struct OwnedPair {
     r1: OwnedRecord,
@@ -115,8 +110,7 @@ impl<'cfg> Pipeline<'cfg> {
 
     #[allow(clippy::missing_errors_doc)]
     pub fn run_se(&self, input: &Path, output: &Path) -> Result<TrimReport> {
-        let mut reader = parse_fastx_file(input)
-            .map_err(|e| parse_err(&format!("opening input {}", input.display()), e))?;
+        let mut reader = open_fastq(input)?;
         let mut writer = ChunkedWriter::create(output, self.cfg.compression)?;
 
         let mut report = TrimReport {
@@ -131,15 +125,7 @@ impl<'cfg> Pipeline<'cfg> {
             chunk.clear();
             while chunk.len() < CHUNK_RECORDS {
                 let Some(r) = reader.next() else { break };
-                let rec = r.map_err(|e| parse_err("malformed FASTQ record", e))?;
-                let qual = rec.qual().ok_or_else(|| {
-                    RsomicsError::InvalidInput("FASTQ record missing quality line".into())
-                })?;
-                chunk.push(OwnedRecord {
-                    id: rec.id().to_vec(),
-                    seq: rec.seq().into_owned(),
-                    qual: qual.to_vec(),
-                });
+                chunk.push(r?);
             }
             if chunk.is_empty() {
                 break;
@@ -163,10 +149,8 @@ impl<'cfg> Pipeline<'cfg> {
 
     #[allow(clippy::missing_errors_doc)]
     pub fn run_pe(&self, in1: &Path, in2: &Path, out1: &Path, out2: &Path) -> Result<TrimReport> {
-        let mut r1 = parse_fastx_file(in1)
-            .map_err(|e| parse_err(&format!("opening input {}", in1.display()), e))?;
-        let mut r2 = parse_fastx_file(in2)
-            .map_err(|e| parse_err(&format!("opening input {}", in2.display()), e))?;
+        let mut r1 = open_fastq(in1)?;
+        let mut r2 = open_fastq(in2)?;
         let mut w1 = ChunkedWriter::create(out1, self.cfg.compression)?;
         let mut w2 = ChunkedWriter::create(out2, self.cfg.compression)?;
 
@@ -187,9 +171,7 @@ impl<'cfg> Pipeline<'cfg> {
                 let (a, b) = (r1.next(), r2.next());
                 match (a, b) {
                     (Some(ra), Some(rb)) => {
-                        let rec1 = own_record(ra)?;
-                        let rec2 = own_record(rb)?;
-                        chunk.push(OwnedPair { r1: rec1, r2: rec2 });
+                        chunk.push(OwnedPair { r1: ra?, r2: rb? });
                     }
                     (None, None) => {
                         done = true;
@@ -421,22 +403,4 @@ fn trim_pe_pair(pair: OwnedPair, cfg: &PipelineConfig) -> ProcessedPe {
             },
         )),
     }
-}
-
-fn own_record(
-    r: std::result::Result<needletail::parser::SequenceRecord, needletail::errors::ParseError>,
-) -> Result<OwnedRecord> {
-    let rec = r.map_err(|e| parse_err("malformed FASTQ record", e))?;
-    let qual = rec
-        .qual()
-        .ok_or_else(|| RsomicsError::InvalidInput("FASTQ record missing quality line".into()))?;
-    Ok(OwnedRecord {
-        id: rec.id().to_vec(),
-        seq: rec.seq().into_owned(),
-        qual: qual.to_vec(),
-    })
-}
-
-fn parse_err(prefix: &str, e: impl std::fmt::Display) -> RsomicsError {
-    RsomicsError::InvalidInput(format!("{prefix}: {e}"))
 }
