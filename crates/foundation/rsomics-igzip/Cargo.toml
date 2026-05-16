@@ -1,0 +1,32 @@
+[package]
+name = "rsomics-igzip"
+version = "0.1.0"
+description = "Minimal Quadrant-② FFI wrapper over Intel ISA-L igzip for fast gzip decompression. Isolated unsafe surface; all consumers stay 100% safe."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["gzip", "igzip", "isa-l", "decompression", "bioinformatics"]
+readme = "README.md"
+
+# This crate is the constitution-sanctioned Quadrant-② FFI isolation crate
+# (see CLAUDE.md §Architecture and §External dependency 4-quadrant classification).
+# It intentionally OMITS `[lints] workspace = true` so that `unsafe_code = "forbid"`
+# from the workspace does NOT apply here — this is the single place in the workspace
+# where audited unsafe is permitted.  Every consumer (rsomics-seqio, fastq-*) stays
+# 100% safe and keeps `[lints] workspace = true`.
+[lints.rust]
+unsafe_code = "allow"
+
+[dependencies]
+# isal-sys 0.5.3: raw bindgen bindings to Intel ISA-L igzip (BSD-2-Clause).
+# Quadrant ②: FFI wrapper — build.rs compiles ISA-L C + asm via cc/nasm.
+# Verified: `cargo search isal-sys --limit 3` → 0.5.3+496255c exists.
+isal-sys = "0.5.3"
+
+[dev-dependencies]
+# flate2/zlib-rs: pure-Rust reference decompressor for round-trip correctness tests.
+flate2 = { workspace = true }
+tempfile = "3"
