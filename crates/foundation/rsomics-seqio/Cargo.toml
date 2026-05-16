@@ -1,0 +1,51 @@
+[package]
+name = "rsomics-seqio"
+version = "0.1.0"
+description = "Fast FASTQ reader for the rsomics-* tool family. Reader-thread + large-block architecture (mirrors fastp's FastqReader) with pluggable decompressor backends. Layer A primitive."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["fastq", "bioinformatics", "bgzf", "gzip", "reader"]
+readme = "README.md"
+
+[features]
+# Default: rsomics-igzip (Quadrant ②, ISA-L igzip via isal-sys; requires nasm +
+# a C toolchain).  Gives the full fastp-class 4 MiB in / 8 MiB out block shape.
+default = ["igzip-backend"]
+
+# igzip-backend: ISA-L igzip via the isolated rsomics-igzip FFI crate.
+# Exposed as a named feature so consumers can check which backend is active.
+igzip-backend = ["dep:rsomics-igzip"]
+
+# pure: flate2 + zlib-rs (Quadrant ①, pure Rust, no nasm/C toolchain required).
+# Degraded throughput; for environments without nasm only.  NOT intended for
+# production builds — use default (igzip-backend) for published binaries.
+pure = []
+
+[dependencies]
+rsomics-common = { path = "../rsomics-common", version = "0.5" }
+# Fallback plain-gz backend used by the `pure` feature (Quadrant ①: pure Rust, zlib-rs).
+flate2 = { workspace = true }
+crossbeam-channel = "0.5"
+# Parallel slab parsing: each raw-byte slab is parsed into OwnedRecords across
+# the rayon thread pool so record allocation is off the single reader thread.
+rayon = { workspace = true }
+
+# igzip-backend: isolated Quadrant-② FFI crate wrapping ISA-L igzip.
+# All unsafe is contained in rsomics-igzip; this crate stays 100% safe.
+rsomics-igzip = { path = "../rsomics-igzip", version = "0.1", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+criterion = { workspace = true }
+flate2 = { workspace = true }
+
+[[bench]]
+name = "seqio_gz"
+harness = false
+
+[lints]
+workspace = true
