@@ -13,8 +13,8 @@ use crate::report::DedupReport;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DedupMode {
-    KmerBin, // fastp -D: hash a 3'-tail k-mer; fast, lossy
-    FullSeq, // seqkit rmdup -s: hash full sequence; exact
+    KmerBin,
+    FullSeq,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -159,7 +159,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let inp = tmp.path().join("in.fq");
         let out = tmp.path().join("out.fq");
-        let common_tail = "AAACCCGGGTTT"; // 12 bp — r1 and r2 share this tail; r3 differs
+        let common_tail = "AAACCCGGGTTT";
         write_fixture(
             &inp,
             &[

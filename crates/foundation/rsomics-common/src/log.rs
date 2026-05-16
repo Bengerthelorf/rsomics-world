@@ -5,9 +5,6 @@ use crate::flags::CommonFlags;
 
 /// Stderr sink respecting `--quiet` / `--verbose`. `error` always prints;
 /// `info` respects quiet; `debug` requires verbose.
-///
-/// Avoids `log`/`tracing` indirection — prevents name collision with the
-/// `log` crate macros in dependent crates' preludes.
 #[derive(Debug, Clone, Copy)]
 pub struct StderrLog {
     pub quiet: bool,

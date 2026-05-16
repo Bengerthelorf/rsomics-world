@@ -1,6 +1,4 @@
 //! Tier-2 fixture management: manifest-driven download + sha256 verification.
-//! Behind the `tier2` Cargo feature so production binaries don't carry
-//! `ureq` / `sha2` / `toml`.
 
 use std::fs::File;
 use std::io::{Read, Write};

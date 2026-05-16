@@ -1,10 +1,3 @@
-//! Criterion bench vs `fastp` on a deterministic synthetic FASTQ.
-//!
-//! Fixture: 100 000 SE reads × 150 bp with a 33 bp 3' adapter overhang on
-//! ~30% of records (≈40 MB plain). Both binaries are pinned to 1 thread
-//! and run with adapter-only flags so the comparison is on the same hot
-//! path the fairness audit was about (`bench-rsomics-fastq-trim-2026-05-15.toml`).
-
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::fs::File;
 use std::io::{BufWriter, Write};

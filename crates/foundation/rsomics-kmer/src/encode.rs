@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn canonical_picks_lex_min_of_pair() {
         let fwd = encode(b"GGGG").unwrap();
-        let rc = reverse_complement(fwd, 4); // CCCC < GGGG in 2-bit (01 < 10)
+        let rc = reverse_complement(fwd, 4);
         assert_eq!(canonical(fwd, 4), rc);
         assert_eq!(canonical(fwd, 4), canonical(rc, 4));
     }

@@ -108,9 +108,6 @@ struct Cli {
 
 fn build_config(cli: &Cli) -> FilterConfig {
     FilterConfig {
-        // fastp stores qualifiedQual as ASCII char and compares qual_byte < qualifiedQual.
-        // qualifiedQual = qualifiedQualityPhred + 33 (Phred+33 encoding).
-        // u16 prevents overflow: Phred 223 + 33 = 256 would wrap in u8.
         qual_threshold_ascii: cli.qualified_quality_phred + 33,
         unqualified_percent_limit: cli.unqualified_percent_limit,
         n_base_limit: cli.n_base_limit,

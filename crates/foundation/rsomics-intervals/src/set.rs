@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::interval::Interval;
 
-/// Chromosome-grouped collection of intervals. `BTreeMap` gives lexicographic
-/// chrom iteration order — matches `bedtools sort` default.
+/// Chromosome-grouped collection of intervals. `BTreeMap` gives lexicographic chrom order — matches `bedtools sort` default.
 #[derive(Debug, Default, Clone)]
 pub struct IntervalSet {
     by_chrom: BTreeMap<String, Vec<Interval>>,
@@ -120,8 +119,6 @@ mod tests {
     #[test]
     fn chroms_iter_is_lexicographic() {
         let s = IntervalSet::from_iter([iv("chr10", 0, 1), iv("chr1", 0, 1), iv("chr2", 0, 1)]);
-        // BTreeMap = string-lexicographic, NOT natural-numeric. "chr10"
-        // sorts before "chr2". That matches bedtools' default sort order.
         let chroms: Vec<_> = s.chroms().collect();
         assert_eq!(chroms, vec!["chr1", "chr10", "chr2"]);
     }

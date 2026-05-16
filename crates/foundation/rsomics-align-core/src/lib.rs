@@ -13,8 +13,8 @@
 pub struct ScoreParams {
     pub match_score: i32,
     pub mismatch: i32,
-    pub gap_open: i32,   // charged on first gap byte; positive
-    pub gap_extend: i32, // charged per additional byte; positive
+    pub gap_open: i32,
+    pub gap_extend: i32,
 }
 
 impl Default for ScoreParams {
@@ -64,7 +64,7 @@ fn sub(a: u8, b: u8, p: &ScoreParams) -> i32 {
     }
 }
 
-/// Global alignment; Gotoh affine-gap DP (M/E/F), O(n·m).
+/// Global alignment; Gotoh affine-gap DP, O(n·m).
 pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {
@@ -91,10 +91,10 @@ pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment
 
     for i in 1..=n {
         for j in 1..=m {
-            let e_open = h[(i - 1) * stride + j] - p.gap_open - p.gap_extend; // E: insert in a
+            let e_open = h[(i - 1) * stride + j] - p.gap_open - p.gap_extend;
             let e_ext = e[(i - 1) * stride + j] - p.gap_extend;
             e[i * stride + j] = e_open.max(e_ext);
-            let f_open = h[i * stride + j - 1] - p.gap_open - p.gap_extend; // F: delete from a
+            let f_open = h[i * stride + j - 1] - p.gap_open - p.gap_extend;
             let f_ext = f[i * stride + j - 1] - p.gap_extend;
             f[i * stride + j] = f_open.max(f_ext);
             let diag = h[(i - 1) * stride + j - 1] + sub(a[i - 1], b[j - 1], p);
@@ -133,7 +133,7 @@ pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment
     })
 }
 
-/// Local alignment; Smith-Waterman affine-gap DP, score ≥ 0.
+/// Local alignment; Smith-Waterman affine-gap DP.
 pub fn smith_waterman(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {

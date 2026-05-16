@@ -290,8 +290,6 @@ fn filter_pe_pair(pair: OwnedPair, cfg: &FilterConfig) -> ProcessedPe {
         ..Default::default()
     };
 
-    // PE: the pair is kept only if BOTH mates pass. Check R1 first; if it fails
-    // we still evaluate R2 to get accurate per-category counts for both mates.
     let outcome1 = cfg.check(&r1.seq, &r1.qual);
     let outcome2 = cfg.check(&r2.seq, &r2.qual);
 
@@ -300,7 +298,6 @@ fn filter_pe_pair(pair: OwnedPair, cfg: &FilterConfig) -> ProcessedPe {
         (FilterOutcome::Pass, FilterOutcome::Pass)
     );
 
-    // Increment counters for each mate independently regardless of the pair decision.
     for outcome in [outcome1, outcome2] {
         match outcome {
             FilterOutcome::Pass => {}
@@ -346,22 +343,18 @@ mod tests {
     fn quality_check_precedes_length_check() {
         let cfg = config_both_enabled();
 
-        // 10 bp read (below required_length=20) with all low-qual bases ('!' = ASCII 33 < 48).
-        // low_qual=10, len=10 → 10*100=1000 > 40*10=400 → FailLowQual before length is reached.
         let seq = b"AAAAAAAAAA";
-        let qual = b"!!!!!!!!!!"; // all ASCII 33, below threshold 48
+        let qual = b"!!!!!!!!!!"; // ASCII 33 = Q0, below threshold 48
         assert!(
             matches!(cfg.check(seq, qual), FilterOutcome::FailLowQual),
             "short + low-qual read must fail as FailLowQual (fastp quality check precedes length check)"
         );
     }
 
-    // Confirm that a short read with good quality is still caught by the length check.
     #[test]
     fn short_read_good_quality_fails_length() {
         let cfg = config_both_enabled();
 
-        // 10 bp, all high-qual ('I' = ASCII 73 ≥ 48), no N bases → passes quality → fails length.
         let seq = b"AAAAAAAAAA";
         let qual = b"IIIIIIIIII";
         assert!(

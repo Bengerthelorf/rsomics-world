@@ -48,7 +48,6 @@ pub struct UmiConfig {
 }
 
 impl UmiConfig {
-    /// Build the name tag fastp would append: `delimiter [prefix _] umi`.
     fn tag(&self, umi: &[u8]) -> Vec<u8> {
         let mut t = Vec::with_capacity(1 + self.prefix.len() + 1 + umi.len());
         t.push(self.delimiter);
@@ -141,9 +140,6 @@ impl<'cfg> Pipeline<'cfg> {
         Self { cfg, compression }
     }
 
-    /// SE: the single read carries the UMI (only `--umi_loc read1` is valid;
-    /// `read2` in SE has no second read and is rejected by the CLI).
-    ///
     /// # Errors
     ///
     /// Propagates input parse / output write errors.
@@ -187,9 +183,6 @@ impl<'cfg> Pipeline<'cfg> {
         Ok(report)
     }
 
-    /// PE: the UMI comes from the read selected by `cfg.loc`; only that read is
-    /// trimmed, both mate names are stamped with the same UMI.
-    ///
     /// # Errors
     ///
     /// Propagates input parse / output write errors; errors if the two inputs
@@ -322,7 +315,6 @@ mod tests {
     fn umi_len_clamped_keeps_last_base() {
         let mut r = rec("r", "ACG", "III");
         apply_umi(&mut r, &cfg(UmiLoc::Read1, 8, 0, "")).unwrap();
-        // umi = min(8,3)=3 → "ACG"; trim = min(3+0, 3-1) = 2 → "G"/"I" remain.
         assert_eq!(r.id, b"r:ACG");
         assert_eq!(r.seq, b"G");
         assert_eq!(r.qual, b"I");
@@ -332,7 +324,6 @@ mod tests {
     fn skip_overrun_keeps_last_base() {
         let mut r = rec("r", "AACCGGTT", "IIIIIIIJ");
         apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 20, "")).unwrap();
-        // umi "AACC"; trim = min(4+20, 8-1) = 7 → last base kept.
         assert_eq!(r.id, b"r:AACC");
         assert_eq!(r.seq, b"T");
         assert_eq!(r.qual, b"J");
@@ -342,7 +333,6 @@ mod tests {
     fn exact_consume_keeps_last_base() {
         let mut r = rec("r", "AACCGGTT", "IIIIIIIJ");
         apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 4, "")).unwrap();
-        // umi "AACC"; trim = min(4+4, 8-1) = 7 → last base kept.
         assert_eq!(r.seq, b"T");
         assert_eq!(r.qual, b"J");
     }
@@ -351,7 +341,6 @@ mod tests {
     fn one_base_read_kept_and_stamped() {
         let mut r = rec("r", "A", "I");
         apply_umi(&mut r, &cfg(UmiLoc::Read1, 1, 0, "")).unwrap();
-        // umi "A"; trim = min(1+0, 1-1) = 0 → the 1 base is kept.
         assert_eq!(r.id, b"r:A");
         assert_eq!(r.seq, b"A");
         assert_eq!(r.qual, b"I");

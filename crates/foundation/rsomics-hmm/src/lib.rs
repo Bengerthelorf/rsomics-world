@@ -11,7 +11,7 @@
 pub struct Hmm {
     pub n_states: usize,
     pub n_symbols: usize,
-    pub pi: Vec<f64>,    // pi[s]
+    pub pi: Vec<f64>,
     pub trans: Vec<f64>, // row-major: trans[s_from * n_states + s_to]
     pub emit: Vec<f64>,  // row-major: emit[s * n_symbols + sym]
 }

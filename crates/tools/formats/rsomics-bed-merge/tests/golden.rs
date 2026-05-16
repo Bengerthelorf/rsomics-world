@@ -84,9 +84,6 @@ fn multi_chrom_independent_merge() {
 
 #[test]
 fn unsorted_input_fails_loud() {
-    // bedtools merge contract: input must be pre-sorted. An out-of-order
-    // start on the same chrom is a malformed pipeline, not something to
-    // silently reorder — a wrong BED is worse than a loud exit.
     let tmp = tempfile::tempdir().unwrap();
     let inp = tmp.path().join("in.bed");
     let out = tmp.path().join("out.bed");

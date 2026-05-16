@@ -1,9 +1,3 @@
-//! Criterion bench vs `fastp` on a deterministic synthetic FASTQ.
-//!
-//! Fixture: 100 000 SE reads × 150 bp with varied quality profiles to exercise
-//! both the pass and fail paths of the filter. Both binaries pinned to 1 thread
-//! with quality filter ON and length filter ON (fastp defaults).
-
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -27,11 +21,8 @@ fn synth_fastq(path: &PathBuf) {
         }
         writeln!(w).unwrap();
         writeln!(w, "+").unwrap();
-        // Quality profile: ~30% of reads have a run of 10 low-qual bases,
-        // exercising the filter fail path at the fastp 40% default threshold.
         let low_run = if (i % 3) == 0 { 10 } else { 0 };
         for j in 0..READ_LEN {
-            // Low-qual run at positions 20..30 for affected reads.
             let q = if j >= 20 && j < 20 + low_run {
                 b'!'
             } else {

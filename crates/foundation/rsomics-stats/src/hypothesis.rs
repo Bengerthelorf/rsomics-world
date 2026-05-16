@@ -46,7 +46,7 @@ pub fn welch_t(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResult> {
         return Err(StatsError::ZeroVariance);
     }
     let t = (ma - mb) / se2.sqrt();
-    let df = se2.powi(2) / ((va / na).powi(2) / (na - 1.0) + (vb / nb).powi(2) / (nb - 1.0)); // Welch–Satterthwaite
+    let df = se2.powi(2) / ((va / na).powi(2) / (na - 1.0) + (vb / nb).powi(2) / (nb - 1.0));
     let dist = StudentsT::new(0.0, 1.0, df).map_err(|e| StatsError::Statrs(e.to_string()))?;
     let p = match alt {
         Alternative::TwoSided => 2.0 * (1.0 - dist.cdf(t.abs())),
@@ -79,7 +79,7 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
             j += 1;
         }
         let tied = (j - i) as f64;
-        let mid = (i as f64 + 1.0 + j as f64) / 2.0; // mid-rank in 1-based: (i+1 + j) / 2
+        let mid = (i as f64 + 1.0 + j as f64) / 2.0;
         for r in ranks.iter_mut().take(j).skip(i) {
             *r = mid;
         }
@@ -100,12 +100,11 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
 
     let mu = n1 * n2 / 2.0;
     let n = n1 + n2;
-    // Normal approximation with tie correction; exact distribution for small n not implemented.
     let sigma = (n1 * n2 / 12.0 * ((n + 1.0) - tie_correction / (n * (n - 1.0)))).sqrt();
     if sigma == 0.0 {
         return Err(StatsError::ZeroVariance);
     }
-    let u = u1.min(u2); // continuity-corrected below
+    let u = u1.min(u2);
     let z = (u - mu + 0.5) / sigma;
     let normal = statrs::distribution::Normal::new(0.0, 1.0)
         .map_err(|e| StatsError::Statrs(e.to_string()))?;
@@ -120,8 +119,7 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
     })
 }
 
-/// 2×2 contingency: `[[a, b], [c, d]]`. Returns the two-sided / one-sided
-/// p-value via the hypergeometric tail — no approximations.
+/// Fisher's exact test on a 2×2 table. P-value via the hypergeometric tail.
 pub fn fisher_exact_2x2(a: u64, b: u64, c: u64, d: u64, alt: Alternative) -> Result<TestResult> {
     let n = a + b + c + d;
     let kk = a + c;
@@ -182,7 +180,6 @@ mod tests {
 
     #[test]
     fn welch_known_value() {
-        // df ≈ 8, t ≈ -2 → two-sided p ≈ 0.0805
         let r = welch_t(
             &[1.0, 2.0, 3.0, 4.0, 5.0],
             &[3.0, 4.0, 5.0, 6.0, 7.0],
@@ -223,7 +220,6 @@ mod tests {
 
     #[test]
     fn fisher_2x2_classic_lady_tasting_tea() {
-        // p = 1/70 (classic lady-tasting-tea exact result)
         let r = fisher_exact_2x2(4, 0, 0, 4, Alternative::Greater).unwrap();
         assert!(approx(r.p_value, 1.0 / 70.0, 1e-6), "p={}", r.p_value);
     }

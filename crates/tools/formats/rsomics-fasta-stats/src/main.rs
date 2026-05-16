@@ -115,10 +115,6 @@ const HELP: HelpSpec = HelpSpec {
     json_result_schema_doc: Some("https://docs.rs/rsomics-fasta-stats/0.4/#json-output-schema"),
 };
 
-/// Compute per-file statistics for FASTA inputs.
-///
-/// Output is the FASTA subset of `seqkit stats`. For FASTQ-only quality
-/// columns, use the sibling FASTQ-stats crate.
 #[derive(Parser, Debug)]
 #[command(name = "rsomics-fasta-stats", version, about, long_about = None, disable_help_flag = true)]
 struct Cli {

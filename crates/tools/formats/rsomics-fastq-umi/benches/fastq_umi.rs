@@ -1,8 +1,3 @@
-//! Criterion bench vs `fastp --umi` on a deterministic synthetic FASTQ.
-//!
-//! Fixture: 100 000 SE reads × 150 bp. Both binaries pinned to 1 thread,
-//! extracting an 8 bp inline UMI from read1.
-
 use criterion::{Criterion, criterion_group, criterion_main};
 use std::fs::File;
 use std::io::{BufWriter, Write};

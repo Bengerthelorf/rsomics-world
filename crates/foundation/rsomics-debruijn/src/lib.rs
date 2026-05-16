@@ -27,9 +27,8 @@ pub struct DbgNode {
 }
 
 /// Canonical de Bruijn graph: nodes are canonical (k-1)-mers; each input
-/// k-mer contributes one edge `prefix(k-1) → suffix(k-1)`. Storing nodes
-/// in canonical form means a sequence and its reverse-complement share
-/// the same graph (matches megahit / spades defaults).
+/// k-mer contributes one edge `prefix(k-1) → suffix(k-1)`. Canonical form
+/// means a sequence and its reverse-complement share the same graph.
 #[derive(Debug, Clone, Default)]
 pub struct Dbg {
     pub k: usize,
@@ -88,9 +87,8 @@ impl Dbg {
         self.edges.len()
     }
 
-    /// Extract unitigs: maximal non-branching paths. Each unitig is a
-    /// vector of (k-1)-mer keys; downstream tools materialise them as
-    /// sequences by joining via the shared (k-2)-suffix/prefix overlap.
+    /// Maximal non-branching paths. Each unitig is a vector of (k-1)-mer
+    /// keys; materialise as sequences by joining via the (k-2) overlap.
     #[must_use]
     pub fn unitigs(&self) -> Vec<Vec<Kmer>> {
         let mut succ: HashMap<Kmer, Vec<Kmer>> = HashMap::new();
@@ -133,7 +131,6 @@ impl Dbg {
                 out.push(path);
             }
         }
-        // pure cycles: no branching node, pick any start
         for &n in self.nodes.keys() {
             if visited.contains(&n) {
                 continue;

@@ -45,16 +45,6 @@ fn read_ids(path: &Path) -> Vec<String> {
         .collect()
 }
 
-// fastp flags used to isolate quality+length filter, disabling everything else:
-//   -A  disable adapter trimming
-//   -G  disable poly-G trimming
-//   --disable_correction  (PE only; PE overlap correction off)
-//   --qualified_quality_phred N
-//   --unqualified_percent_limit U
-//   --length_required M
-//   --length_limit L (0 = omit / not passed since fastp omits it when 0)
-//   -j / -h  required fastp report sinks
-
 #[test]
 fn se_quality_filter_matches_fastp_defaults() {
     assert!(
@@ -236,17 +226,15 @@ fn write_pe_record(w: &mut impl Write, id: &str, seq: &[u8], qual_byte: u8) {
 }
 
 fn make_pe_quality_fixture(in1: &Path, in2: &Path) {
-    let high_qual: u8 = b'I'; // ASCII 73 = Q40; above any threshold we test
-    let low_qual: u8 = b'!'; // ASCII 33 = Q0; below any threshold we test
+    let high_qual: u8 = b'I';
+    let low_qual: u8 = b'!';
 
     let mut w1 = std::fs::File::create(in1).unwrap();
     let mut w2 = std::fs::File::create(in2).unwrap();
 
-    // pair1: both high-qual → should survive
     write_pe_record(&mut w1, "pair1", b"ACGTACGTACGTACGTACGT", high_qual);
     write_pe_record(&mut w2, "pair1", b"TGCATGCATGCATGCATGCA", high_qual);
 
-    // pair2: R1 has 10 low-qual out of 20 (>40% → fail), R2 high-qual → whole pair dropped
     let mut r1_mixed = vec![low_qual; 10];
     r1_mixed.extend_from_slice(&[high_qual; 10]);
     let mut w1_buf = std::io::BufWriter::new(&mut w1);
@@ -258,7 +246,6 @@ fn make_pe_quality_fixture(in1: &Path, in2: &Path) {
     drop(w1_buf);
     write_pe_record(&mut w2, "pair2", b"TGCATGCATGCATGCATGCA", high_qual);
 
-    // pair3: R1 high-qual, R2 has 10 low-qual → whole pair dropped
     write_pe_record(&mut w1, "pair3", b"ACGTACGTACGTACGTACGT", high_qual);
     let mut r2_mixed = vec![low_qual; 10];
     r2_mixed.extend_from_slice(&[high_qual; 10]);
@@ -270,7 +257,6 @@ fn make_pe_quality_fixture(in1: &Path, in2: &Path) {
     writeln!(w2_buf).unwrap();
     drop(w2_buf);
 
-    // pair4: both mates fail (all low-qual) → whole pair dropped
     write_pe_record(&mut w1, "pair4", b"ACGTACGTACGTACGTACGT", low_qual);
     write_pe_record(&mut w2, "pair4", b"TGCATGCATGCATGCATGCA", low_qual);
 }

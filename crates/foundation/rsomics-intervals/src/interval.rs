@@ -28,9 +28,8 @@ impl Strand {
 
 /// 0-based, half-open `[start, end)` interval on a named contig.
 ///
-/// Intentionally tiny (chrom + range + optional strand) — hot-path algorithms
-/// iterate over millions of these. Per-record extras (name, score, BED12
-/// blocks) belong on a wrapper that owns an `Interval`.
+/// Intentionally tiny — hot-path algorithms iterate over millions of these.
+/// Per-record extras (name, score, BED12 blocks) belong on a wrapper type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Interval {
     pub chrom: String,
@@ -71,8 +70,7 @@ impl Interval {
         self.end - self.start
     }
 
-    /// Always false — `Interval::new` rejects empty intervals at construction.
-    /// Present so generic code can call `.is_empty()` without a special case.
+    /// Always `false` — `Interval::new` rejects empty intervals at construction.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         false

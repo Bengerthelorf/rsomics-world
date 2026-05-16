@@ -3,8 +3,6 @@ pub mod tier2;
 
 use std::process::{Command, Output, Stdio};
 
-/// `PathBuf` pointing to `tests/golden/<rel>` under the caller's crate.
-/// Macro so `env!("CARGO_MANIFEST_DIR")` resolves at the call site.
 #[macro_export]
 macro_rules! fixture_path {
     ($rel:expr) => {{

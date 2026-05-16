@@ -12,8 +12,8 @@ fn mk(chrom: &str, start: u64, end: u64) -> Interval {
 }
 
 /// Merge overlapping or touching intervals within each chromosome.
-/// Touching intervals `[a, b)` and `[b, c)` collapse into `[a, c)` — matches
-/// `bedtools merge -d 0`. Strand is dropped on output.
+/// Touching intervals `[a, b)` and `[b, c)` collapse into `[a, c)` — matches `bedtools merge -d 0`.
+/// Strand is dropped on output.
 #[must_use]
 pub fn merge(input: &IntervalSet) -> IntervalSet {
     let mut work = input.clone();
@@ -40,15 +40,12 @@ pub fn merge(input: &IntervalSet) -> IntervalSet {
     out
 }
 
-/// Intersect two interval sets — each overlapping pair emits an interval
-/// clipped to the overlap region. Mirrors `bedtools intersect` default
-/// (duplicate overlaps retained when one interval in `a` hits multiple in `b`).
+/// Intersect two interval sets — each overlapping pair emits an interval clipped to the overlap.
+/// Mirrors `bedtools intersect` default (duplicates retained when one `a` interval hits multiple `b`).
 #[must_use]
 pub fn intersect(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
-    // coitrees index over b → O(n_a·log n_b + output) regardless of how
-    // interval lengths are distributed. A hand-rolled active-set sweep
-    // collapses to O(n_a·n_b) on a long-a / many-short-a / dense-b shape
-    // (CNV vs SNP); the tree has no such cliff.
+    // coitrees index over b: O(n_a·log n_b + output) regardless of interval length distribution.
+    // An active-set sweep degrades to O(n_a·n_b) on long-a/dense-b shapes (e.g. CNV vs SNP).
     let bx = IntervalIndex::build(b);
     let mut out = IntervalSet::new();
     for (chrom, a_ivs) in a.iter_chroms() {
@@ -66,8 +63,7 @@ pub fn intersect(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
     out
 }
 
-/// Subtract `b`'s coverage from `a`, emitting residual pieces per `a`
-/// interval. Mirrors `bedtools subtract` without `-A`.
+/// Subtract `b`'s coverage from `a`. Mirrors `bedtools subtract` without `-A`.
 #[must_use]
 pub fn subtract(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
     let b_merged = merge(b);
@@ -76,9 +72,7 @@ pub fn subtract(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
         let b_ivs = b_merged.get(chrom).unwrap_or(&[]);
         let mut av: Vec<&Interval> = a_ivs.iter().collect();
         av.sort_unstable_by_key(|x| (x.start, x.end));
-        // b_merged is sorted + disjoint ⇒ ends ascending. With a's starts
-        // ascending, the first b that can touch `ai` only moves forward —
-        // monotone `lo` makes this O(n+m) not O(n·m).
+        // b_merged is sorted + disjoint; monotone `lo` makes this O(n+m) not O(n·m).
         let mut lo = 0usize;
         for ai in &av {
             while lo < b_ivs.len() && b_ivs[lo].end <= ai.start {
@@ -117,8 +111,7 @@ fn subtract_one(a: &Interval, b_ivs: &[Interval]) -> Vec<(u64, u64)> {
     out
 }
 
-/// Complement: regions of each chromosome NOT covered by `input`, bounded by
-/// `chrom_sizes`. Mirrors `bedtools complement -g`.
+/// Complement: uncovered regions of each chromosome, bounded by `chrom_sizes`. Mirrors `bedtools complement -g`.
 #[must_use]
 pub fn complement(input: &IntervalSet, chrom_sizes: &[(String, u64)]) -> IntervalSet {
     let merged = merge(input);
@@ -204,8 +197,6 @@ mod tests {
 
     #[test]
     fn intersect_long_a_then_short_a_dense_b() {
-        // The shape a tree handles but an active-set sweep degrades on:
-        // one spanning a, then a short a, against dense b.
         let a = set([iv("chr1", 0, 100), iv("chr1", 10, 11)]);
         let b = set([iv("chr1", 5, 15), iv("chr1", 50, 60)]);
         let i = intersect(&a, &b);

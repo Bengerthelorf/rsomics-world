@@ -52,8 +52,7 @@ pub fn write_bed3<W: Write, I: IntoIterator<Item = Interval>>(mut w: W, ivs: I) 
     Ok(())
 }
 
-/// Write as BED6. `name`/`score` emit `.`/`0` (bedtools placeholders);
-/// strand emits `+`/`-`/`.`.
+/// Write as BED6. `name`/`score` emit `.`/`0`; strand emits `+`/`-`/`.`.
 #[allow(clippy::missing_errors_doc)]
 pub fn write_bed6<W: Write, I: IntoIterator<Item = Interval>>(mut w: W, ivs: I) -> Result<()> {
     for iv in ivs {
@@ -73,22 +72,14 @@ pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Interval>> {
     read(io::Cursor::new(bytes))
 }
 
-/// Single-pass merge of overlapping/touching intervals over an input that
-/// is already sorted by chrom then start — the `bedtools merge` contract.
-/// Out-of-order input (a smaller start on the active chrom, or a chrom
-/// that already closed reappearing) fails loud rather than emitting a
-/// wrong result. `track`/`browser`/`#` preamble lines are skipped like
-/// bedtools. chrom is treated as opaque bytes, written through verbatim
-/// (bedtools never UTF-8-validates a contig name). No per-line `String`,
-/// no full materialisation: one reused line buffer, the running cluster,
-/// and a chrom buffer that reallocates only on chrom change.
+/// Single-pass merge over pre-sorted BED3 input (sorted by chrom then start).
+/// Out-of-order input or a reappearing chrom fails loud. `track`/`browser`/`#`
+/// preamble lines are skipped. Chrom is treated as opaque bytes (no UTF-8 validation).
 #[allow(clippy::missing_errors_doc)]
 pub fn merge_sorted<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
     let mut rdr = BufReader::new(r);
     let mut line: Vec<u8> = Vec::with_capacity(256);
     let mut chrom: Vec<u8> = Vec::with_capacity(32);
-    // Closed chroms, for the reappearing-chrom sortedness check. One entry
-    // per distinct chrom (tens at most) — a linear scan beats hashing here.
     let mut closed: Vec<Vec<u8>> = Vec::new();
     let mut have = false;
     let (mut cstart, mut cend) = (0_u64, 0_u64);
@@ -291,7 +282,6 @@ mod tests {
 
     #[test]
     fn merge_sorted_rejects_reappearing_chrom() {
-        // chr1 -> chr2 -> chr1: bedtools errors; we must too, not split.
         let input = "chr1\t100\t200\nchr2\t100\t200\nchr1\t300\t400\n";
         let mut out = Vec::new();
         let err = merge_sorted(io::Cursor::new(input.as_bytes()), &mut out).unwrap_err();
@@ -315,8 +305,6 @@ mod tests {
 
     #[test]
     fn merge_sorted_passes_non_utf8_chrom_through_verbatim() {
-        // bedtools treats the contig name as opaque bytes; so do we — no
-        // lossy "?" substitution, no spurious error.
         let mut input = b"chr\xff\t100\t200\nchr\xff\t150\t250\n".to_vec();
         let mut out = Vec::new();
         merge_sorted(io::Cursor::new(&mut input), &mut out).unwrap();

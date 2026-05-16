@@ -6,9 +6,7 @@ pub fn bonferroni_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(pvalues.iter().map(|p| (p * n).min(1.0)).collect())
 }
 
-/// Benjamini–Hochberg FDR control. Returns adjusted p-values in the input
-/// order. Walk the rank-ordered ps from highest to lowest, applying the
-/// monotonic step-up correction `min(running, n*p/rank)`.
+/// Benjamini–Hochberg FDR adjustment. Returns values in input order.
 pub fn bh_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();

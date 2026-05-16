@@ -218,7 +218,7 @@ fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
 // Port of bio/util/length-stats.go. seqkit's L50 counts unique-length buckets,
 // not records — reproduced so `--tabular --all` agrees with seqkit.
 struct LengthStats {
-    counts: Vec<(u64, u64)>, // (length, cumulative_count) sorted ascending, deduped
+    counts: Vec<(u64, u64)>,
     sum: u64,
     count: u64,
 }

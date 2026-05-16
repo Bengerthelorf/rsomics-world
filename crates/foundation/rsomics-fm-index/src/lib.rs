@@ -26,8 +26,8 @@ const OCC_STRIDE: usize = 32;
 pub struct FmIndex {
     pub bwt: Vec<u8>,
     pub sa: Vec<i32>,
-    c: [usize; 256],      // C[c] = count of bytes < c in bwt
-    occ: Vec<[u32; 256]>, // sparse rank table, stride = OCC_STRIDE
+    c: [usize; 256],
+    occ: Vec<[u32; 256]>,
 }
 
 impl FmIndex {
@@ -90,7 +90,6 @@ impl FmIndex {
         acc
     }
 
-    /// SA interval `[lo, hi)` of suffixes starting with `pattern`, or `None`.
     #[must_use]
     pub fn backward_search(&self, pattern: &[u8]) -> Option<(usize, usize)> {
         if pattern.is_empty() {

@@ -1,6 +1,3 @@
-// Hamming-distance only; fastp's --allow_gap_overlap_trimming is not implemented.
-// Trim geometry: negative offset = adapter present, non-negative = no adapter trim.
-
 #[derive(Debug, Clone, Copy)]
 pub struct OverlapConfig {
     pub overlap_require: usize,

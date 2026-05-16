@@ -16,7 +16,7 @@ pub(crate) fn parse_record<R: BufRead>(reader: &mut R) -> Result<Option<OwnedRec
         .read_until(b'\n', &mut header)
         .map_err(RsomicsError::Io)?;
     if n == 0 {
-        return Ok(None); // clean EOF
+        return Ok(None);
     }
     trim_newline(&mut header);
     if header.first() != Some(&b'@') {
@@ -83,7 +83,6 @@ pub(crate) fn parse_record<R: BufRead>(reader: &mut R) -> Result<Option<OwnedRec
     Ok(Some(OwnedRecord { id, seq, qual }))
 }
 
-/// Strip a trailing `\n`, and then a trailing `\r` if present.
 #[inline]
 fn trim_newline(buf: &mut Vec<u8>) {
     if buf.last() == Some(&b'\n') {

@@ -79,7 +79,6 @@ impl Cache {
         Ok(())
     }
 
-    /// Absolute path to `model` in this cache (present or not).
     #[must_use]
     pub fn path_for(&self, model: &Model) -> PathBuf {
         let ext = match model.format {

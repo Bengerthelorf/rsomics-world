@@ -2,8 +2,7 @@ use statrs::distribution::{ChiSquared, ContinuousCDF, Normal};
 
 use crate::{Result, StatsError};
 
-/// Fisher's method: combines independent p-values into a single chi-square
-/// statistic with 2k df. Reduces to χ² survival on `-2 Σ ln(p_i)`.
+/// Fisher's method: combines independent p-values via `-2 Σ ln(p_i)` χ²(2k).
 pub fn fisher_combine(pvalues: &[f64]) -> Result<f64> {
     if pvalues.is_empty() {
         return Err(StatsError::Empty);
@@ -14,7 +13,6 @@ pub fn fisher_combine(pvalues: &[f64]) -> Result<f64> {
         if !(0.0..=1.0).contains(&p) || p.is_nan() {
             return Err(StatsError::InvalidPValue(p));
         }
-        // p = 0 dominates: stat → ∞, combined p → 0.
         if p == 0.0 {
             return Ok(0.0);
         }
@@ -24,8 +22,7 @@ pub fn fisher_combine(pvalues: &[f64]) -> Result<f64> {
     Ok((1.0 - chi2.cdf(stat)).clamp(0.0, 1.0))
 }
 
-/// Stouffer's Z-score method, optional per-study weights. With unit weights
-/// it reduces to `Φ̄(Σ z_i / √k)`.
+/// Stouffer's Z-score method with optional per-study weights.
 pub fn stouffer_combine(pvalues: &[f64], weights: Option<&[f64]>) -> Result<f64> {
     if pvalues.is_empty() {
         return Err(StatsError::Empty);
@@ -65,7 +62,6 @@ mod tests {
 
     #[test]
     fn fisher_combine_two_significant() {
-        // -2·2·ln(0.05) = 11.98; χ²(4) survival ≈ 0.0175
         let p = fisher_combine(&[0.05, 0.05]).unwrap();
         assert!(approx(p, 0.0175, 1e-3), "p={p}");
     }
@@ -84,7 +80,6 @@ mod tests {
 
     #[test]
     fn stouffer_unit_weights_two_signif() {
-        // z = Φ̄⁻¹(0.95)·√2 ≈ 2.326 → p ≈ 0.0100
         let p = stouffer_combine(&[0.05, 0.05], None).unwrap();
         assert!(approx(p, 0.0100, 1e-3), "p={p}");
     }

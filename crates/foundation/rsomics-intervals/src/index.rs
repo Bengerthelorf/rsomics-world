@@ -1,14 +1,10 @@
-// coitrees uses end-inclusive [first, last] intervals. We translate at the
-// boundary: half-open [start, end) → coitrees::Interval::new(start, end-1, …).
-
+// coitrees uses end-inclusive [first, last] intervals: half-open [start, end) → (start, end-1).
+// coitrees swaps the query-callback node type by SIMD backend (neon/avx2 metadata is `&usize`;
+// basic is `usize`). The macro below makes both paths type-check.
 use std::collections::HashMap;
 
 use coitrees::{COITree, Interval as CoitInterval, IntervalTree};
 
-// coitrees swaps the query-callback's node type by backend:
-//   neon / avx2  → &Interval<&'a usize>     (metadata field is `&usize`)
-//   basic        → &IntervalNode<usize, u32> (metadata field is `usize`)
-// Tip-toe around it with a macro so both paths type-check.
 #[cfg(any(target_feature = "avx2", target_feature = "neon"))]
 macro_rules! meta_id {
     ($n:ident) => {
@@ -55,8 +51,6 @@ impl IntervalIndex {
         }
     }
 
-    /// Visit every overlapping interval via callback — avoids the `Vec`
-    /// allocation of [`Self::query`].
     pub fn for_each_overlap<F: FnMut(&Interval)>(
         &self,
         chrom: &str,
@@ -137,7 +131,6 @@ mod tests {
 
     #[test]
     fn half_open_touching_does_not_overlap() {
-        // [100,200) and [200,300) share NO bases. Index must respect that.
         let s = IntervalSet::from_iter([iv("chr1", 100, 200)]);
         let idx = IntervalIndex::build(&s);
         assert_eq!(idx.count_overlaps("chr1", 200, 300), 0);

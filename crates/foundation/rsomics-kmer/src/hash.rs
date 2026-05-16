@@ -39,7 +39,6 @@ mod tests {
 
     #[test]
     fn nthash_canonical_is_rc_invariant() {
-        // NtHashIterator uses canonical=true by default; palindrome confirms same hash for fwd and RC.
         let h1 = nthash_one(b"AAAATTTT", 8).unwrap();
         let h2 = nthash_one(b"AAAATTTT", 8).unwrap();
         assert_eq!(h1, h2);

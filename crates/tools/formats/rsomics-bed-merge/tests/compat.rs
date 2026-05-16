@@ -21,7 +21,6 @@ fn write_bed(path: &std::path::Path, lines: &[&str]) {
 }
 
 fn bedtools_merge(input: &std::path::Path) -> Vec<u8> {
-    // bedtools merge requires sorted input.
     let sorted = Command::new("bedtools")
         .args(["sort", "-i", input.to_str().unwrap()])
         .output()

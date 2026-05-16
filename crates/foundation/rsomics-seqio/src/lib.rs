@@ -63,9 +63,8 @@ pub fn open_fastq(path: &Path) -> Result<FastqSource> {
             let r = reader_plain::PlainReader::open(path)?;
             Ok(FastqSource::Plain(r))
         }
-        // BGZF is a gzip stream of concatenated `BC`-subfield members; the
-        // igzip backend's multi-member handling decodes it correctly. A
-        // noodles parallel-block fast path is deferred until a consumer needs it.
+        // BGZF is a stream of concatenated gzip members with BC extra subfields;
+        // the igzip backend's multi-member handling decodes it correctly.
         InputKind::Gz | InputKind::Bgzf => {
             let r = reader_gz::GzReader::open(path)?;
             Ok(FastqSource::Gz(r))
@@ -73,8 +72,6 @@ pub fn open_fastq(path: &Path) -> Result<FastqSource> {
     }
 }
 
-// The plain reader lives in this module; it is small enough not to warrant
-// its own file and the module boundary keeps the public API clean.
 pub(crate) mod reader_plain {
     use std::fs::File;
     use std::io::BufReader;

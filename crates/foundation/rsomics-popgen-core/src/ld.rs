@@ -39,7 +39,6 @@ mod tests {
 
     #[test]
     fn perfect_ld_pair() {
-        // Both alleles co-occur on every haplotype → r² = 1.
         let g = vec![[0, 0], [0, 0], [1, 1], [1, 1]];
         let r2 = r_squared(&g).unwrap();
         assert!(approx(r2, 1.0, 1e-9), "{r2}");
@@ -47,7 +46,6 @@ mod tests {
 
     #[test]
     fn no_ld_independent_loci() {
-        // 50/50 split, independent → r² ≈ 0.
         let g = vec![[0, 0], [0, 1], [1, 0], [1, 1]];
         let r2 = r_squared(&g).unwrap();
         assert!(approx(r2, 0.0, 1e-9), "{r2}");

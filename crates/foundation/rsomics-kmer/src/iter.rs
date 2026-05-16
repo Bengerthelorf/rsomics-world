@@ -76,7 +76,7 @@ mod tests {
             .unwrap()
             .collect::<Result<_>>()
             .unwrap();
-        let rev_comp = b"ACGTACGT"; // ACGT pal
+        let rev_comp = b"ACGTACGT";
         let rc: Vec<u64> = KmerIter::new(rev_comp, 4, true)
             .unwrap()
             .collect::<Result<_>>()

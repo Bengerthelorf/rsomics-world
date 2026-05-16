@@ -15,7 +15,7 @@ pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 #[cfg(test)]
 pub(crate) const GZ_DEFAULT_LEVEL: i32 = 4;
 
-pub const MAX_PENDING_CHUNKS: usize = 16; // 16 × 256 KB = 4 MB peak in-flight
+pub const MAX_PENDING_CHUNKS: usize = 16;
 
 fn compress_member(plain: &[u8], level: i32) -> Result<Vec<u8>> {
     let level = CompressionLvl::new(level).map_err(|e| {

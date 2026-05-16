@@ -1,6 +1,3 @@
-// Criterion benchmark of the gz read path on a synthetic .gz fixture. The
-// backend is target-selected (ISA-L igzip on Linux, flate2 elsewhere):
-//   cargo bench -p rsomics-seqio --bench seqio_gz
 use std::io::Write;
 
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -30,8 +27,6 @@ fn make_gz_fixture(n_records: usize) -> tempfile::NamedTempFile {
 }
 
 fn bench_gz_decode(c: &mut Criterion) {
-    // 100_000 × ~78 bytes ≈ 7.8 MB uncompressed, ~2 MB gzipped; fits in
-    // one IN_BUF read cycle so we measure decode + parse overhead cleanly.
     let fixture = make_gz_fixture(100_000);
     let path = fixture.path().to_path_buf();
 

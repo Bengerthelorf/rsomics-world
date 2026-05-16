@@ -234,7 +234,6 @@ mod tests {
     fn tiny_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
         let dir = tempfile::tempdir().unwrap();
         let prefix = dir.path().join("toy");
-        // 3 variants × 4 samples.
         let mut bim = File::create(prefix.with_extension("bim")).unwrap();
         writeln!(bim, "1\trs1\t0\t100\tA\tG").unwrap();
         writeln!(bim, "1\trs2\t0\t200\tC\tT").unwrap();
@@ -287,7 +286,6 @@ mod tests {
     #[test]
     fn sample_major_rejected_with_clear_error() {
         let (_d, prefix) = tiny_fixture();
-        // Re-write .bed with byte 3 = 0x00 (sample-major flag).
         let mut bed = File::create(prefix.with_extension("bed")).unwrap();
         bed.write_all(&[0x6c, 0x1b, 0x00, 0x78, 0xFF, 0x00])
             .unwrap();

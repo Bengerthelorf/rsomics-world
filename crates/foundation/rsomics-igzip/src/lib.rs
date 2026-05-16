@@ -1,28 +1,14 @@
-//! Minimal Quadrant-② FFI wrapper over Intel ISA-L igzip.
-//!
-//! Exposes a single safe type: [`GzReader`], which implements [`std::io::Read`]
-//! over a gzip-compressed file.  All `unsafe` is contained in this crate; every
-//! consumer stays 100% safe Rust.
-//!
-//! ## Algorithm shape
+//! Quadrant-② FFI wrapper over Intel ISA-L igzip.
 //!
 //! Mirrors fastp `src/fastqreader.cpp readToBufIgzip` (Chen et al., MIT):
-//! - 4 MiB compressed input buffer (`IGZIP_IN`).
-//! - 8 MiB decompressed output buffer (`FQ_BUF`).
-//! - Multi-member gzip support: on end-of-member with trailing bytes,
-//!   re-initialise the inflate state for the next concatenated member.
+//! 4 MiB compressed input buffer, 8 MiB decompressed output buffer, multi-member
+//! gzip support.  The isal-rs safe wrapper is NOT used: its `BUF_SIZE` is
+//! hard-coded at 16 KiB, throttling the large-block pattern that gives ISA-L
+//! its throughput advantage.
 //!
-//! The isal-rs safe wrapper is NOT used here because its internal `BUF_SIZE`
-//! is hard-coded at 16 KiB, which prevents the large-block read pattern that
-//! gives ISA-L its throughput advantage.
-//!
-//! ## Platform support
-//!
-//! ISA-L's hand-written aarch64 assembly does not assemble under Apple's
-//! integrated assembler, so `isal-sys` is a Linux-only dependency. On
-//! non-Linux targets this crate still compiles but `GzReader::new` returns an
-//! `Unsupported` error — consumers (e.g. `rsomics-seqio`) select a pure-Rust
-//! decoder per target instead. The performance contract is enforced on Linux.
+//! ISA-L's aarch64 assembly does not assemble under Apple's integrated assembler,
+//! so `isal-sys` is Linux-only.  On non-Linux targets `GzReader::new` returns
+//! `Unsupported`; consumers select a pure-Rust decoder instead.
 
 use std::io::{self, Read};
 use std::path::Path;
@@ -39,21 +25,17 @@ use isal_sys::igzip_lib::{
     isal_gzip_header_init, isal_inflate, isal_inflate_init, isal_read_gzip_header,
 };
 
-/// 4 MiB compressed-input read buffer — matches fastp `IGZIP_IN_BUF`.
 #[cfg(target_os = "linux")]
 const IGZIP_IN: usize = 1 << 22;
-/// 8 MiB decompressed-output buffer — matches fastp `FQ_BUF`.
 #[cfg(target_os = "linux")]
 const FQ_BUF: usize = 1 << 23;
 
-/// Non-Linux stub: ISA-L's aarch64 asm does not build under Apple clang, so
-/// the igzip backend is Linux-only. Compiles everywhere; fails loud if used.
 #[cfg(not(target_os = "linux"))]
 pub struct GzReader;
 
 #[cfg(not(target_os = "linux"))]
 impl GzReader {
-    /// Always returns `Unsupported` — the ISA-L backend is Linux-only.
+    /// Open a gzip file for streaming decompression.
     ///
     /// # Errors
     ///
@@ -75,52 +57,34 @@ impl Read for GzReader {
 
 /// Safe streaming gzip decompressor backed by Intel ISA-L igzip.
 ///
-/// Implements [`Read`].  Data is decompressed in up to `FQ_BUF`-sized
-/// (8 MiB) chunks.  Concatenated gzip members (common in bioinformatics `.gz`
-/// files) are handled transparently.
-///
-/// # Errors
-///
-/// Any ISA-L error code, truncated stream, or file I/O failure surfaces as
-/// `io::Error` — never silently truncated or zero-padded.  Wrong FASTQ output
-/// is worse than a crash.
+/// Concatenated gzip members are handled transparently.  Any ISA-L error,
+/// truncated stream, or I/O failure surfaces as `io::Error`.
 #[cfg(target_os = "linux")]
 pub struct GzReader {
     file: File,
-    /// Compressed-data staging buffer.
     in_buf: Vec<u8>,
-    /// Decompressed-data output buffer; `out_pos..out_end` are unconsumed bytes.
     out_buf: Vec<u8>,
     out_pos: usize,
     out_end: usize,
-    /// ISA-L inflate state.  Heap-boxed because inflate_state is ~85 KiB.
+    // ~85 KiB — heap-boxed to avoid stack overflow.
     state: Box<inflate_state>,
     done: bool,
 }
 
 #[cfg(target_os = "linux")]
 impl GzReader {
-    /// Open `path` as a gzip file and initialise the ISA-L inflate state.
-    ///
-    /// Reads the first gzip header on construction so that errors in the header
-    /// surface immediately rather than on the first `read` call.
+    /// Open a gzip file and parse its first header.
     ///
     /// # Errors
     ///
-    /// Returns `io::Error` if `path` cannot be opened, the first bytes cannot
-    /// be read, or the gzip header is malformed.
+    /// Returns `io::Error` if the file cannot be opened or the gzip header is malformed.
     pub fn new(path: &Path) -> io::Result<Self> {
         let mut file = File::open(path)
             .map_err(|e| io::Error::new(e.kind(), format!("igzip open {}: {e}", path.display())))?;
 
-        // inflate_state is ~85 KiB — heap-box it; a stack temporary risks
-        // overflow. SAFETY: inflate_state is #[repr(C)] and every field is an
-        // integer, pointer, or byte array, so the all-zero bit pattern is
-        // valid for the whole struct (no enum/niche/NonNull field).
-        // MaybeUninit::zeroed therefore produces a fully-initialised value
-        // with no uninit bytes; isal_inflate_init then sets the scalar fields
-        // it owns, and ISA-L writes the huffman tables and tmp buffers before
-        // it ever reads them.
+        // SAFETY: inflate_state is #[repr(C)] with only integer/pointer/byte-array
+        // fields — the all-zero bit pattern is valid (no enum/niche/NonNull).
+        // isal_inflate_init sets all scalar fields before ISA-L reads them.
         let mut state = unsafe {
             let mut s: Box<MaybeUninit<inflate_state>> = Box::new(MaybeUninit::zeroed());
             isal_inflate_init(s.as_mut_ptr().cast::<inflate_state>());
@@ -143,8 +107,7 @@ impl GzReader {
             });
         }
 
-        // SAFETY: in_buf lives for the duration of the call; state is fully
-        // initialised by isal_inflate_init; n ≤ in_buf.len().
+        // SAFETY: in_buf outlives the call; state is initialised; n ≤ in_buf.len().
         let ret = unsafe {
             let mut gz_hdr: MaybeUninit<isal_gzip_header> = MaybeUninit::uninit();
             isal_gzip_header_init(gz_hdr.as_mut_ptr());
@@ -171,20 +134,14 @@ impl GzReader {
         })
     }
 
-    /// Decompress the next block into `out_buf`, updating `out_pos`/`out_end`.
-    ///
-    /// Returns `Ok(false)` when the stream is exhausted, `Ok(true)` when new
-    /// bytes are available, or `Err` on any decompression or I/O failure.
     fn refill(&mut self) -> io::Result<bool> {
         loop {
             if self.state.avail_in == 0 {
                 let n = self.file.read(&mut self.in_buf)?;
                 if n == 0 {
-                    // ISA-L sets block_state == ISAL_BLOCK_FINISH only after
-                    // check_gzip_checksum validates the trailer, so it is the
-                    // sole clean-EOF signal. Any other terminal state — e.g.
-                    // ISAL_CHECKSUM_CHECK on a missing/short trailer, or a
-                    // mid-member state — means the stream was truncated.
+                    // ISAL_BLOCK_FINISH is set only after the gzip trailer checksum
+                    // validates — it is the sole clean-EOF signal. Any other state
+                    // here means the stream was truncated.
                     if self.state.block_state == ISAL_BLOCK_FINISH {
                         return Ok(false);
                     }
@@ -200,9 +157,7 @@ impl GzReader {
             self.state.next_out = self.out_buf.as_mut_ptr();
             self.state.avail_out = FQ_BUF as u32;
 
-            // SAFETY: state.next_in points into in_buf (owned by self, valid);
-            // state.next_out points into out_buf (owned by self, valid);
-            // avail_in/avail_out are correctly set above.
+            // SAFETY: next_in/next_out point into self.in_buf/out_buf; avail_in/avail_out are set above.
             let ret = unsafe { isal_inflate(&mut *self.state as *mut inflate_state) };
 
             let produced = FQ_BUF - self.state.avail_out as usize;
@@ -219,9 +174,6 @@ impl GzReader {
                     }
                 }
                 ISAL_OUT_OVERFLOW => {
-                    // Output buffer full — that's expected when the 8 MiB out
-                    // buffer fills before the input is exhausted.  Return what
-                    // we have; the caller will call refill() again.
                     if produced > 0 {
                         return Ok(true);
                     }
@@ -230,15 +182,11 @@ impl GzReader {
                     ));
                 }
                 ISAL_END_INPUT => {
-                    // All input consumed without finishing the gzip member.
-                    // Return any output we have, then try again with more input.
                     if produced > 0 {
                         return Ok(true);
                     }
                 }
                 _ => {
-                    // isal_inflate returns negative or unexpected positive codes
-                    // for corrupt/truncated data.
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!("igzip: decompression error (isal error {ret})"),
@@ -246,8 +194,6 @@ impl GzReader {
                 }
             }
 
-            // Multi-member support: if isal finished a member but avail_in > 0,
-            // a concatenated gzip member follows.  Re-initialise for the next member.
             if self.state.block_state == ISAL_BLOCK_FINISH && self.state.avail_in > 0 {
                 let saved_next_in = self.state.next_in;
                 let saved_avail_in = self.state.avail_in;
@@ -416,7 +362,6 @@ mod tests {
 
     #[test]
     fn data_larger_than_fq_buf() {
-        // 12 MiB of repetitive data compresses well but decompresses to >8 MiB.
         let data: Vec<u8> = (0u8..=255).cycle().take(12 * 1024 * 1024).collect();
         let gz = gz_encode(&data);
         let f = write_tmp(&gz);
@@ -451,9 +396,6 @@ mod tests {
         assert!(result.is_err(), "truncated gz must return Err, got Ok");
     }
 
-    /// Dropping any 1–8 bytes of the 8-byte gzip trailer must Err, not return
-    /// a short clean read: the only clean-EOF signal is ISAL_BLOCK_FINISH,
-    /// which ISA-L sets solely after the trailer checksum validates.
     #[test]
     fn trailer_truncation_one_through_eight_bytes_all_error() {
         let data = b"@r1\nACGTACGTACGT\n+\nIIIIIIIIIIII\n@r2\nTTTT\n+\nFFFF\n";
@@ -469,16 +411,10 @@ mod tests {
         }
     }
 
-    /// Many concatenated members whose total compressed size far exceeds the
-    /// 4 MiB input buffer: exercises member boundaries scattered across
-    /// successive 4 MiB file reads. Output must be byte-identical to a
-    /// reference multi-member decoder — a premature stop at any member
-    /// boundary would shorten the result and fail the comparison.
     #[test]
     fn multi_member_large_spanning_input_buffer() {
-        // Pseudo-random ACGT (xorshift64) so gzip cannot crush it — the
-        // compressed stream must genuinely exceed the 4 MiB input buffer for
-        // this to exercise member boundaries across successive file reads.
+        // Pseudo-random ACGT via xorshift64 — compresses poorly so the stream
+        // genuinely exceeds the 4 MiB input buffer.
         let mut s: u64 = 0x9E37_79B9_7F4A_7C15;
         let mut rng_acgt = |n: usize| -> Vec<u8> {
             (0..n)
