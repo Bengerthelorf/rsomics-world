@@ -95,6 +95,21 @@ and largely closed-source) and post-alignment QC (samtools stats, mosdepth
   - Consumes primitives: `rsomics-kmer` (`nthash-rs`), `fastbloom`, `needletail`, `noodles-fastq`
   - Notes: Unique among trimmers for k-mer contaminant matching against a reference (phiX, rRNA, host). The Java is slow and memory-hungry; a Rust port using `fastbloom` + `nthash` for the k-mer side would be a clear win.
 
+- [ ] **`BFC`** — k-mer-spectrum substitution-error corrector for Illumina reads.
+  - Reference impl: `C` · [lh3/bfc](https://github.com/lh3/bfc) · `MIT`
+  - Existing Rust: none verified (`cargo search "error correction fastq"` → only filter/simulate/split-kmer crates; no read corrector)
+  - Existing Rust kind: `none`
+  - Existing non-C alternatives: `Lighter` ([mourisl/Lighter](https://github.com/mourisl/Lighter), C++, `GPL-3.0` — Bloom-cardinality corrector; clean-room only); `Karect`, `Musket`, `Bloocoo` (older, lower priority)
+  - Parallelism: BFC pthreads over reads; ours rayon over read batches
+  - SIMD: k-mer roll (ntHash) auto-vectorises; correction-decision path is branchy
+  - Quadrant: ① (pure Rust + rayon; `rsomics-kmer` ntHash + `fastbloom` blocked filter)
+  - GPU-amenable: maybe — k-mer counting/lookup is SIMT-trivial; the greedy correction walk is branch-divergent, CPU is the right first target
+  - Upstream license: `MIT` (read + cite `bfc.c` permitted; it is the behavioural + compat reference)
+  - Priority: `P1`
+  - Layer: `B` (tool — `rsomics-fastq-correct`; one operation = correct substitution errors by k-mer spectrum; a standalone pre-assembly / pre-variant-calling pipeline stage)
+  - Consumes primitives: `rsomics-kmer` (k-mer count + ntHash, Layer-A 0.1.0), `rsomics-seqio` (FASTQ in), `rsomics-fqgz` (gz out), `fastbloom`
+  - Notes: BFC builds a k-mer coverage histogram, picks a trusted/untrusted threshold from the bimodal spectrum, then greedily rewrites untrusted bases along the highest-support k-mer path. Write original (BFC is the MIT compat oracle; Lighter GPL → paper + black-box only). Feature-complete = BFC's real flag surface (`-k` k-mer, `-s` genome-size/auto, `-t` threads, drop-vs-correct policy), not an MVP. golden + version-gated compat vs `bfc`; 4090 perfgate `>1.0×`; L2 FreshEye on the threshold-pick + correction-walk fidelity to `bfc.c`.
+
 - [ ] **`Trim Galore`** — cutadapt + FastQC wrapper (Perl).
   - Reference impl: `Perl` · [FelixKrueger/TrimGalore](https://github.com/FelixKrueger/TrimGalore) · `GPL-3.0`
   - Existing Rust: none verified
