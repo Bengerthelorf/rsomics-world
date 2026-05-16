@@ -282,11 +282,12 @@ module prose is reduced to at most a one-line crate summary, or removed.
 - Foundation crates: `rsomics-<primitive>` (e.g. `rsomics-common`,
   `rsomics-intervals`, `rsomics-kmer`, `rsomics-fm-index`, `rsomics-align-core`,
   `rsomics-stats`).
-- Tool crates: `rsomics-<tool>` (e.g. `rsomics-fastp`, `rsomics-bam`,
-  `rsomics-bwa`).
-- A tool with multiple modes ships them as subcommands of a single binary
-  (e.g. `rsomics-bam view`, `rsomics-bam sort`, `rsomics-bam markdup`), not as
-  separate crates.
+- Tool crates: `rsomics-<format>-<op>`, one operation per crate
+  (e.g. `rsomics-bam-view`, `rsomics-bam-sort`, `rsomics-fastq-trim`).
+  Upstream Swiss-army binaries (`samtools`, `fastp`, `picard`) are exploded
+  into one crate per operation a user/pipeline invokes on its own — never
+  wrapped 1:1 as subcommands. This is the per-function partition rule in
+  `CLAUDE.md`; it governs.
 
 ## Linking between docs
 
