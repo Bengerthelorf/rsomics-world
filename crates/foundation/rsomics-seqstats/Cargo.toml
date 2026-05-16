@@ -1,0 +1,19 @@
+[package]
+name = "rsomics-seqstats"
+version = "0.1.0"
+description = "Format-agnostic sequence statistics primitives (length distribution: N50/L50/Nx + quartiles, base composition, alphabet guess). Layer-A, shared verbatim by the rsomics-* *-stats tools so output byte-agrees with `seqkit stats -a`."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["bioinformatics", "n50", "statistics", "gc-content", "seqkit"]
+readme = "README.md"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+bytecount = { version = "0.6", features = ["runtime-dispatch-simd"] }
+
+[lints]
+workspace = true
