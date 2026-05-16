@@ -253,6 +253,13 @@ Every tool crate has the same shape — no ad-hoc layout:
 
 - `src/main.rs` — thin: clap dispatch + `run(...)`, nothing else.
 - `src/cli.rs` — the `Cli` struct and the `rsomics_help` `HelpSpec`.
+  It MUST carry a `#[cfg(test)] fn cli_definition_is_valid()` calling
+  `<Cli as clap::CommandFactory>::command().debug_assert()`. clap's
+  CLI-graph validation (unique shorts incl. the flattened `CommonFlags`,
+  no id clashes) only fires when the binary parses, so without this test
+  a broken CLI is invisible to `cargo test` and lib unit tests. `-q`
+  (`--quiet`), `-t` (`--threads`) and `--json` are reserved by
+  `CommonFlags` — an upstream's clashing short maps to a long-only flag.
 - `src/lib.rs` — the operation API. When the operation is algorithmically
   large or spans several distinct concerns (e.g. k-mer machinery + a count
   table + the algorithm core + IO orchestration), `lib.rs` is a thin
