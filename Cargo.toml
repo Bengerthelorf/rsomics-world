@@ -49,6 +49,10 @@ pedantic = { level = "warn", priority = -1 }
 
 [profile.release]
 codegen-units = 1
-lto = true
+# thin (not fat) LTO: fat LTO discards symbols only indirectly referenced
+# from C++/asm static archives (rapidgzip-sys's vendored ISA-L), breaking
+# the release link. thin keeps cross-module optimisation at ~fat perf but
+# links mixed-language archives. perfgate gates any regression.
+lto = "thin"
 opt-level = 3
 strip = true
