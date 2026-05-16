@@ -196,3 +196,16 @@ pub const HELP: HelpSpec = HelpSpec {
     ],
     json_result_schema_doc: None,
 };
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    /// clap's `debug_assert` validates the whole arg graph (unique shorts
+    /// incl. the flattened `CommonFlags`, no id clashes). It only fires
+    /// when the binary parses, so without this test a CLI-definition error
+    /// is invisible to `cargo test` and lib unit tests.
+    #[test]
+    fn cli_definition_is_valid() {
+        super::Cli::command().debug_assert();
+    }
+}
