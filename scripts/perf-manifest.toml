@@ -62,11 +62,13 @@ upstream_version = "fastp --version"
 
 [spec.rsomics-fastq-correct]
 # gz input (the real workload). BFC is the k-mer-spectrum corrector
-# reference; it emits corrected reads to stdout (the only stdout-only
-# upstream — perfgate captures stdout→OUT at the gate step). Same k as
-# our default; -s sizes BFC's bloom (no effect on ours; fair: both do
-# one count pass + per-read correction over the same gz input).
-fixture          = "fastqgz:1000000:150"
+# reference; it emits corrected reads to stdout (perfgate redirects each
+# side's stdout to a scratch file). 100k reads, not 1M: error correction
+# is a per-read best-first heap search (super-linear), so 13 hyperfine
+# runs × 2 tools over 1M reads does not finish in a sane window — 100k is
+# still a non-trivial, representative count-pass + correction workload and
+# the ratio is fixture-size-invariant (both sides see the same input).
+fixture          = "fastqgz:100000:150"
 ours_args        = "-t 1 --in1 FIX --out1 OUT"
 upstream_bin     = "bfc"
 upstream_args    = "-s 100m -k 33 -t 1 FIX"
