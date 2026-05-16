@@ -311,7 +311,10 @@ fn ec1dir(
             let mut os: i32 = -1;
             let mut fixed = z.i > end;
             let mut other_ext = 0;
-            let mut added: Vec<(Penalty, i32)> = Vec::with_capacity(4);
+            // ≤ 4 by construction (`for b in 0u8..4`, ≤ 1 push/iter): a
+            // fixed array kills a per-heap-pop heap allocation.
+            let mut added: [(Penalty, i32); 4] = [(Penalty::default(), 0); 4];
+            let mut n_added = 0usize;
 
             if let Some(cb) = c
                 && cb.b < 4
@@ -364,7 +367,8 @@ fn ec1dir(
                         absent_high: (s >> 8 & 0xff) < cfg.min_cov,
                         b,
                     };
-                    added.push((pen, s));
+                    added[n_added] = (pen, s);
+                    n_added += 1;
                     other_ext += 1;
                 } else {
                     let pen = Penalty {
@@ -374,7 +378,8 @@ fn ec1dir(
                         absent_high: os < 0 || (os >> 8 & 0xff) < cfg.min_cov,
                         b,
                     };
-                    added.push((pen, os));
+                    added[n_added] = (pen, os);
+                    n_added += 1;
                 }
             }
 
@@ -386,21 +391,21 @@ fn ec1dir(
                 break;
             }
 
-            if c.is_some() || added.len() == 1 {
-                if added.len() > 1 && heap.len() > cfg.max_heap {
-                    let best = added
+            if c.is_some() || n_added == 1 {
+                if n_added > 1 && heap.len() > cfg.max_heap {
+                    let best = added[..n_added]
                         .iter()
                         .min_by_key(|(p, _)| weighted_penalty(*p))
                         .copied()
                         .unwrap();
                     buf_update(cfg, &mut heap, &mut stack, &z, best.0);
                 } else {
-                    for (pen, _) in &added {
+                    for (pen, _) in &added[..n_added] {
                         buf_update(cfg, &mut heap, &mut stack, &z, *pen);
                     }
                 }
             } else {
-                if added.is_empty() && z.k >= 0 {
+                if n_added == 0 && z.k >= 0 {
                     let zk = z.k as usize;
                     stack[zk].tot_pen +=
                         W_ABSENT * (cfg.max_end_ext - (z.i as i64 - end as i64) as i32);
