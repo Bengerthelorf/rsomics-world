@@ -162,13 +162,11 @@ impl<'cfg> Pipeline<'cfg> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use rsomics_seqio::OwnedRecord;
 
     use super::{CorrectConfig, correct_one};
     use crate::correct::{EcBase, SEQ_NT4, best_island, bfc_ec_greedy_k, seq_conv};
-    use crate::count::CountTable;
+    use crate::count::{CountTable, KmerMap};
     use crate::kmer::{BfcKmer, bfc_hash_64};
 
     #[test]
@@ -215,7 +213,7 @@ mod tests {
         let cfg = CorrectConfig::default();
         let ch = CountTable {
             k: cfg.k,
-            map: HashMap::new(),
+            map: KmerMap::default(),
         };
         let rec = OwnedRecord {
             id: b"r".to_vec(),
@@ -240,7 +238,7 @@ mod tests {
         };
         let mut ch = CountTable {
             k: cfg.k,
-            map: HashMap::new(),
+            map: KmerMap::default(),
         };
         for _ in 0..10 {
             let s = seq_conv(&seq, &qual, cfg.qual_threshold);
@@ -277,7 +275,7 @@ mod tests {
         let truth = b"ACGTCAGTTGA"; // exactly k bases
         let mut ch = CountTable {
             k,
-            map: HashMap::new(),
+            map: KmerMap::default(),
         };
         // Heavily cover the truth k-mer; nothing else seen.
         let mut tx = BfcKmer::NULL;
@@ -311,7 +309,7 @@ mod tests {
         // An empty table → no confident alternative → -1.
         let empty = CountTable {
             k,
-            map: HashMap::new(),
+            map: KmerMap::default(),
         };
         assert_eq!(bfc_ec_greedy_k(k, 0, &corrupt, &empty), -1);
     }

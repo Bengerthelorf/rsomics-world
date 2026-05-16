@@ -12,7 +12,10 @@ impl BfcKmer {
 
     #[inline]
     pub(crate) fn append(&mut self, k: usize, c: u64) {
-        let mask = if k >= 64 { u64::MAX } else { (1u64 << k) - 1 };
+        // k is validated 11..=63 at the Pipeline/CLI boundary (BFC_MAX_KMER
+        // 63), so the `k >= 64` case is unreachable — drop the branch from
+        // this per-base hot primitive.
+        let mask = (1u64 << k) - 1;
         self.x[0] = ((self.x[0] << 1) | (c & 1)) & mask;
         self.x[1] = ((self.x[1] << 1) | (c >> 1)) & mask;
         self.x[2] = (self.x[2] >> 1) | ((1u64 ^ (c & 1)) << (k - 1));

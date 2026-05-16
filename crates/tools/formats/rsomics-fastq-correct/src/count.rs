@@ -1,6 +1,7 @@
 //! BFC counting table — port of `htab.c`/`bbf.c` + the count pass.
 
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 use std::path::Path;
 
 use rsomics_common::Result;
@@ -9,6 +10,29 @@ use rsomics_seqio::{OwnedRecord, open_fastq};
 use crate::CorrectConfig;
 use crate::correct::seq_conv;
 use crate::kmer::{BfcKmer, bfc_kmer_hash};
+
+/// The map key is already a `bfc_kmer_hash` value (a full `Thomas-Wang`
+/// double-hash) — re-hashing it with `SipHash` on every `occ()`/`add()`
+/// is pure waste and was ~half the hot path. BFC's own `bfc_ch` indexes
+/// directly by the hash with no second hash, so passing the `u64` through
+/// unchanged is both faster and closer to BFC. Non-`u64` writes are a bug
+/// (the only key type is `u64`) and panic loudly.
+#[derive(Default)]
+pub(crate) struct IdentityHasher(u64);
+
+impl Hasher for IdentityHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, _: &[u8]) {
+        unreachable!("CountTable key is u64; only write_u64 is used");
+    }
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+}
+
+pub(crate) type KmerMap = HashMap<u64, Occ, BuildHasherDefault<IdentityHasher>>;
 
 /// Per-k-mer occupancy: low byte = coverage, bits 8..14 = high-quality
 /// coverage, both saturating — the layout BFC's `bfc_ch_kmer_occ` returns
@@ -23,7 +47,7 @@ pub(crate) struct Occ {
 /// `bfc_kmer_hash`). Built once over every input read before correction.
 pub(crate) struct CountTable {
     pub(crate) k: usize,
-    pub(crate) map: HashMap<u64, Occ>,
+    pub(crate) map: KmerMap,
 }
 
 impl CountTable {
@@ -65,7 +89,7 @@ impl CountTable {
 pub(crate) fn build_table(paths: &[&Path], cfg: &CorrectConfig) -> Result<CountTable> {
     let mut ch = CountTable {
         k: cfg.k,
-        map: HashMap::new(),
+        map: KmerMap::default(),
     };
     for p in paths {
         let src = open_fastq(p)?;
