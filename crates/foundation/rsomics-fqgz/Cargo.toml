@@ -1,0 +1,24 @@
+[package]
+name = "rsomics-fqgz"
+version = "0.1.0"
+description = "Chunked parallel-libdeflate gzip (or plain) FASTQ-record writer. Layer-A primitive shared by the rsomics-* fastq-* tools."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+categories = ["science"]
+keywords = ["fastq", "gzip", "libdeflate", "bioinformatics", "writer"]
+readme = "README.md"
+
+[dependencies]
+rsomics-common = { path = "../rsomics-common", version = "0.5" }
+libdeflater = "1"
+rayon = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+flate2 = { workspace = true }
+
+[lints]
+workspace = true

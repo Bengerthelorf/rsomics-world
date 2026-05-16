@@ -12,8 +12,8 @@ use crate::overlap::{
     OverlapConfig, OverlapResult, analyze as overlap_analyze, reverse_complement,
     trim_lengths as overlap_trim_lengths,
 };
-use crate::parallel_gz::ChunkedWriter;
 use crate::polyx::{PolyXConfig, find_dominant_polyx_3p, find_polyx_3p};
+use rsomics_fqgz::ChunkedWriter;
 
 const CHUNK_RECORDS: usize = 8192; // ≈12 MB per chunk at 150 bp; amortises rayon dispatch
 

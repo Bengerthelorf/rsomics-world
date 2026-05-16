@@ -1,6 +1,4 @@
-// Gzip permits concatenated members; gunzip/fastp/seqkit decode them transparently.
-// One self-contained gzip member per ~256 KB chunk, compressed in parallel via
-// libdeflate. flate2/zlib-rs is ~3× slower single-threaded than fastp's libdeflate.
+//! Chunked parallel-libdeflate gzip / plain FASTQ-record writer.
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -13,7 +11,7 @@ use rsomics_common::{Context, Result, RsomicsError};
 pub const GZ_CHUNK_BYTES: usize = 256 * 1024;
 
 #[cfg(test)]
-pub(crate) const GZ_DEFAULT_LEVEL: i32 = 4;
+const GZ_DEFAULT_LEVEL: i32 = 4;
 
 pub const MAX_PENDING_CHUNKS: usize = 16;
 
@@ -140,6 +138,9 @@ impl ChunkedWriter {
         Ok(())
     }
 
+    /// # Errors
+    ///
+    /// `Io` or `UpstreamError` if the final flush / compression fails.
     pub fn finalize(mut self) -> Result<()> {
         self.flush_pending()
     }

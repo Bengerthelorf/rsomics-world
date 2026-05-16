@@ -1,5 +1,3 @@
-pub(crate) mod parallel_gz;
-
 use std::path::Path;
 
 use rayon::prelude::*;
@@ -7,7 +5,7 @@ use rsomics_common::{Result, RsomicsError};
 use rsomics_seqio::{OwnedRecord, open_fastq};
 use serde::Serialize;
 
-use crate::parallel_gz::ChunkedWriter;
+use rsomics_fqgz::ChunkedWriter;
 
 const CHUNK_RECORDS: usize = 8192;
 

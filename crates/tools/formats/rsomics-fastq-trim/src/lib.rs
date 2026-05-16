@@ -1,7 +1,6 @@
 pub mod adapter;
 pub mod fixed;
 pub mod overlap;
-pub(crate) mod parallel_gz;
 pub mod pipeline;
 pub mod polyx;
 
