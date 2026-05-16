@@ -51,7 +51,9 @@ pub struct Cli {
 
     /// Phred quality at/above which a base is "high-quality" for the
     /// penalty model (BFC `-q`).
-    #[arg(short = 'q', long = "qual-threshold", default_value_t = 20)]
+    // No short: `-q` is reserved by CommonFlags (`--quiet`) across the
+    // rsomics-* family; BFC's `-q` maps to `--qual-threshold` long-only.
+    #[arg(long = "qual-threshold", default_value_t = 20)]
     qual_threshold: u8,
 
     /// Skip correction — pass reads through unchanged (BFC `-E`). The
@@ -237,7 +239,7 @@ pub const HELP: HelpSpec = HelpSpec {
                     why_default: Some("BFC default -w 10"),
                 },
                 FlagSpec {
-                    short: Some('q'),
+                    short: None,
                     long: "qual-threshold",
                     aliases: &[],
                     value: Some("<n>"),
@@ -245,7 +247,7 @@ pub const HELP: HelpSpec = HelpSpec {
                     required: false,
                     default: Some("20"),
                     description: "Phred ≥ this is high-quality in the penalty model",
-                    why_default: Some("BFC default -q 20"),
+                    why_default: Some("BFC default -q 20 (long-only; -q is --quiet)"),
                 },
                 FlagSpec {
                     short: Some('E'),
@@ -355,3 +357,17 @@ pub const HELP: HelpSpec = HelpSpec {
     ],
     json_result_schema_doc: Some("https://docs.rs/rsomics-fastq-correct/0.1/#json-output-schema"),
 };
+
+#[cfg(test)]
+mod tests {
+    use clap::CommandFactory;
+
+    /// clap's `debug_assert` validates the whole arg graph (unique shorts
+    /// incl. the flattened `CommonFlags`, no id clashes). It only fires
+    /// when the binary parses, so without this test a CLI-definition error
+    /// is invisible to `cargo test` and only surfaces when the binary runs.
+    #[test]
+    fn cli_definition_is_valid() {
+        super::Cli::command().debug_assert();
+    }
+}
