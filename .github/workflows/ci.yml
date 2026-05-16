@@ -124,6 +124,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends fastp samtools bedtools
           # isal-sys (rsomics-igzip ② FFI) builds ISA-L from C+asm via autotools+nasm.
           sudo apt-get install -y --no-install-recommends nasm autoconf automake libtool
+          # BFC (lh3, MIT) — rsomics-fastq-correct compat oracle, not packaged;
+          # built from source (needs zlib). Linux only; macOS compat skips it.
+          sudo apt-get install -y --no-install-recommends zlib1g-dev
+          git clone -q --depth 1 https://github.com/lh3/bfc /tmp/bfc
+          make -s -C /tmp/bfc
+          sudo install -m 0755 /tmp/bfc/bfc /usr/local/bin/bfc
           arch=$(uname -m)
           case "$arch" in
             x86_64)  seqkit_arch=amd64 ;;
@@ -138,6 +144,7 @@ jobs:
           samtools --version | head -1
           seqkit version
           bedtools --version
+          bfc -v 2>&1 | head -1 || true
       - name: Install upstream binaries for compat tests (macOS)
         if: runner.os == 'macOS'
         run: |
