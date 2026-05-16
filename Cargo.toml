@@ -56,3 +56,11 @@ codegen-units = 1
 lto = "thin"
 opt-level = 3
 strip = true
+
+# Release codegen with symbols kept — perf/flamegraph only, never shipped
+# (`cargo build --profile profiling`). Same opt as release so a profile
+# reflects shipped behaviour; perfgate still runs the stripped release.
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = 1
