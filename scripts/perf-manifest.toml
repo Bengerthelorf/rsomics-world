@@ -39,6 +39,16 @@ upstream_bin     = "fastp"
 upstream_args    = "--thread 1 --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT --disable_quality_filtering --json /dev/null --html /dev/null"
 upstream_version = "fastp --version"
 
+[spec.rsomics-fastq-umi]
+# gz input (the real workload). fastp isolated to UMI-only (everything else
+# disabled) so both sides do the same work: read .fastq.gz, move the 8 bp 5'
+# UMI into the read name, write plain. Reference upstream = fastp 0.20.1.
+fixture          = "fastqgz:1000000:150"
+ours_args        = "-t 1 --umi_len 8 --in1 FIX --out1 OUT"
+upstream_bin     = "fastp"
+upstream_args    = "--thread 1 --umi --umi_loc read1 --umi_len 8 -i FIX -o OUT --disable_adapter_trimming --disable_quality_filtering --disable_length_filtering --disable_trim_poly_g --json /dev/null --html /dev/null"
+upstream_version = "fastp --version"
+
 [spec.rsomics-bed-merge]
 fixture          = "bed:2000000:24"
 ours_args        = "-i FIX"
