@@ -18,10 +18,13 @@
 # In --ours-args / --upstream-args the bare words FIX and OUT are replaced
 # by the input fixture and a per-side scratch output path. bin + fixture
 # are symlinked into a space-free tmp dir before timing, so substituted
-# paths never contain spaces and this works from the apostrophe/space repo
-# path under --shell=none. A run that does not clear >1.0x still gets
-# written (FAIL verdict) — a recorded miss is the signal that an
-# optimisation pass is owed before any tag.
+# paths never contain spaces — safe to run under a real shell. Each side's
+# stdout is redirected to a scratch file: a stdout-only upstream (e.g. bfc,
+# which emits corrected reads to stdout with no -o) would otherwise fill
+# the OS pipe and deadlock with nothing draining it, and the write is part
+# of the work both sides must do for a fair comparison. A run that does not
+# clear >1.0x still gets written (FAIL verdict) — a recorded miss is the
+# signal that an optimisation pass is owed before any tag.
 set -euo pipefail
 
 NAME=  FIXTURE=  FIXTURE2=  OURS_BIN=  OURS_ARGS=  UP_BIN=  UP_ARGS=  UP_VER=  WARMUP=3  MINRUNS=10
@@ -88,10 +91,10 @@ ours_args=$(subst "$OURS_ARGS" out.ours)
 up_args=$(subst "$UP_ARGS" out.up)
 
 tmp_json=$(mktemp); trap 'rm -rf "$work" "$tmp_json"' EXIT
-hyperfine --warmup "$WARMUP" --min-runs "$MINRUNS" --shell=none \
+hyperfine --warmup "$WARMUP" --min-runs "$MINRUNS" --shell=sh \
   --export-json "$tmp_json" \
-  -n ours     "$work/ours $ours_args" \
-  -n upstream "$work/upstream $up_args" >/dev/null
+  -n ours     "$work/ours $ours_args > $work/ours.stdout" \
+  -n upstream "$work/upstream $up_args > $work/upstream.stdout" >/dev/null
 
 read -r o_mean o_sd o_min o_max u_mean u_sd u_min u_max ratio verdict <<EOF
 $(python3 - "$tmp_json" <<'PY'
