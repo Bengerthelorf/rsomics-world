@@ -71,6 +71,9 @@ done <<< "$cls"
 mkfix() { # "<kind>:<a>:<b>" dst [seed] -> path
   local spec=$1 dst=$2 seed=${3:-} IFS=:
   set -- $spec
+  # A gz fixture must keep a .gz name so perfgate's extension-preserving
+  # symlink lets extension-sniffing upstreams (fastp) detect compression.
+  [ "$1" = fastqgz ] && dst="$dst.fastq.gz"
   python3 scripts/mkfixture.py "$1" "$dst" "$2" "$3" $seed >/dev/null
   echo "$dst"
 }

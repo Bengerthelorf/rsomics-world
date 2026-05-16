@@ -17,8 +17,22 @@ upstream_bin     = "seqkit"
 upstream_args    = "stats -j 1 FIX"
 upstream_version = "seqkit version"
 
+[spec.rsomics-fastq-filter]
+# Same flag pairing the crate's compat.rs validated byte-equal vs fastp:
+# adapter + polyG off, default quality+length filter on (matches ours).
+fixture          = "fastq:1000000:150"
+ours_args        = "-t 1 --in1 FIX --out1 OUT"
+upstream_bin     = "fastp"
+upstream_args    = "--thread 1 -i FIX -o OUT --disable_adapter_trimming --disable_trim_poly_g --json /dev/null --html /dev/null"
+upstream_version = "fastp --version"
+
 [spec.rsomics-fastq-trim]
-fixture          = "fastq:300000:150"
+# gz input (not plain): .fastq.gz is the universal sequencer distribution
+# format and the workload rsomics-seqio's igzip backend exists to win. Plain
+# fastq-trim is already proven (3.88x); the enforced gate must cover the gz
+# decode+trim hot path this crate now depends on. Both sides read the same
+# single-member gzip; outputs are plain so only the read path differs.
+fixture          = "fastqgz:300000:150"
 ours_args        = "-t 1 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC --in1 FIX --out1 OUT"
 upstream_bin     = "fastp"
 upstream_args    = "--thread 1 --adapter_sequence AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT --disable_quality_filtering --json /dev/null --html /dev/null"

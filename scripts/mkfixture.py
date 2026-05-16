@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Deterministic synthetic fixtures for perfgate. Tier-3 (HDD, not git).
 
-    mkfixture.py fasta OUT n_records seq_len
-    mkfixture.py fastq OUT n_reads read_len      # 3' TruSeq adapter on ~60%
-    mkfixture.py bed   OUT n_intervals n_chroms   # sorted, overlapping
+    mkfixture.py fasta   OUT n_records seq_len
+    mkfixture.py fastq   OUT n_reads read_len     # 3' TruSeq adapter on ~60%
+    mkfixture.py fastqgz OUT n_reads read_len     # same bytes, gzip (mtime=0)
+    mkfixture.py bed     OUT n_intervals n_chroms  # sorted, overlapping
 
 Fixed seed → byte-identical across runs, so a fixture's sha256 is a
 stable identity recorded by perfgate.
 """
+import gzip
 import random
 import sys
 
@@ -37,6 +39,24 @@ elif KIND == "fastq":
             q = bytes(33 + min(40, 20 + random.randint(-8, 15))
                       for _ in range(B))
             f.write(b"@r%d\n%s\n+\n%s\n" % (i, seq, q))
+
+elif KIND == "fastqgz":
+    # Byte-identical uncompressed content to `fastq` for the same seed/params,
+    # then single-member gzip. mtime=0 keeps the header fixed so the fixture
+    # sha256 is a stable identity. level 6 = typical real .fastq.gz.
+    buf = bytearray()
+    for i in range(A):
+        insert = random.randint(B // 3, B)
+        seq = bytes(ACGT[random.getrandbits(2)] for _ in range(insert))
+        if random.random() < 0.6:
+            seq = (seq + ADAPTER)[:B]
+        seq = (seq + bytes(ACGT[random.getrandbits(2)]
+                           for _ in range(B)))[:B]
+        q = bytes(33 + min(40, 20 + random.randint(-8, 15))
+                  for _ in range(B))
+        buf += b"@r%d\n%s\n+\n%s\n" % (i, seq, q)
+    with open(OUT, "wb") as f:
+        f.write(gzip.compress(bytes(buf), compresslevel=6, mtime=0))
 
 elif KIND == "bed":
     rows = []
