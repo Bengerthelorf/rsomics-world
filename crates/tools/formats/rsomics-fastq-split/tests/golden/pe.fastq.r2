@@ -1,0 +1,16 @@
+@p1
+TTTT
++
+IIII
+@p2
+GGGG
++
+IIII
+@p3
+CCCC
++
+IIII
+@p4
+AAAA
++
+IIII

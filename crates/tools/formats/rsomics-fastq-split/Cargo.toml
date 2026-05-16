@@ -1,0 +1,45 @@
+[package]
+name = "rsomics-fastq-split"
+version = "0.1.0"
+description = "Split a FASTQ into N files or by line count. Rust port of fastp's split (deterministic --split_by_lines is byte-equal to fastp 0.20.1; --split N is exact-count). SE and PE."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+categories = ["science", "command-line-utilities"]
+keywords = ["fastq", "bioinformatics", "split", "fastp", "preprocessing"]
+
+[[bin]]
+name = "rsomics-fastq-split"
+path = "src/main.rs"
+
+[lib]
+name = "rsomics_fastq_split"
+path = "src/lib.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-fqgz = { path = "../../../foundation/rsomics-fqgz", version = "0.1" }
+rsomics-seqio = { path = "../../../foundation/rsomics-seqio", version = "0.1" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+anyhow.workspace = true
+rayon.workspace = true
+flate2.workspace = true
+libdeflater = "1"
+
+[dev-dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5", features = ["test-support", "rayon"] }
+tempfile = "3"
+criterion.workspace = true
+
+[[bench]]
+name = "fastq_split"
+harness = false
+
+[lints]
+workspace = true

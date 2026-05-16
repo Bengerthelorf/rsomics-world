@@ -49,6 +49,17 @@ upstream_bin     = "fastp"
 upstream_args    = "--thread 1 --umi --umi_loc read1 --umi_len 8 -i FIX -o OUT --disable_adapter_trimming --disable_quality_filtering --disable_length_filtering --disable_trim_poly_g --json /dev/null --html /dev/null"
 upstream_version = "fastp --version"
 
+[spec.rsomics-fastq-split]
+# gz input, --split_by_lines (deterministic both sides; the byte-equal mode).
+# 400000 lines = 100k reads/file over 1M reads → 10 split files. Both write
+# <digits>.<basename OUT> next to OUT in the space-free scratch dir; perfgate
+# times throughput only (distinct ours/upstream OUT bases, no collision).
+fixture          = "fastqgz:1000000:150"
+ours_args        = "-t 1 --split_by_lines 400000 --in1 FIX --out1 OUT"
+upstream_bin     = "fastp"
+upstream_args    = "--thread 1 --split_by_lines 400000 -i FIX -o OUT --disable_adapter_trimming --disable_quality_filtering --disable_length_filtering --disable_trim_poly_g --json /dev/null --html /dev/null"
+upstream_version = "fastp --version"
+
 [spec.rsomics-bed-merge]
 fixture          = "bed:2000000:24"
 ours_args        = "-i FIX"

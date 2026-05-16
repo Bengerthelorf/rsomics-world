@@ -1067,6 +1067,26 @@ dependencies = [
  "libdeflater",
  "rayon",
  "rsomics-common",
+ "rsomics-fqgz",
+ "rsomics-help",
+ "rsomics-seqio",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "rsomics-fastq-split"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "criterion",
+ "flate2",
+ "libdeflater",
+ "rayon",
+ "rsomics-common",
+ "rsomics-fqgz",
  "rsomics-help",
  "rsomics-seqio",
  "serde",
@@ -1086,6 +1106,7 @@ dependencies = [
  "memchr",
  "rayon",
  "rsomics-common",
+ "rsomics-fqgz",
  "rsomics-help",
  "rsomics-seqio",
  "serde",
@@ -1104,6 +1125,7 @@ dependencies = [
  "libdeflater",
  "rayon",
  "rsomics-common",
+ "rsomics-fqgz",
  "rsomics-help",
  "rsomics-seqio",
  "serde",
@@ -1117,6 +1139,17 @@ version = "0.1.0"
 dependencies = [
  "divsufsort",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "rsomics-fqgz"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "libdeflater",
+ "rayon",
+ "rsomics-common",
+ "tempfile",
 ]
 
 [[package]]
