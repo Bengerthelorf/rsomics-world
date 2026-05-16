@@ -240,6 +240,36 @@ of hundreds of micro-binaries for library math. Tell: if a crate's
 `perf-manifest` exemption reason is "not a CLI tool / library function", it was
 mis-classified into Layer B and its capability belongs in a Layer-A crate.
 
+## Standard crate skeleton
+
+Every tool crate has the same shape — no ad-hoc layout:
+
+- `src/main.rs` — thin: clap dispatch + `run(...)`, nothing else.
+- `src/cli.rs` — the `Cli` struct and the `rsomics_help` `HelpSpec`.
+- `src/lib.rs` — the operation API.
+- Shared machinery (parallel gzip writer, FASTQ reader, …) is a Layer-A
+  foundation dependency, never copied between crates. A module needed by 2+
+  tool crates is promoted to Layer A before the second copy exists.
+
+A tool crate is feature-complete for its operation: the full upstream
+flag/option surface for that one operation is implemented and compat-tested,
+established by reading the pinned upstream source. "Deferred / YAGNI" applies
+only to whether a *separate* operation deserves its own crate — never to
+omitting flags of the operation a crate already owns.
+
+## Comment bar
+
+Near-zero. A comment exists only if it is one of: a `SAFETY:` justification on
+an `unsafe` block; a `# Errors` / `# Panics` / `# Safety` line the toolchain
+lints force on a `pub` item; a paper/spec citation or license note; or a
+genuinely non-derivable invariant a competent reader cannot get from the code
+or simple reasoning. Everything else — what-comments, restating code,
+control-flow narration, "obvious" rationale, section separators — is deleted.
+
+Architecture, algorithm, platform, and origin narrative does **not** live in
+the code. Its home is the crate `README.md` and the per-crate docs. `//!`
+module prose is reduced to at most a one-line crate summary, or removed.
+
 ## Crate naming
 
 - Foundation crates: `rsomics-<primitive>` (e.g. `rsomics-common`,
