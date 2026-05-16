@@ -97,6 +97,9 @@ impl<'cfg> Pipeline<'cfg> {
             )));
         }
         let ch = build_table(&[input], self.cfg)?;
+        // BFC `bfc_correct`: the count-histogram mode is computed once and
+        // shared by every per-read worker — never per read (that is O(N²)).
+        let mode = ch.hist_mode(self.cfg.min_cov);
         let mut reader = open_fastq(input)?;
         let mut w = ChunkedWriter::create(output, self.compression)?;
         let mut report = CorrectReport::default();
@@ -119,7 +122,7 @@ impl<'cfg> Pipeline<'cfg> {
                     if cfg.drop_unique_kmer && has_unique_kmer(cfg, &ch, &rec) {
                         return (None, bases_in, 0);
                     }
-                    match correct_one(cfg, &ch, &rec) {
+                    match correct_one(cfg, &ch, &rec, mode) {
                         Some((seq, qual)) => {
                             let corrected =
                                 seq.iter().filter(|&&c| c.is_ascii_lowercase()).count() as u64;
@@ -219,7 +222,7 @@ mod tests {
             seq: b"ACGTACGTACGTACGTACGTACGTACGTACGTACGT".to_vec(),
             qual: b"IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII".to_vec(),
         };
-        assert!(correct_one(&cfg, &ch, &rec).is_none());
+        assert!(correct_one(&cfg, &ch, &rec, ch.hist_mode(cfg.min_cov)).is_none());
     }
 
     #[test]
@@ -256,7 +259,8 @@ mod tests {
                 }
             }
         }
-        let (out, _) = correct_one(&cfg, &ch, &rec).expect("clean high-cov read corrects");
+        let (out, _) = correct_one(&cfg, &ch, &rec, ch.hist_mode(cfg.min_cov))
+            .expect("clean high-cov read corrects");
         assert!(
             out.iter().all(u8::is_ascii_uppercase),
             "a clean read must stay uppercase (no corrections): {:?}",

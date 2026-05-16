@@ -541,10 +541,15 @@ fn heap_pop(h: &mut Vec<HeapNode>) -> HeapNode {
 /// `ec1dir`, then the two directional results are merged by BFC's
 /// agreement rule and the corrected sequence + ec-encoded quality emitted.
 /// Returns `None` when the read is uncorrectable / over the N threshold.
+/// `mode` is the count-histogram peak (BFC `bfc_ch_hist`). BFC computes it
+/// once in `bfc_correct` and hands it to every per-read worker; computing
+/// it per read here was O(reads × table) = quadratic. It is now a caller
+/// argument, computed once in `Pipeline::run`.
 pub(crate) fn correct_one(
     cfg: &CorrectConfig,
     ch: &CountTable,
     rec: &OwnedRecord,
+    mode: i32,
 ) -> Option<(Vec<u8>, Vec<u8>)> {
     let mut s = seq_conv(&rec.seq, &rec.qual, cfg.qual_threshold);
     let n = s.len();
@@ -562,7 +567,6 @@ pub(crate) fn correct_one(
     let (start, end) = if let Some(se) = best_island(cfg.k, &s) {
         se
     } else {
-        let mode = ch.hist_mode(cfg.min_cov);
         let mut bstart = 0usize;
         let mut ec = -1i32;
         let mut bend;
