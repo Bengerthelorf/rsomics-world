@@ -215,6 +215,31 @@ The choice is not a license to skip Tier 1 — every Layer B crate needs at
 least one Tier-1 fixture, committed or generated. The compat test reads it,
 diffs against upstream, fails loud.
 
+## Layer A vs Layer B — the classification test
+
+One operation = one crate is the partition rule, but the *layer* it lands in
+is decided by one question:
+
+> In real bioinformatics practice, does someone invoke this as a standalone
+> shell command / pipeline stage — or is it only ever a function call inside
+> another tool, script, or notebook?
+
+- **Standalone command / pipeline stage** (`samtools sort`, `bedtools merge`,
+  fastp's split / trim / filter / umi, an aligner, a variant caller) →
+  **Layer B**, one installable binary per operation. The anti-Swiss-Army-knife
+  explosion applies here: these are genuinely invoked separately.
+- **Only ever a compositional primitive** (p-value adjustment / FDR, a GLM
+  fit, a distance metric, a codec, an index kernel) → **Layer A**, a function
+  in a coherent foundation crate (`rsomics-stats`, `rsomics-align-core`, …).
+  **No standalone binary crate.** These are the "library-only, depended on by
+  2+ tools" crates the architecture already defines.
+
+This *lowers* user cost: a pipeline depends on a few foundation libraries plus
+the handful of standalone tools it actually shells out to — not `cargo install`
+of hundreds of micro-binaries for library math. Tell: if a crate's
+`perf-manifest` exemption reason is "not a CLI tool / library function", it was
+mis-classified into Layer B and its capability belongs in a Layer-A crate.
+
 ## Crate naming
 
 - Foundation crates: `rsomics-<primitive>` (e.g. `rsomics-common`,
