@@ -42,6 +42,8 @@ jobs:
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: ISA-L build toolchain (isal-sys → rsomics-igzip)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nasm autoconf automake libtool
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   # Per-push runs a minimal fast lane: Linux x86_64 (the truth, runs
@@ -120,6 +122,8 @@ jobs:
           # column layout the compat test parses, so pull the upstream
           # static binary instead. Architecture-aware (amd64 / arm64).
           sudo apt-get install -y --no-install-recommends fastp samtools bedtools
+          # isal-sys (rsomics-igzip ② FFI) builds ISA-L from C+asm via autotools+nasm.
+          sudo apt-get install -y --no-install-recommends nasm autoconf automake libtool
           arch=$(uname -m)
           case "$arch" in
             x86_64)  seqkit_arch=amd64 ;;
@@ -138,6 +142,8 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install fastp seqkit samtools bedtools
+          # isal-sys (rsomics-igzip ② FFI) builds ISA-L from C+asm via autotools+nasm.
+          brew install nasm autoconf automake libtool
           fastp --version
           samtools --version | head -1
           seqkit version

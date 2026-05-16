@@ -58,6 +58,19 @@ jobs:
             echo "::notice::$CRATE is library-only — skipping binary build + package."
           fi
 
+      - name: ISA-L build toolchain (isal-sys → rsomics-igzip)
+        if: steps.hasbin.outputs.has_bin == 'yes'
+        shell: bash
+        run: |
+          # Tool crates that read FASTQ pull rsomics-seqio's default igzip
+          # backend → isal-sys builds ISA-L from C+asm via autotools+nasm.
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends nasm autoconf automake libtool
+          else
+            brew install nasm autoconf automake libtool
+          fi
+
       - name: Build release binary
         if: steps.hasbin.outputs.has_bin == 'yes'
         shell: bash

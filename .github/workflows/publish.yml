@@ -49,6 +49,8 @@ jobs:
           # See ci.yml for the same install step.
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fastp samtools bedtools
+          # isal-sys (rsomics-igzip ② FFI) builds ISA-L from C+asm via autotools+nasm.
+          sudo apt-get install -y --no-install-recommends nasm autoconf automake libtool
           arch=$(uname -m)
           case "$arch" in
             x86_64)  seqkit_arch=amd64 ;;
