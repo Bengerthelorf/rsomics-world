@@ -126,6 +126,47 @@ I
     assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
 }
 
+/// `--umi_loc index1`: the UMI is the read-name trailing index field
+/// (fastp 0.20.1 `Read::firstIndex`, backward scan to the last `:`/`+`),
+/// stamped without trimming seq/qual. A name with no index field is a
+/// pass-through (fastp's `if(!umi.empty())` guard), not an error.
+#[test]
+fn se_umi_index1_golden() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("o.fq");
+    let st = Command::new(ours())
+        .args([
+            "-i",
+            fixture("se_umi.fastq").to_str().unwrap(),
+            "-o",
+            out.to_str().unwrap(),
+            "--umi_loc",
+            "index1",
+        ])
+        .status()
+        .unwrap();
+    assert!(st.success());
+
+    // readA name=`readA 1:N:0:ACGT` → firstIndex=ACGT, tag before first space,
+    //   seq/qual untouched. readB=`readB` / readC=`readC desc here` have no
+    //   index field → empty UMI → pass-through unchanged.
+    let expected = "\
+@readA:ACGT 1:N:0:ACGT
+AACCGGTTACGTACGTACGT
++
+IIIIIIIIIIIIIIIIIIII
+@readB
+TTGGCCAATGCATGCATGCA
++
+FFFFFFFFFFFFFFFFFFFF
+@readC desc here
+GGGGCCCCAAAATTTTACGT
++
+HHHHHHHHHHHHHHHHHHHH
+";
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
+}
+
 /// A zero-length UMI source read has no defined fastp 0.20.1 output (fastp's
 /// `trimFront` throws). We fail loud rather than fabricate a record.
 #[test]

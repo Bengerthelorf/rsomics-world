@@ -9,16 +9,61 @@ use rsomics_fqgz::ChunkedWriter;
 
 const CHUNK_RECORDS: usize = 8192;
 
-/// Which read carries the inline 5' UMI (fastp `UMI_LOC_READ1` / `UMI_LOC_READ2`).
+/// Where the UMI is taken from — the full fastp 0.20.1 `--umi_loc` set.
 ///
-/// Index-based locations (`index1`/`index2`/`per_index`/`per_read`) need
-/// separate index-FASTQ inputs or dual-UMI merge; they are intentionally not
-/// implemented until a consumer needs them (the inline read1/read2 case is the
-/// dominant UMI workflow and what `umi_tools extract` defaults to).
+/// `Read1`/`Read2`: 5' of that read's sequence (the read is trimmed).
+/// `Index1`/`Index2`: the read-name trailing index field (`firstIndex` of R1
+/// / `lastIndex` of R2), no trim. `PerIndex`: `firstIndex(R1) "_" lastIndex(R2)`.
+/// `PerRead`: 5' of both reads' sequences merged `umi1 "_" umi2`, both trimmed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UmiLoc {
     Read1,
     Read2,
+    Index1,
+    Index2,
+    PerIndex,
+    PerRead,
+}
+
+/// fastp 0.20.1 `Read::lastIndex` (src/read.cpp), verbatim: scan the name
+/// backward from `len-3` for the last `:`/`+`; return everything after it.
+/// Empty when the name is < 5 bytes or has no delimiter. The C `substr`
+/// length is clamped to the end, which the slice replicates.
+fn last_index(name: &[u8]) -> Vec<u8> {
+    let len = name.len();
+    if len < 5 {
+        return Vec::new();
+    }
+    for i in (0..=len - 3).rev() {
+        if name[i] == b':' || name[i] == b'+' {
+            return name[i + 1..len].to_vec();
+        }
+    }
+    Vec::new()
+}
+
+/// fastp 0.20.1 `Read::firstIndex` (src/read.cpp), verbatim: backward from
+/// `len-3`, a `+` sets the field end to its index-1 (dual-index split), the
+/// last `:` ends the scan; return the `:`..`+` (or `:`..end) field. Bounds
+/// are clamped exactly as the C `substr` would.
+fn first_index(name: &[u8]) -> Vec<u8> {
+    let len = name.len();
+    if len < 5 {
+        return Vec::new();
+    }
+    let mut end = len;
+    for i in (0..=len - 3).rev() {
+        if name[i] == b'+' {
+            end = i.saturating_sub(1);
+        }
+        if name[i] == b':' {
+            // fastp substr(i+1, end-i) == name[i+1 ..= end] → half-open end+1.
+            let stop = (end + 1).min(len);
+            let start = (i + 1).min(stop);
+            return name[start..stop].to_vec();
+        }
+    }
+    Vec::new()
 }
 
 /// Exact fastp UMI semantics — sourced from fastp `src/umiprocessor.cpp`
@@ -73,21 +118,18 @@ fn stamp(id: &[u8], tag: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Extract the 5' UMI from `src`, trim it off, and stamp the source name.
-/// Returns the tag stamped (so PE callers can stamp the mate identically).
+/// Take the 5' UMI from `src`'s sequence and trim it (+ skip) off seq & qual.
 ///
-/// Byte-faithful to fastp 0.20.1: `umi = seq[..min(umi_len, read_len)]`;
-/// then fastp `Read::trimFront(len)` does `len = min(length()-1, len)` — it
-/// keeps at least one base, so the 5' trim is `min(umi_len + skip,
-/// read_len - 1)`, NOT `read_len`. fastp also guards `if(!umi.empty())
-/// addUmiToName(...)` and its `trimFront` on a zero-length read throws; a
-/// zero-length UMI source read therefore has no defined fastp output, so we
-/// fail loud rather than fabricate a record fastp never emits.
+/// Byte-faithful to fastp 0.20.1: `umi = seq[..min(umi_len, read_len)]`; fastp
+/// `Read::trimFront` clamps to `length()-1` (keeps ≥1 base) so the trim is
+/// `min(umi_len + skip, read_len - 1)`. fastp's `trimFront` on a zero-length
+/// read throws (no defined output), so a zero-length seq-UMI source fails loud
+/// rather than fabricate a record fastp never emits.
 ///
 /// # Errors
 ///
-/// `InvalidInput` if the UMI source read has zero length.
-fn apply_umi(src: &mut OwnedRecord, cfg: &UmiConfig) -> Result<Vec<u8>> {
+/// `InvalidInput` if the seq-UMI source read has zero length.
+fn take_seq_umi(src: &mut OwnedRecord, cfg: &UmiConfig) -> Result<Vec<u8>> {
     let read_len = src.seq.len();
     let umi_len = cfg.len.min(read_len);
     if umi_len == 0 {
@@ -99,9 +141,65 @@ fn apply_umi(src: &mut OwnedRecord, cfg: &UmiConfig) -> Result<Vec<u8>> {
     let trim = (umi_len + cfg.skip).min(read_len - 1);
     src.seq.drain(..trim);
     src.qual.drain(..trim);
+    Ok(umi)
+}
+
+/// Apply the UMI transform to a record (PE: pass `mate`) per `cfg.loc`,
+/// mirroring fastp 0.20.1 `UmiProcessor::process`: build the UMI for the
+/// location, trim only the sequence-UMI source read(s), then — iff the UMI is
+/// non-empty (fastp's `if(!umi.empty())` guard, so a missing index field is a
+/// pass-through, not an error) — stamp the same tag into both names.
+///
+/// # Errors
+///
+/// `InvalidInput` if a sequence-UMI source read has zero length, or the
+/// location needs a mate that is absent (rejected earlier by the CLI).
+fn process(
+    rec: &mut OwnedRecord,
+    mut mate: Option<&mut OwnedRecord>,
+    cfg: &UmiConfig,
+) -> Result<()> {
+    let umi: Vec<u8> = match cfg.loc {
+        UmiLoc::Read1 => take_seq_umi(rec, cfg)?,
+        UmiLoc::Read2 => {
+            let m = mate.as_deref_mut().ok_or_else(|| {
+                RsomicsError::ConfigError("--umi_loc read2 requires PE input".into())
+            })?;
+            take_seq_umi(m, cfg)?
+        }
+        UmiLoc::Index1 => first_index(&rec.id),
+        UmiLoc::Index2 => {
+            let m = mate.as_deref().ok_or_else(|| {
+                RsomicsError::ConfigError("--umi_loc index2 requires PE input".into())
+            })?;
+            last_index(&m.id)
+        }
+        UmiLoc::PerIndex => {
+            let mut u = first_index(&rec.id);
+            if let Some(m) = mate.as_deref() {
+                u.push(b'_');
+                u.extend_from_slice(&last_index(&m.id));
+            }
+            u
+        }
+        UmiLoc::PerRead => {
+            let mut u = take_seq_umi(rec, cfg)?;
+            if let Some(m) = mate.as_deref_mut() {
+                u.push(b'_');
+                u.extend_from_slice(&take_seq_umi(m, cfg)?);
+            }
+            u
+        }
+    };
+    if umi.is_empty() {
+        return Ok(());
+    }
     let tag = cfg.tag(&umi);
-    src.id = stamp(&src.id, &tag);
-    Ok(tag)
+    rec.id = stamp(&rec.id, &tag);
+    if let Some(m) = mate {
+        m.id = stamp(&m.id, &tag);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -164,7 +262,7 @@ impl<'cfg> Pipeline<'cfg> {
                 .par_drain(..)
                 .map(|mut rec| {
                     let bases_in = rec.seq.len() as u64;
-                    apply_umi(&mut rec, self.cfg)?;
+                    process(&mut rec, None, self.cfg)?;
                     let bases_out = rec.seq.len() as u64;
                     Ok((rec, bases_in, bases_out))
                 })
@@ -223,16 +321,7 @@ impl<'cfg> Pipeline<'cfg> {
                 .par_drain(..)
                 .map(|mut p| {
                     let bases_in = (p.r1.seq.len() + p.r2.seq.len()) as u64;
-                    let tag = match self.cfg.loc {
-                        UmiLoc::Read1 => apply_umi(&mut p.r1, self.cfg)?,
-                        UmiLoc::Read2 => apply_umi(&mut p.r2, self.cfg)?,
-                    };
-                    // Stamp the non-source mate's name with the same UMI tag so
-                    // the pair keeps a consistent identifier (fastp behaviour).
-                    match self.cfg.loc {
-                        UmiLoc::Read1 => p.r2.id = stamp(&p.r2.id, &tag),
-                        UmiLoc::Read2 => p.r1.id = stamp(&p.r1.id, &tag),
-                    }
+                    process(&mut p.r1, Some(&mut p.r2), self.cfg)?;
                     let bases_out = (p.r1.seq.len() + p.r2.seq.len()) as u64;
                     Ok((p, bases_in, bases_out))
                 })
@@ -277,7 +366,7 @@ mod tests {
     #[test]
     fn extract_trims_and_stamps_no_space() {
         let mut r = rec("read1", "ACGTACGTAA", "IIIIIIIIII");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 0, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 4, 0, "")).unwrap();
         assert_eq!(r.id, b"read1:ACGT");
         assert_eq!(r.seq, b"ACGTAA");
         assert_eq!(r.qual, b"IIIIII");
@@ -286,7 +375,7 @@ mod tests {
     #[test]
     fn stamp_inserts_before_first_space() {
         let mut r = rec("read1 1:N:0", "TTTTGGGG", "IIIIIIII");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 0, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 4, 0, "")).unwrap();
         assert_eq!(r.id, b"read1:TTTT 1:N:0");
         assert_eq!(r.seq, b"GGGG");
     }
@@ -294,7 +383,7 @@ mod tests {
     #[test]
     fn skip_removes_extra_bases_after_umi() {
         let mut r = rec("r", "AACCGGTT", "IIIIIIII");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 2, 2, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 2, 2, "")).unwrap();
         assert_eq!(r.id, b"r:AA");
         assert_eq!(r.seq, b"GGTT");
         assert_eq!(r.qual, b"IIII");
@@ -303,7 +392,7 @@ mod tests {
     #[test]
     fn prefix_joined_with_underscore() {
         let mut r = rec("r", "ACGTACGT", "IIIIIIII");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 0, "UMI")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 4, 0, "UMI")).unwrap();
         assert_eq!(r.id, b"r:UMI_ACGT");
     }
 
@@ -312,7 +401,7 @@ mod tests {
     #[test]
     fn umi_len_clamped_keeps_last_base() {
         let mut r = rec("r", "ACG", "III");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 8, 0, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 8, 0, "")).unwrap();
         assert_eq!(r.id, b"r:ACG");
         assert_eq!(r.seq, b"G");
         assert_eq!(r.qual, b"I");
@@ -321,7 +410,7 @@ mod tests {
     #[test]
     fn skip_overrun_keeps_last_base() {
         let mut r = rec("r", "AACCGGTT", "IIIIIIIJ");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 20, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 4, 20, "")).unwrap();
         assert_eq!(r.id, b"r:AACC");
         assert_eq!(r.seq, b"T");
         assert_eq!(r.qual, b"J");
@@ -330,7 +419,7 @@ mod tests {
     #[test]
     fn exact_consume_keeps_last_base() {
         let mut r = rec("r", "AACCGGTT", "IIIIIIIJ");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 4, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 4, 4, "")).unwrap();
         assert_eq!(r.seq, b"T");
         assert_eq!(r.qual, b"J");
     }
@@ -338,7 +427,7 @@ mod tests {
     #[test]
     fn one_base_read_kept_and_stamped() {
         let mut r = rec("r", "A", "I");
-        apply_umi(&mut r, &cfg(UmiLoc::Read1, 1, 0, "")).unwrap();
+        process(&mut r, None, &cfg(UmiLoc::Read1, 1, 0, "")).unwrap();
         assert_eq!(r.id, b"r:A");
         assert_eq!(r.seq, b"A");
         assert_eq!(r.qual, b"I");
@@ -347,6 +436,66 @@ mod tests {
     #[test]
     fn empty_source_read_errors() {
         let mut r = rec("r", "", "");
-        assert!(apply_umi(&mut r, &cfg(UmiLoc::Read1, 4, 0, "")).is_err());
+        assert!(process(&mut r, None, &cfg(UmiLoc::Read1, 4, 0, "")).is_err());
+    }
+
+    #[test]
+    fn index_parsing_matches_fastp_readcpp() {
+        // single index: first == last == the trailing field
+        assert_eq!(first_index(b"R1 1:N:0:ATCACG"), b"ATCACG");
+        assert_eq!(last_index(b"R1 1:N:0:ATCACG"), b"ATCACG");
+        // dual index: first = before '+', last = after '+'
+        assert_eq!(first_index(b"R1 1:N:0:ATCACG+TGGTCA"), b"ATCACG");
+        assert_eq!(last_index(b"R1 1:N:0:ATCACG+TGGTCA"), b"TGGTCA");
+        // no delimiter / too short → empty
+        assert_eq!(first_index(b"abcd"), b"");
+        assert_eq!(last_index(b"readname"), b"");
+    }
+
+    #[test]
+    fn index1_stamps_from_header_no_trim() {
+        let mut r = rec("read 1:N:0:ACGTAA", "TTTTGGGG", "IIIIIIII");
+        process(&mut r, None, &cfg(UmiLoc::Index1, 0, 0, "")).unwrap();
+        assert_eq!(r.id, b"read:ACGTAA 1:N:0:ACGTAA");
+        assert_eq!(r.seq, b"TTTTGGGG"); // index mode never trims
+        assert_eq!(r.qual, b"IIIIIIII");
+    }
+
+    #[test]
+    fn index_missing_field_is_passthrough_not_error() {
+        let mut r = rec("plainname", "ACGT", "IIII");
+        process(&mut r, None, &cfg(UmiLoc::Index1, 0, 0, "")).unwrap();
+        assert_eq!(r.id, b"plainname"); // empty UMI ⇒ fastp !empty guard ⇒ no stamp
+        assert_eq!(r.seq, b"ACGT");
+    }
+
+    #[test]
+    fn per_index_pe_merges_first_and_last() {
+        let mut r1 = rec("p 1:N:0:AAA+CCC", "GGGG", "IIII");
+        let mut r2 = rec("p 2:N:0:AAA+CCC", "TTTT", "FFFF");
+        process(&mut r1, Some(&mut r2), &cfg(UmiLoc::PerIndex, 0, 0, "")).unwrap();
+        assert_eq!(r1.id, b"p:AAA_CCC 1:N:0:AAA+CCC");
+        assert_eq!(r2.id, b"p:AAA_CCC 2:N:0:AAA+CCC");
+        assert_eq!(r1.seq, b"GGGG"); // index mode: no trim either mate
+        assert_eq!(r2.seq, b"TTTT");
+    }
+
+    #[test]
+    fn per_read_pe_merges_both_seq_umis_and_trims_both() {
+        let mut r1 = rec("p 1", "AACCGGGG", "IIIIIIII");
+        let mut r2 = rec("p 2", "TTGGCCCC", "FFFFFFFF");
+        process(&mut r1, Some(&mut r2), &cfg(UmiLoc::PerRead, 4, 0, "")).unwrap();
+        assert_eq!(r1.id, b"p:AACC_TTGG 1");
+        assert_eq!(r2.id, b"p:AACC_TTGG 2");
+        assert_eq!(r1.seq, b"GGGG"); // both trimmed by 4
+        assert_eq!(r2.seq, b"CCCC");
+    }
+
+    #[test]
+    fn read2_and_index2_require_pe() {
+        let mut r = rec("r 1:N:0:ACGT", "ACGTACGT", "IIIIIIII");
+        assert!(process(&mut r, None, &cfg(UmiLoc::Read2, 4, 0, "")).is_err());
+        let mut r2 = rec("r 1:N:0:ACGT", "ACGTACGT", "IIIIIIII");
+        assert!(process(&mut r2, None, &cfg(UmiLoc::Index2, 0, 0, "")).is_err());
     }
 }
