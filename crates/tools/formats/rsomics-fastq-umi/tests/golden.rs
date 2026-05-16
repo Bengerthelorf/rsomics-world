@@ -189,3 +189,31 @@ fn empty_source_read_errors_cli() {
         "empty UMI source read must fail loud, not emit a fabricated record"
     );
 }
+
+/// fastp 0.20.1 rejects `read2` / `index2` / `per_index` / `per_read`
+/// without a paired input at option-validation time. Match it: SE with a
+/// PE-only location must fail loud, not silently emit a partial UMI.
+#[test]
+fn pe_only_loc_in_se_rejected_cli() {
+    for loc in ["per_index", "per_read", "read2", "index2"] {
+        let tmp = tempfile::tempdir().unwrap();
+        let out = tmp.path().join("o.fq");
+        let st = Command::new(ours())
+            .args([
+                "-i",
+                fixture("se_umi.fastq").to_str().unwrap(),
+                "-o",
+                out.to_str().unwrap(),
+                "--umi_loc",
+                loc,
+                "--umi_len",
+                "4",
+            ])
+            .status()
+            .unwrap();
+        assert!(
+            !st.success(),
+            "--umi_loc {loc} in SE must fail loud (fastp rejects it), got success"
+        );
+    }
+}

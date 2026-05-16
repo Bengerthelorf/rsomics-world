@@ -113,9 +113,13 @@ impl Cli {
         match (self.in2.as_ref(), self.out2.as_ref()) {
             (Some(in2), Some(out2)) => p.run_pe(&self.in1, in2, &self.out1, out2),
             (None, None) => {
-                if matches!(cfg.loc, UmiLoc::Read2 | UmiLoc::Index2) {
+                if matches!(
+                    cfg.loc,
+                    UmiLoc::Read2 | UmiLoc::Index2 | UmiLoc::PerIndex | UmiLoc::PerRead
+                ) {
                     return Err(RsomicsError::ConfigError(
-                        "--umi_loc read2/index2 requires PE input (--in2/--out2)".into(),
+                        "--umi_loc read2/index2/per_index/per_read requires PE input (--in2/--out2)"
+                            .into(),
                     ));
                 }
                 p.run_se(&self.in1, &self.out1)
