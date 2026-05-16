@@ -1041,6 +1041,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-fastq-correct"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "criterion",
+ "rayon",
+ "rsomics-common",
+ "rsomics-fqgz",
+ "rsomics-help",
+ "rsomics-kmer",
+ "rsomics-seqio",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-fastq-dedup"
 version = "0.1.0"
 dependencies = [

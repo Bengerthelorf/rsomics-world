@@ -60,6 +60,18 @@ upstream_bin     = "fastp"
 upstream_args    = "--thread 1 --split_by_lines 400000 -i FIX -o OUT --disable_adapter_trimming --disable_quality_filtering --disable_length_filtering --disable_trim_poly_g --json /dev/null --html /dev/null"
 upstream_version = "fastp --version"
 
+[spec.rsomics-fastq-correct]
+# gz input (the real workload). BFC is the k-mer-spectrum corrector
+# reference; it emits corrected reads to stdout (the only stdout-only
+# upstream — perfgate captures stdout→OUT at the gate step). Same k as
+# our default; -s sizes BFC's bloom (no effect on ours; fair: both do
+# one count pass + per-read correction over the same gz input).
+fixture          = "fastqgz:1000000:150"
+ours_args        = "-t 1 --in1 FIX --out1 OUT"
+upstream_bin     = "bfc"
+upstream_args    = "-s 100m -k 33 -t 1 FIX"
+upstream_version = "bfc -v"
+
 [spec.rsomics-bed-merge]
 fixture          = "bed:2000000:24"
 ours_args        = "-i FIX"
