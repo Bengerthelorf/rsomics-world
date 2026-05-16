@@ -253,7 +253,19 @@ Every tool crate has the same shape — no ad-hoc layout:
 
 - `src/main.rs` — thin: clap dispatch + `run(...)`, nothing else.
 - `src/cli.rs` — the `Cli` struct and the `rsomics_help` `HelpSpec`.
-- `src/lib.rs` — the operation API.
+- `src/lib.rs` — the operation API. When the operation is algorithmically
+  large or spans several distinct concerns (e.g. k-mer machinery + a count
+  table + the algorithm core + IO orchestration), `lib.rs` is a thin
+  `pub use` facade (+ the top-level config / `Pipeline`) over topical
+  submodules — it is **not** left as one multi-hundred-line file.
+  `rsomics-fastq-trim` (`adapter.rs`/`fixed.rs`/`overlap.rs`/`polyx.rs`/
+  `pipeline.rs`, `lib.rs` = 11-line facade) and the foundation crates
+  (`rsomics-kmer` = `count/encode/hash/iter.rs`, `rsomics-stats` =
+  `fdr/combine/hypothesis.rs`) are the pattern. For a port, draw module
+  boundaries along the **upstream source files** so the port stays
+  diff-able file-by-file against the reference. Don't split for its own
+  sake — a small `lib.rs` for a simple operation stays one file (YAGNI;
+  the trigger is size + multiple concerns, not a line count alone).
 - Shared machinery (parallel gzip writer, FASTQ reader, …) is a Layer-A
   foundation dependency, never copied between crates. A module needed by 2+
   tool crates is promoted to Layer A before the second copy exists.
