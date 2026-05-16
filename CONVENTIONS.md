@@ -1,5 +1,12 @@
 # Conventions
 
+> ‼️ Operating discipline (highest priority): **never stop / never end a turn**
+> except when a decision only the user can make is required, or a universal
+> correctness halt fires. CI / 4090 / background agents running, "clean
+> boundary", "unverified base", or context filling up are **not** reasons to
+> stop — context auto-compacts; switch to other non-blocked campaign work and
+> keep going. (See memory `feedback-never-stop`.)
+
 Rules for contributing to this repo and for the Rust crates it ships.
 
 ## Repository shape

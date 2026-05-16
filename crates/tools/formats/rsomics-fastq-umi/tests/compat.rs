@@ -1,14 +1,5 @@
-//! Byte-level compat vs `fastp --umi` (the perfgate/CI reference is fastp
-//! 0.20.1 on 4090/Linux apt). fastp 0.20.1 `addUmiToName`: tag = `:` +
-//! `[prefix _]` + umi, inserted before the first space in the read name else
-//! appended; the UMI-source read is `trimFront(umi_len + umi_skip)` on seq +
-//! qual. Everything else fastp does is disabled so only the UMI transform
-//! remains, making the output FASTQ byte-comparable.
-//!
-//! Authoritative on Linux/4090 (fastp 0.20.1). A newer local fastp (1.x) has
-//! divergent flag semantics and UMI output and is NOT a valid compat oracle —
-//! the test skips loudly if fastp is absent and is byte-exact where the
-//! pinned 0.20.1 upstream runs.
+//! Byte-compat vs fastp 0.20.1 (the pinned oracle); UMI output is
+//! version-specific so a non-0.20 fastp is skipped, not asserted against.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

@@ -11,10 +11,19 @@ All `unsafe` is contained within this crate.  Every consumer (`rsomics-seqio`,
 | Crate | Problem |
 |---|---|
 | `isal-rs` | Safe wrapper but hard-codes `BUF_SIZE = 16 KiB`, preventing the large-block read pattern that gives ISA-L its throughput advantage |
-| `rapidgzip-sys` | Release-mode static link is structurally broken (see `.autopilot/state/gz-input-survey.md`) |
 
-The correct shape — 4 MiB compressed input / 8 MiB decompressed output blocks —
-requires calling `isal_sys` directly with caller-controlled buffer sizes.
+The correct shape — 4 MiB compressed input / 8 MiB decompressed output blocks,
+mirroring fastp `src/fastqreader.cpp readToBufIgzip` with multi-member gzip
+support — requires calling `isal_sys` directly with caller-controlled buffer
+sizes.
+
+## Platform support
+
+ISA-L's hand-written aarch64 assembly does not assemble under Apple's
+integrated assembler, so `isal-sys` is a Linux-only dependency. On non-Linux
+targets this crate still compiles but `GzReader::new` returns an `Unsupported`
+error; consumers (e.g. `rsomics-seqio`) select a pure-Rust decoder per target.
+The performance contract is enforced on Linux.
 
 ## Dependency quadrant
 

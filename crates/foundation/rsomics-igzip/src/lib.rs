@@ -1,14 +1,4 @@
 //! Quadrant-② FFI wrapper over Intel ISA-L igzip.
-//!
-//! Mirrors fastp `src/fastqreader.cpp readToBufIgzip` (Chen et al., MIT):
-//! 4 MiB compressed input buffer, 8 MiB decompressed output buffer, multi-member
-//! gzip support.  The isal-rs safe wrapper is NOT used: its `BUF_SIZE` is
-//! hard-coded at 16 KiB, throttling the large-block pattern that gives ISA-L
-//! its throughput advantage.
-//!
-//! ISA-L's aarch64 assembly does not assemble under Apple's integrated assembler,
-//! so `isal-sys` is Linux-only.  On non-Linux targets `GzReader::new` returns
-//! `Unsupported`; consumers select a pure-Rust decoder instead.
 
 use std::io::{self, Read};
 use std::path::Path;

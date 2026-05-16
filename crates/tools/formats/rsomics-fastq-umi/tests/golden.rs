@@ -1,7 +1,5 @@
-//! fastp-independent golden test: encodes the fastp 0.20.1 UMI semantics as a
-//! hand-computed expected output so correctness is gated everywhere (mac / CI
-//! / 4090), not only where the pinned fastp upstream is installed. compat.rs
-//! additionally byte-checks against the real fastp 0.20.1.
+//! fastp-independent golden: hand-computed fastp-0.20.1 UMI output so
+//! correctness is gated everywhere, not only where fastp is installed.
 
 use std::path::PathBuf;
 use std::process::Command;

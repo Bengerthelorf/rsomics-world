@@ -1,11 +1,5 @@
-//! Byte-level compat vs `fastp --split_by_lines` (reference: fastp 0.20.1 on
-//! 4090/CI). `--split_by_lines` is deterministic on both sides, so the full
-//! set of split files — names and bytes — must match exactly. (`--split N` is
-//! fastp's file-size *estimate*, not exact-count, so it is not a byte oracle;
-//! that mode is covered by the fastp-independent golden test.)
-//!
-//! Version-gated: a non-0.20 local fastp (1.x) has divergent semantics and is
-//! not a valid oracle — skip loud there, enforce where 0.20.1 runs (4090/CI).
+//! Byte-compat of `--split_by_lines` vs the pinned fastp 0.20.1 oracle
+//! (deterministic both sides); skipped, not asserted, on a non-0.20 fastp.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
