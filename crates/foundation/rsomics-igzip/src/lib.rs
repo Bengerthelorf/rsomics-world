@@ -15,12 +15,24 @@
 //! The isal-rs safe wrapper is NOT used here because its internal `BUF_SIZE`
 //! is hard-coded at 16 KiB, which prevents the large-block read pattern that
 //! gives ISA-L its throughput advantage.
+//!
+//! ## Platform support
+//!
+//! ISA-L's hand-written aarch64 assembly does not assemble under Apple's
+//! integrated assembler, so `isal-sys` is a Linux-only dependency. On
+//! non-Linux targets this crate still compiles but `GzReader::new` returns an
+//! `Unsupported` error — consumers (e.g. `rsomics-seqio`) select a pure-Rust
+//! decoder per target instead. The performance contract is enforced on Linux.
 
-use std::fs::File;
 use std::io::{self, Read};
-use std::mem::MaybeUninit;
 use std::path::Path;
 
+#[cfg(target_os = "linux")]
+use std::fs::File;
+#[cfg(target_os = "linux")]
+use std::mem::MaybeUninit;
+
+#[cfg(target_os = "linux")]
 use isal_sys::igzip_lib::{
     ISAL_DECOMP_OK, ISAL_END_INPUT, ISAL_GZIP, ISAL_OUT_OVERFLOW, inflate_state,
     isal_block_state_ISAL_BLOCK_FINISH as ISAL_BLOCK_FINISH, isal_gzip_header,
@@ -28,9 +40,38 @@ use isal_sys::igzip_lib::{
 };
 
 /// 4 MiB compressed-input read buffer — matches fastp `IGZIP_IN_BUF`.
+#[cfg(target_os = "linux")]
 const IGZIP_IN: usize = 1 << 22;
 /// 8 MiB decompressed-output buffer — matches fastp `FQ_BUF`.
+#[cfg(target_os = "linux")]
 const FQ_BUF: usize = 1 << 23;
+
+/// Non-Linux stub: ISA-L's aarch64 asm does not build under Apple clang, so
+/// the igzip backend is Linux-only. Compiles everywhere; fails loud if used.
+#[cfg(not(target_os = "linux"))]
+pub struct GzReader;
+
+#[cfg(not(target_os = "linux"))]
+impl GzReader {
+    /// Always returns `Unsupported` — the ISA-L backend is Linux-only.
+    ///
+    /// # Errors
+    ///
+    /// Always `io::ErrorKind::Unsupported` on non-Linux targets.
+    pub fn new(_path: &Path) -> io::Result<Self> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "rsomics-igzip: the ISA-L igzip backend is Linux-only on this build",
+        ))
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+impl Read for GzReader {
+    fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+        unreachable!("rsomics-igzip GzReader cannot be constructed off Linux")
+    }
+}
 
 /// Safe streaming gzip decompressor backed by Intel ISA-L igzip.
 ///
@@ -43,6 +84,7 @@ const FQ_BUF: usize = 1 << 23;
 /// Any ISA-L error code, truncated stream, or file I/O failure surfaces as
 /// `io::Error` — never silently truncated or zero-padded.  Wrong FASTQ output
 /// is worse than a crash.
+#[cfg(target_os = "linux")]
 pub struct GzReader {
     file: File,
     /// Compressed-data staging buffer.
@@ -56,6 +98,7 @@ pub struct GzReader {
     done: bool,
 }
 
+#[cfg(target_os = "linux")]
 impl GzReader {
     /// Open `path` as a gzip file and initialise the ISA-L inflate state.
     ///
@@ -249,6 +292,7 @@ impl GzReader {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl Read for GzReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.done {
@@ -283,7 +327,7 @@ impl Read for GzReader {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use std::io::{Read, Write};
 
