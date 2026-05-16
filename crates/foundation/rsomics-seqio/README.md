@@ -14,16 +14,15 @@ decompression, and record parsing runs in parallel across the rayon pool.
 ## Design
 
 `open_fastq(path)` detects the input format by magic bytes (never by file
-extension) and dispatches to one of three paths:
+extension) and dispatches:
 
 1. **Plain** — `BufReader<File>` + line parser. No extra threads.
-2. **Plain gzip** — a dedicated producer thread decompresses in 8 MiB blocks
-   and sends whole-record-aligned raw byte slabs (`Vec<u8>`) over a bounded
-   `crossbeam-channel`. The consumer parses each slab in parallel on the rayon
-   thread pool, so per-record allocation is off the reader thread. The producer
-   never parses; the consumer never decompresses.
-3. **BGZF** (feature `bgzf`) — `noodles-bgzf` parallel block decoder wrapped in
-   the same line parser.
+2. **gzip** (incl. BGZF, whose `BC`-subfield members are concatenated gzip the
+   backend decodes transparently) — a dedicated producer thread decompresses in
+   8 MiB blocks and sends whole-record-aligned raw byte slabs (`Vec<u8>`) over a
+   bounded `crossbeam-channel`. The consumer parses each slab in parallel on the
+   rayon thread pool, so per-record allocation is off the reader thread. The
+   producer never parses; the consumer never decompresses.
 
 Slab boundary invariant: every slab the producer emits contains an integer
 number of complete 4-line FASTQ records. Boundaries are found by counting
@@ -32,18 +31,19 @@ characters. The tail after the last complete record is carried into the next
 block. Truncated or corrupt input surfaces as `Err`, never a short clean read;
 a panic in the decode thread is delivered to the consumer as a loud `Err`.
 
-## Decompressor backends (gz path)
+## gz backend (target-selected, no Cargo feature)
 
-| Feature | Backend | Quadrant | Notes |
+| Target | Backend | Quadrant | Notes |
 |---|---|---|---|
-| `igzip-backend` (default) | `rsomics-igzip` (Intel ISA-L igzip via `isal-sys`) | ② FFI over C+asm | fastp-class 4 MiB-in / 8 MiB-out block shape; requires nasm + a C toolchain |
-| `pure` | flate2 + zlib-rs | ① pure Rust | Degraded fallback; no nasm/C toolchain; NOT for production publishing |
-| `bgzf` | noodles-bgzf 0.47 | ① pure Rust | BGZF only; noodles parallel block decode |
+| `target_os = "linux"` | `rsomics-igzip` (Intel ISA-L igzip via `isal-sys`) | ② FFI over C+asm | fastp-class 4 MiB-in / 8 MiB-out block shape; the perf contract is enforced here |
+| everything else | flate2 + zlib-rs | ① pure Rust | ISA-L's aarch64 asm does not assemble under Apple's assembler; correct, not perf-gated |
 
-All `unsafe` lives in the isolated `rsomics-igzip` crate (Quadrant ②); this
-crate stays 100% safe and keeps `[lints] workspace = true`. The producer /
-consumer code is identical across backends — only the `build_decoder` call
-differs.
+Selection is purely by `cfg(target_os)`, not a Cargo feature, so
+`--all-features` cannot accidentally disable the igzip path on Linux. All
+`unsafe` lives in the isolated `rsomics-igzip` crate (Quadrant ②); this crate
+stays 100% safe and keeps `[lints] workspace = true`. The producer / consumer
+code is identical across backends — only the `build_decoder` call differs. A
+noodles parallel-block BGZF fast path is deferred until a consumer needs it.
 
 ## BGZF detection
 

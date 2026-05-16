@@ -33,10 +33,10 @@ use rsomics_common::{Result, RsomicsError};
 use crate::OwnedRecord;
 use crate::parse::parse_record;
 
-/// Compressed-data read buffer for the pure-Rust fallback backend — matches
-/// fastp `IGZIP_IN_BUF`. The igzip backend does its own 4 MiB input buffering
-/// inside `rsomics-igzip`, so this is dead under the default feature set.
-#[cfg(not(feature = "igzip-backend"))]
+/// Compressed-data read buffer for the non-Linux pure-Rust backend — matches
+/// fastp `IGZIP_IN_BUF`. On Linux the igzip backend does its own 4 MiB input
+/// buffering inside `rsomics-igzip`, so this is unused there.
+#[cfg(not(target_os = "linux"))]
 const IN_BUF: usize = 4 * 1024 * 1024;
 /// Decompressed-data block size — matches fastp `FQ_BUF`.
 const OUT_BUF: usize = 8 * 1024 * 1024;
@@ -310,19 +310,18 @@ fn last_record_boundary(data: &[u8]) -> Option<usize> {
     last_boundary
 }
 
-// Priority (first matching feature wins):
-//   1. `igzip-backend` — ISA-L igzip via the isolated rsomics-igzip FFI crate
-//      (Quadrant ②; requires nasm + C toolchain; default shipping backend).
-//   2. `pure`          — flate2 + zlib-rs (Quadrant ①, pure Rust; degraded
-//      fallback for environments without nasm; not for production publishing).
+// Backend is target-selected: ISA-L igzip (Quadrant ②, rsomics-igzip) on
+// Linux where isal-sys builds and the perf contract is enforced; pure-Rust
+// flate2/zlib-rs (Quadrant ①) elsewhere, since ISA-L's aarch64 assembly does
+// not assemble under Apple's integrated assembler.
 
-#[cfg(feature = "igzip-backend")]
+#[cfg(target_os = "linux")]
 fn build_decoder(path: &Path) -> Result<Box<dyn Read>> {
     let reader = rsomics_igzip::GzReader::new(path).map_err(RsomicsError::Io)?;
     Ok(Box::new(reader))
 }
 
-#[cfg(not(feature = "igzip-backend"))]
+#[cfg(not(target_os = "linux"))]
 fn build_decoder(path: &Path) -> Result<Box<dyn Read>> {
     use std::fs::File;
     use std::io::BufReader as StdBuf;

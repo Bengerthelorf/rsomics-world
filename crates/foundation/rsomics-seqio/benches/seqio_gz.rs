@@ -1,10 +1,6 @@
-// Criterion benchmark comparing available decompressor backends on a synthetic
-// .gz fixture.  Run with:
+// Criterion benchmark of the gz read path on a synthetic .gz fixture. The
+// backend is target-selected (ISA-L igzip on Linux, flate2 elsewhere):
 //   cargo bench -p rsomics-seqio --bench seqio_gz
-//   cargo bench -p rsomics-seqio --bench seqio_gz --features igzip
-//   cargo bench -p rsomics-seqio --bench seqio_gz --features zlib-ng
-//
-// Results inform the perfgate backend choice before publish.
 use std::io::Write;
 
 use criterion::{Criterion, criterion_group, criterion_main};
