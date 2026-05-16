@@ -50,10 +50,20 @@ repo_root=$(git rev-parse --show-toplevel); cd "$repo_root"
 
 work=$(mktemp -d /tmp/perfgate.XXXXXX)
 trap 'rm -rf "$work"' EXIT
-ln -s "$(cd "$(dirname "$FIXTURE")" && pwd)/$(basename "$FIXTURE")" "$work/fixture"
+# Preserve the full original extension in the symlink name. Upstreams
+# (fastp, samtools, bcftools) sniff compression by FILENAME EXTENSION,
+# not magic bytes: an extension-stripped `$work/fixture` makes fastp read
+# a .gz as plain text → it errors out in ~0.3 s, and the gate then
+# measures the upstream's crash time, not its real throughput. Our tools
+# content-detect, so only the upstream side was being silently corrupted.
+fix_b=$(basename "$FIXTURE"); fix_ext="${fix_b#*.}"
+FIX_NAME="fixture.$fix_ext"
+ln -s "$(cd "$(dirname "$FIXTURE")" && pwd)/$fix_b" "$work/$FIX_NAME"
 if [ -n "$FIXTURE2" ]; then
   [ -f "$FIXTURE2" ] || { echo "perfgate: fixture2 not found: $FIXTURE2" >&2; exit 2; }
-  ln -s "$(cd "$(dirname "$FIXTURE2")" && pwd)/$(basename "$FIXTURE2")" "$work/fixture2"
+  fix2_b=$(basename "$FIXTURE2"); fix2_ext="${fix2_b#*.}"
+  FIX2_NAME="fixture2.$fix2_ext"
+  ln -s "$(cd "$(dirname "$FIXTURE2")" && pwd)/$fix2_b" "$work/$FIX2_NAME"
 fi
 ln -s "$(cd "$(dirname "$OURS_BIN")" && pwd)/$(basename "$OURS_BIN")" "$work/ours"
 up_abs=$(command -v "$UP_BIN" || echo "$UP_BIN")
@@ -71,8 +81,9 @@ fix_size=$(wc -c < "$FIXTURE" | tr -d ' ')
 fix_sha=$(sha256 "$FIXTURE")
 up_ver_str=$([ -n "$UP_VER" ] && eval "$UP_VER" 2>&1 | head -1 || echo "n/a")
 
-# FIX2 before FIX (FIX is a prefix of FIX2).
-subst() { local s=$1; s=${s//FIX2/$work/fixture2}; s=${s//FIX/$work/fixture}; s=${s//OUT/$work/$2}; echo "$s"; }
+# FIX2 before FIX (FIX is a prefix of FIX2). Substituted paths keep the
+# original extension so extension-sniffing upstreams detect compression.
+subst() { local s=$1; s=${s//FIX2/$work/${FIX2_NAME:-fixture2}}; s=${s//FIX/$work/$FIX_NAME}; s=${s//OUT/$work/$2}; echo "$s"; }
 ours_args=$(subst "$OURS_ARGS" out.ours)
 up_args=$(subst "$UP_ARGS" out.up)
 
