@@ -1,7 +1,7 @@
 [package]
 name = "rsomics-pvalue-adjust"
-version = "0.1.0"
-description = "Multiple-testing correction for a column of p-values. BH FDR + Bonferroni; equivalent to R's p.adjust."
+version = "0.2.0"
+description = "Multiple-testing correction for a column of p-values — the full R p.adjust method set (holm/hochberg/hommel/BH/BY/bonferroni/none)."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
 rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
-rsomics-stats = { path = "../../../foundation/rsomics-stats", version = "0.1" }
+rsomics-stats = { path = "../../../foundation/rsomics-stats", version = "0.2" }
 clap = { workspace = true, features = ["derive"] }
 anyhow.workspace = true
 

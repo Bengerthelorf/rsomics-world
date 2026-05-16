@@ -1,7 +1,7 @@
 [package]
 name = "rsomics-fastq-umi"
-version = "0.1.0"
-description = "FASTQ inline-UMI extract + stamp. Rust port of fastp's UMI processing (read1/read2 location): move the 5' UMI into the read name. SE and PE."
+version = "0.2.0"
+description = "FASTQ inline-UMI extract + stamp. Rust port of fastp's UMI processing — full --umi_loc set (read1/read2/index1/index2/per_index/per_read): move the UMI into the read name. SE and PE."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

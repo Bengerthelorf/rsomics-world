@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-stats"
-version = "0.1.0"
+version = "0.2.0"
 description = "Statistical tests, FDR control, p-value combination for the rsomics-* tool family. Layer A primitive."
 edition.workspace = true
 rust-version.workspace = true
