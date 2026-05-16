@@ -34,9 +34,14 @@ w_absent_high=1`, `max_path_diff=15`, `max_heap=100`, `max_end_ext=5`):
   a best-first correction walk (a min-heap on the BFC weighted penalty),
   run forward then on the reverse complement; the two directional results
   are merged by BFC's agreement rule.
-- Reads with > 5 % ambiguous bases, no solid k-mer, an uncorrectable `N`,
-  or too many dead-ends are uncorrectable: passed through unchanged, or
-  dropped with `--discard-uncorrectable`.
+- A read with no solid k-mer is not given up on immediately: BFC's
+  greedy single-substitution probe (`bfc_ec_greedy_k`) scans successive
+  first-k-mers for one confidently-supported base fix and re-anchors on
+  success.
+- Reads with > 5 % ambiguous bases, an uncorrectable `N`, too many
+  dead-ends, or no solid k-mer even after the greedy probe are
+  uncorrectable: passed through unchanged, or dropped with
+  `--discard-uncorrectable`.
 - Corrected bases are lower-cased; with qualities, a corrected base's
   quality byte encodes the original base (BFC's `34 + ob` convention).
 

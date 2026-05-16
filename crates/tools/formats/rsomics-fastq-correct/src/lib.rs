@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use rayon::prelude::*;
-use rsomics_common::Result;
+use rsomics_common::{Result, RsomicsError};
 use rsomics_fqgz::ChunkedWriter;
 use rsomics_seqio::{OwnedRecord, open_fastq};
 use serde::Serialize;
@@ -100,6 +100,18 @@ impl BfcKmer {
         self.x[2] = (self.x[2] >> 1) | ((1u64 ^ (c & 1)) << (k - 1));
         self.x[3] = (self.x[3] >> 1) | ((1u64 ^ (c >> 1)) << (k - 1));
     }
+
+    /// BFC `bfc_kmer_change`: set base `d` (counted from the 3' end,
+    /// `0 ≤ d < k`) to `c` in-place on both the forward and RC planes.
+    #[inline]
+    fn change(&mut self, k: usize, d: usize, c: u64) {
+        let t = !(1u64 << d);
+        self.x[0] = ((c & 1) << d) | (self.x[0] & t);
+        self.x[1] = ((c >> 1) << d) | (self.x[1] & t);
+        let t = !(1u64 << (k - 1 - d));
+        self.x[2] = ((1u64 ^ (c & 1)) << (k - 1 - d)) | (self.x[2] & t);
+        self.x[3] = ((1u64 ^ (c >> 1)) << (k - 1 - d)) | (self.x[3] & t);
+    }
 }
 
 /// BFC `bfc_hash_64` — Thomas Wang's invertible integer hash, masked.
@@ -122,9 +134,13 @@ fn bfc_hash_64(mut key: u64, mask: u64) -> u64 {
 /// `bfc_ch` (the table's collision profile is the documented compat gap).
 #[inline]
 fn bfc_kmer_hash(k: usize, x: &[u64; 4]) -> u64 {
+    // BFC_MAX_KMER is 63; k is validated ≤ 63 at the Pipeline/CLI boundary
+    // (fail-loud there). The `<< k` below is only well-defined for k < 64,
+    // so assert the invariant rather than silently zeroing in release.
+    debug_assert!(k < 64, "k must be < 64 (BFC_MAX_KMER); got {k}");
     let t = k >> 1;
     let u = usize::from((x[1] >> t & 1) > (x[3] >> t & 1));
-    let mask = if k >= 64 { u64::MAX } else { (1u64 << k) - 1 };
+    let mask = (1u64 << k) - 1;
     let h0 = bfc_hash_64((x[u << 1].wrapping_add(x[(u << 1) | 1])) & mask, mask);
     let h1 = bfc_hash_64(h0 ^ x[(u << 1) | 1], mask);
     ((h0 ^ h1) << k) | ((h0.wrapping_add(h1)) & mask)
@@ -160,6 +176,25 @@ impl CountTable {
         if high_qual {
             e.hi = e.hi.saturating_add(1).min(0x3f);
         }
+    }
+
+    /// BFC `bfc_ch_hist` mode: the peak of the coverage histogram (the
+    /// genomic coverage), used by the greedy probe's confidence gate. The
+    /// peak is taken over `cov ≥ min_cov` so the error-noise spike at low
+    /// coverage does not dominate.
+    fn hist_mode(&self, min_cov: i32) -> i32 {
+        let mut hist = [0u64; 256];
+        for o in self.map.values() {
+            hist[o.cov as usize] += 1;
+        }
+        let (mut mode, mut best) = (0i32, 0u64);
+        for c in (min_cov.max(1) as usize)..256 {
+            if hist[c] > best {
+                best = hist[c];
+                mode = c as i32;
+            }
+        }
+        mode
     }
 }
 
@@ -279,6 +314,64 @@ fn best_island(k: usize, s: &[EcBase]) -> Option<(usize, usize)> {
         "best_island start<0: start={start} max_i={max_i} max={max} k={k} n={n}"
     );
     Some((start.max(0) as usize, max_i as usize))
+}
+
+/// BFC `bfc_ec_first_kmer`: scan from `start` for the first window of `k`
+/// consecutive non-N bases. Returns `(i, x)` where `i` is the index of the
+/// k-th base (the k-mer's 3' end), or `s.len()` if no such window exists.
+fn ec_first_kmer(k: usize, s: &[EcBase], start: usize) -> (usize, BfcKmer) {
+    let mut x = BfcKmer::NULL;
+    let mut l = 0usize;
+    let mut i = start;
+    while i < s.len() {
+        if s[i].b < 4 {
+            x.append(k, u64::from(s[i].b));
+            l += 1;
+            if l == k {
+                break;
+            }
+        } else {
+            l = 0;
+            x = BfcKmer::NULL;
+        }
+        i += 1;
+    }
+    (i, x)
+}
+
+/// BFC `bfc_ec_greedy_k`: try every single-base substitution of `x`; if
+/// exactly one alternative k-mer is strongly supported (best coverage
+/// `> mode/3` and second-best `< 3`), return `pos<<2 | base` (pos counted
+/// from the 3' end), else `-1`. Rescues reads with no solid island but one
+/// confident single error in the first clean k-mer window.
+fn bfc_ec_greedy_k(k: usize, mode: i32, x: &BfcKmer, ch: &CountTable) -> i32 {
+    let (mut max, mut max2, mut max_ec) = (0i32, 0i32, -1i32);
+    for i in 0..k {
+        let c = (x.x[1] >> i & 1) << 1 | (x.x[0] >> i & 1);
+        for j in 0u64..4 {
+            if j == c {
+                continue;
+            }
+            let mut y = *x;
+            y.change(k, i, j);
+            let ret = i32::from(ch.occ(&y).cov);
+            if ret == 0 {
+                continue;
+            }
+            if max < ret {
+                max2 = max;
+                max = ret;
+                max_ec = (i << 2 | j as usize) as i32;
+            } else if max2 < ret {
+                max2 = ret;
+            }
+        }
+    }
+    if max * 3 > mode && max2 < 3 {
+        max_ec
+    } else {
+        -1
+    }
 }
 
 // BFC `bfc_penalty_t` — four 1-bit penalty kinds + the chosen base; the
@@ -482,15 +575,16 @@ fn ec1dir(
                 stop = true;
             }
         }
-        if stop {
-            if z.k >= 0 {
-                let tp = stack[z.k as usize].tot_pen;
-                if tp < min_path_pen {
-                    min_path_pen = tp;
-                    min_path = n_paths as i64;
-                }
-                path[n_paths] = z.k;
+        // Only a node with a real stack index is a valid terminating path;
+        // BFC's path[] never holds the seed's -1 (the seed always extends
+        // before any stop), so a degenerate z.k<0 stop is not a path.
+        if stop && z.k >= 0 {
+            let tp = stack[z.k as usize].tot_pen;
+            if tp < min_path_pen {
+                min_path_pen = tp;
+                min_path = n_paths as i64;
             }
+            path[n_paths] = z.k;
             n_paths += 1;
             if n_paths == MAX_PATHS {
                 break;
@@ -629,7 +723,38 @@ fn correct_one(
         return None;
     }
     ec_kcov(cfg.k, cfg.min_cov, &mut s, ch);
-    let (start, end) = best_island(cfg.k, &s)?;
+    // BFC `bfc_ec1`: with a solid island, anchor there. Without one, try
+    // the greedy single-substitution probe over successive first-k-mers;
+    // on success apply that one base fix and re-anchor, else NO_SOLID.
+    let (start, end) = if let Some(se) = best_island(cfg.k, &s) {
+        se
+    } else {
+        let mode = ch.hist_mode(cfg.min_cov);
+        let mut bstart = 0usize;
+        let mut ec = -1i32;
+        let mut bend;
+        loop {
+            let (e, x) = ec_first_kmer(cfg.k, &s, bstart);
+            bend = e;
+            if bend >= n {
+                break;
+            }
+            ec = bfc_ec_greedy_k(cfg.k, mode, &x, ch);
+            if ec >= 0 {
+                break;
+            }
+            if bend + (cfg.k >> 1) >= n {
+                break;
+            }
+            bstart = bend - (cfg.k >> 1);
+        }
+        if ec < 0 {
+            return None;
+        }
+        s[bend - (ec as usize >> 2)].b = (ec & 3) as u8;
+        let ne = bend + 1;
+        (ne - cfg.k, ne)
+    };
 
     let mut ec0 = Vec::new();
     if ec1dir(cfg, ch, &s, &mut ec0, start, n) < 0 {
@@ -754,6 +879,12 @@ impl<'cfg> Pipeline<'cfg> {
     /// Propagates FASTQ read / write errors; never silently drops a record
     /// for an IO reason (only BFC's defined uncorrectable/policy drops).
     pub fn run(&self, input: &Path, output: &Path) -> Result<CorrectReport> {
+        if self.cfg.k < 11 || self.cfg.k > 63 || self.cfg.k.is_multiple_of(2) {
+            return Err(RsomicsError::ConfigError(format!(
+                "k must be odd and in 11..=63 (BFC_MAX_KMER 63), got {}",
+                self.cfg.k
+            )));
+        }
         let ch = build_table(&[input], self.cfg)?;
         let mut reader = open_fastq(input)?;
         let mut w = ChunkedWriter::create(output, self.compression)?;
@@ -913,5 +1044,53 @@ mod tests {
             "a clean read must stay uppercase (no corrections): {:?}",
             String::from_utf8_lossy(&out)
         );
+    }
+
+    /// BFC `bfc_ec_greedy_k` rescue: with exactly one strongly-supported
+    /// single substitution of the probed k-mer (best `> mode/3`, 2nd `< 3`)
+    /// it returns `pos<<2 | base`; with no confident alternative, `-1`.
+    #[test]
+    fn greedy_rescue_picks_the_one_supported_substitution() {
+        let k = 11;
+        let truth = b"ACGTCAGTTGA"; // exactly k bases
+        let mut ch = CountTable {
+            k,
+            map: HashMap::new(),
+        };
+        // Heavily cover the truth k-mer; nothing else seen.
+        let mut tx = BfcKmer::NULL;
+        for &b in truth {
+            tx.append(k, u64::from(SEQ_NT4[b as usize]));
+        }
+        for _ in 0..20 {
+            ch.add(&tx, true);
+        }
+        // Probe the truth k-mer with its 3'-most base corrupted A→T (truth
+        // ends in 'A'=0; corrupt to 'T'=3 at pos k-1, i.e. bit 0 / d=0).
+        // greedy must propose restoring it to the truth base 'A'.
+        let mut corrupt = BfcKmer::NULL;
+        for (i, &b) in truth.iter().enumerate() {
+            let base = if i == k - 1 {
+                3
+            } else {
+                u64::from(SEQ_NT4[b as usize])
+            };
+            corrupt.append(k, base);
+        }
+        let mode = ch.hist_mode(3);
+        let ec = bfc_ec_greedy_k(k, mode, &corrupt, &ch);
+        assert!(ec >= 0, "a confident single fix must be found");
+        assert_eq!(ec >> 2, 0, "the corrupted base is the 3'-most (d=0)");
+        assert_eq!(
+            (ec & 3) as u8,
+            SEQ_NT4[b'A' as usize],
+            "restored base must be the truth base A"
+        );
+        // An empty table → no confident alternative → -1.
+        let empty = CountTable {
+            k,
+            map: HashMap::new(),
+        };
+        assert_eq!(bfc_ec_greedy_k(k, 0, &corrupt, &empty), -1);
     }
 }
