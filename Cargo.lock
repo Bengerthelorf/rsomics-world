@@ -1025,16 +1025,16 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fasta-stats"
-version = "0.4.3"
+version = "0.4.4"
 dependencies = [
  "anyhow",
- "bytecount",
  "clap",
  "criterion",
  "memchr",
  "needletail",
  "rsomics-common",
  "rsomics-help",
+ "rsomics-seqstats",
  "serde",
  "serde_json",
  "tempfile",
@@ -1273,6 +1273,14 @@ dependencies = [
  "rsomics-common",
  "rsomics-igzip",
  "tempfile",
+]
+
+[[package]]
+name = "rsomics-seqstats"
+version = "0.1.0"
+dependencies = [
+ "bytecount",
+ "serde",
 ]
 
 [[package]]

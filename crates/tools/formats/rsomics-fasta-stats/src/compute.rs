@@ -6,7 +6,10 @@ use std::path::Path;
 
 use needletail::parse_fastx_file;
 use rsomics_common::{Result, RsomicsError};
+use rsomics_seqstats::{LengthStats, classify, count_any_of};
 use serde::Serialize;
+
+pub use rsomics_seqstats::SeqType;
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -19,30 +22,6 @@ impl Default for Config {
         Self {
             extended: false,
             gap_letters: b"- .".to_vec(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub enum SeqType {
-    #[serde(rename = "DNA")]
-    Dna,
-    #[serde(rename = "RNA")]
-    Rna,
-    #[serde(rename = "Protein")]
-    Protein,
-    #[serde(rename = "Other")]
-    Other,
-}
-
-impl SeqType {
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Dna => "DNA",
-            Self::Rna => "RNA",
-            Self::Protein => "Protein",
-            Self::Other => "Other",
         }
     }
 }
@@ -88,8 +67,6 @@ pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
     let mut reader = parse_fastx_file(path)
         .map_err(|e| RsomicsError::InvalidInput(format!("opening {}: {e}", path.display())))?;
 
-    // bytecount SIMD (4-pass) beats scalar single-pass: NEON/AVX2 recoups
-    // bandwidth cost. (M2: scalar LUT 83 ms vs 53 ms on chr22 fixture.)
     let mut lengths: Vec<u64> = Vec::new();
     let mut num_seqs: u64 = 0;
     let mut sum_len: u64 = 0;
@@ -202,186 +179,6 @@ fn extend(
     }
 }
 
-fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
-    let mut seen = [false; 256];
-    let mut total: u64 = 0;
-    for &n in needles {
-        if seen[n as usize] {
-            continue;
-        }
-        seen[n as usize] = true;
-        total += bytecount::count(haystack, n) as u64;
-    }
-    total
-}
-
-// Port of bio/util/length-stats.go. seqkit's L50 counts unique-length buckets,
-// not records — reproduced so `--tabular --all` agrees with seqkit.
-struct LengthStats {
-    counts: Vec<(u64, u64)>,
-    sum: u64,
-    count: u64,
-}
-
-impl LengthStats {
-    fn new(mut lengths: Vec<u64>) -> Self {
-        let sum: u64 = lengths.iter().sum();
-        let count = lengths.len() as u64;
-        lengths.sort_unstable();
-        let mut counts: Vec<(u64, u64)> = Vec::new();
-        let mut acc: u64 = 0;
-        let mut i = 0;
-        while i < lengths.len() {
-            let v = lengths[i];
-            let mut j = i;
-            while j < lengths.len() && lengths[j] == v {
-                j += 1;
-            }
-            acc += (j - i) as u64;
-            counts.push((v, acc));
-            i = j;
-        }
-        Self { counts, sum, count }
-    }
-
-    fn get_value(&self, even: bool, i_med_l: u64, i_med_r: u64) -> f64 {
-        let mut flag = false;
-        let mut prev: u64 = 0;
-        for &(len, acc) in &self.counts {
-            if flag {
-                return (len + prev) as f64 / 2.0;
-            }
-            if acc > i_med_l {
-                if even {
-                    if acc > i_med_r {
-                        return len as f64;
-                    }
-                    flag = true;
-                    prev = len;
-                } else {
-                    return len as f64;
-                }
-            }
-        }
-        // Callers pass i_med_l < self.count, so the last bucket's acc always
-        // terminates the loop. Reaching here means a caller broke the invariant.
-        unreachable!(
-            "LengthStats::get_value: i_med_l={i_med_l} not bracketed in counts (count={}, flag={flag}, prev={prev})",
-            self.count
-        )
-    }
-
-    fn q2(&self) -> f64 {
-        if self.counts.is_empty() {
-            return 0.0;
-        }
-        if self.counts.len() == 1 {
-            return self.counts[0].0 as f64;
-        }
-        let even = self.count & 1 == 0;
-        if even {
-            let l = self.count / 2 - 1;
-            let r = self.count / 2;
-            self.get_value(true, l, r)
-        } else {
-            self.get_value(false, self.count / 2, 0)
-        }
-    }
-
-    fn q1(&self) -> f64 {
-        if self.counts.is_empty() {
-            return 0.0;
-        }
-        if self.counts.len() == 1 {
-            return self.counts[0].0 as f64;
-        }
-        let parent_even = self.count & 1 == 0;
-        let n = if parent_even {
-            self.count / 2
-        } else {
-            self.count.div_ceil(2)
-        };
-        let even = n & 1 == 0;
-        if even {
-            self.get_value(true, n / 2 - 1, n / 2)
-        } else {
-            self.get_value(false, n / 2, 0)
-        }
-    }
-
-    fn q3(&self) -> f64 {
-        if self.counts.is_empty() {
-            return 0.0;
-        }
-        if self.counts.len() == 1 {
-            return self.counts[0].0 as f64;
-        }
-        let parent_even = self.count & 1 == 0;
-        let (n, mean) = if parent_even {
-            (self.count / 2, self.count / 2)
-        } else {
-            (self.count.div_ceil(2), self.count / 2)
-        };
-        let even = n & 1 == 0;
-        if even {
-            self.get_value(true, n / 2 - 1 + mean, n / 2 + mean)
-        } else {
-            self.get_value(false, n / 2 + mean, 0)
-        }
-    }
-
-    fn n50_l50(&self) -> (u64, u64) {
-        if self.counts.is_empty() {
-            return (0, 0);
-        }
-        if self.counts.len() == 1 {
-            return (self.counts[0].0, 1);
-        }
-        let half = self.sum as f64 / 2.0;
-        let mut sum_len: f64 = 0.0;
-        let n = self.counts.len();
-        for i in (0..n).rev() {
-            let (len, acc) = self.counts[i];
-            let prev_acc = if i == 0 { 0 } else { self.counts[i - 1].1 };
-            let per_len_count = acc - prev_acc;
-            sum_len += (len * per_len_count) as f64;
-            if sum_len >= half {
-                return (len, (n - i) as u64);
-            }
-        }
-        (0, 0)
-    }
-}
-
-fn classify(sample: &[u8]) -> SeqType {
-    if sample.is_empty() {
-        return SeqType::Other;
-    }
-    let mut has_t = false;
-    let mut has_u = false;
-    let mut has_protein_only = false;
-    for &b in sample {
-        let c = b.to_ascii_uppercase();
-        match c {
-            b'T' => has_t = true,
-            b'U' => has_u = true,
-            b'E' | b'F' | b'I' | b'L' | b'P' | b'Q' | b'Z' | b'X' | b'*' => {
-                has_protein_only = true;
-            }
-            b'A' | b'C' | b'G' | b'N' | b'-' | b'.' | b' ' | b'\n' | b'\r' | b'R' | b'Y' | b'S'
-            | b'W' | b'K' | b'M' | b'B' | b'D' | b'H' | b'V' => {}
-            _ => return SeqType::Other,
-        }
-    }
-    if has_protein_only {
-        SeqType::Protein
-    } else if has_u && !has_t {
-        SeqType::Rna
-    } else {
-        SeqType::Dna
-    }
-}
-
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
@@ -441,22 +238,6 @@ mod tests {
         let e = s.extended.expect("--all");
         assert_eq!(e.n50, 6);
         assert_eq!(e.l50, 2);
-    }
-
-    #[test]
-    fn quartiles_three_contigs_match_seqkit() {
-        let ls = LengthStats::new(vec![4, 6, 8]);
-        assert_eq!(ls.q1(), 5.0);
-        assert_eq!(ls.q2(), 6.0);
-        assert_eq!(ls.q3(), 7.0);
-    }
-
-    #[test]
-    fn quartiles_one_to_nine_match_seqkit() {
-        let ls = LengthStats::new((1u64..=9).collect());
-        assert_eq!(ls.q1(), 3.0);
-        assert_eq!(ls.q2(), 5.0);
-        assert_eq!(ls.q3(), 7.0);
     }
 
     #[test]
