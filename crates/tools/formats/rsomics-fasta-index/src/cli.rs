@@ -55,9 +55,7 @@ impl Cli {
             }
             Cmd::Fetch { input, regions } => {
                 if regions.is_empty() {
-                    return Err(RsomicsError::InvalidInput(
-                        "no region specified".into(),
-                    ));
+                    return Err(RsomicsError::InvalidInput("no region specified".into()));
                 }
                 let fai_path = input.with_extension(format!(
                     "{}.fai",
@@ -86,10 +84,7 @@ pub static HELP: HelpSpec = HelpSpec {
         our_license: "MIT OR Apache-2.0",
         paper_doi: Some("10.1093/bioinformatics/btp352"),
     }),
-    usage_lines: &[
-        "index <FASTA>",
-        "fetch <FASTA> <REGION>...",
-    ],
+    usage_lines: &["index <FASTA>", "fetch <FASTA> <REGION>..."],
     sections: &[Section {
         title: "SUBCOMMANDS",
         flags: &[
