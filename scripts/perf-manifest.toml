@@ -170,6 +170,12 @@ upstream_version = "fastqc --version"
 # single-thread both sides; bbduk.sh JVM heap bounded to 1g so it does not
 # auto-grab runner RAM (the bfc -s lesson). Random fixture ⇒ ~no matches,
 # so both emit all reads — the timed work is the identical k-mer scan.
+# BAM tools: mkfixture.py doesn't generate BAM yet; perfgate deferred
+# until a BAM fixture generator lands. Covered by in-crate criterion
+# bench against samtools on Tier-1 golden BAM.
+[exempt.rsomics-bam-flagstat]
+reason = "No BAM fixture generator in mkfixture.py yet. Covered by criterion bench + compat test vs samtools. Perfgate will activate when the BAM fixture generator lands."
+
 [spec.rsomics-bbduk]
 fixture          = "fastq:1000000:150"
 ours_args        = "-t 1 --literal AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT"
