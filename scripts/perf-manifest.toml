@@ -176,6 +176,9 @@ upstream_version = "fastqc --version"
 [exempt.rsomics-bam-flagstat]
 reason = "No BAM fixture generator in mkfixture.py yet. Covered by criterion bench + compat test vs samtools. Perfgate will activate when the BAM fixture generator lands."
 
+[exempt.rsomics-bam-idxstats]
+reason = "Reads BAI index metadata only (no full-BAM scan). Runtime is dominated by index read + header parse (~instant for any file); perfgate timing would measure noise. Covered by compat test vs samtools."
+
 [spec.rsomics-bbduk]
 fixture          = "fastq:1000000:150"
 ours_args        = "-t 1 --literal AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT"
