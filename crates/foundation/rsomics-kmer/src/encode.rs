@@ -4,7 +4,7 @@ pub type Kmer = u64;
 
 const MAX_K: usize = 32;
 
-const fn base_bits(b: u8) -> Option<u64> {
+pub const fn base_bits(b: u8) -> Option<u64> {
     match b {
         b'A' | b'a' => Some(0b00),
         b'C' | b'c' => Some(0b01),

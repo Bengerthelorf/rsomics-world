@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use rsomics_kmer::{encode, reverse_complement};
+use rsomics_kmer::{RollingKmers, encode, reverse_complement};
 
 // k ≤ 31: reverse_complement does 1u64 << (2*k), UB at k=32; BBDuk's own default is 27
 pub const MAX_K: usize = 31;
@@ -196,14 +196,13 @@ impl RefKmers {
         self.full.is_empty()
     }
 
-    // N-bearing k-mers don't encode → counted as non-matching, as in BBDuk
     #[must_use]
     pub fn hits(&self, seq: &[u8]) -> usize {
         if seq.len() < self.k {
             return 0;
         }
-        seq.windows(self.k)
-            .filter_map(|w| encode(w).ok())
+        RollingKmers::new(seq, self.k)
+            .flatten()
             .filter(|&c| self.full.contains(&self.key(c)))
             .count()
     }
@@ -213,8 +212,9 @@ impl RefKmers {
         if seq.len() < self.k {
             return None;
         }
-        seq.windows(self.k)
-            .position(|w| encode(w).is_ok_and(|c| self.full.contains(&self.key(c))))
+        RollingKmers::new(seq, self.k)
+            .enumerate()
+            .find_map(|(i, opt)| opt.filter(|&c| self.full.contains(&self.key(c))).map(|_| i))
     }
 
     // ktrim=r cut: full-k-mer hit, else (mink>0) start of the longest ref-matching 3' tip — BBDuk never trims an internal short k-mer

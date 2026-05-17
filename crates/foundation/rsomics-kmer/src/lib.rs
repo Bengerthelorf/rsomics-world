@@ -9,11 +9,13 @@ pub mod count;
 pub mod encode;
 pub mod hash;
 pub mod iter;
+pub mod roll;
 
 pub use count::KmerCounts;
-pub use encode::{Kmer, canonical, decode, encode, reverse_complement};
+pub use encode::{Kmer, base_bits, canonical, decode, encode, reverse_complement};
 pub use hash::{murmur3_x64_128, nthash_iter, nthash_one};
 pub use iter::KmerIter;
+pub use roll::RollingKmers;
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
