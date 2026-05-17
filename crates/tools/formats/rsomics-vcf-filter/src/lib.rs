@@ -49,11 +49,10 @@ pub fn filter_vcf(
         stats.total += 1;
 
         if let Some(min_q) = cfg.min_qual {
-            let dominated = record
+            if record
                 .quality_score()
-                .map(|r| r.map_or(false, |q| q < min_q))
-                .unwrap_or(false);
-            if dominated {
+                .is_some_and(|r| r.is_ok_and(|q| q < min_q))
+            {
                 continue;
             }
         }
