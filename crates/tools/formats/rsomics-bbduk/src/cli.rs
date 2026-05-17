@@ -1,11 +1,12 @@
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
 use needletail::parse_fastx_file;
+use rayon::prelude::*;
 use rsomics_common::{CommonFlags, Result, RsomicsError, ToolMeta};
+use rsomics_fqgz::ChunkedWriter;
 use rsomics_help::{Example, FlagSpec, HelpSpec, Origin, Section};
+use rsomics_seqio::{OwnedRecord, open_fastq};
 
 use rsomics_bbduk::{Config, KTrim, MAX_HDIST, MAX_K, QTrim, RefKmers, process};
 
@@ -106,15 +107,7 @@ fn parse_qtrim(s: &str) -> Result<QTrim> {
     }
 }
 
-fn writer(path: &str) -> Result<Box<dyn Write>> {
-    if path == "-" {
-        Ok(Box::new(BufWriter::new(io::stdout().lock())))
-    } else {
-        Ok(Box::new(BufWriter::new(
-            File::create(path).map_err(RsomicsError::Io)?,
-        )))
-    }
-}
+const CHUNK_RECORDS: usize = 8192;
 
 impl Cli {
     fn config(&self) -> Result<Config> {
@@ -177,7 +170,6 @@ impl Cli {
     pub fn execute(&self) -> Result<()> {
         let cfg = self.config()?;
         let ref_seqs = self.load_refs()?;
-        // --ktrim r|l with no reference is a user mistake — fail loud; kfilter with no ref is a BBDuk-faithful no-op (quality-trim-only) and is allowed
         if cfg.ktrim != KTrim::None && ref_seqs.is_empty() {
             return Err(RsomicsError::InvalidInput(
                 "--ktrim r|l needs a reference: pass --ref FILE and/or --literal SEQ".into(),
@@ -191,90 +183,125 @@ impl Cli {
             ));
         }
 
-        let mut r1 = parse_fastx_file(&self.in1).map_err(|e| {
-            RsomicsError::InvalidInput(format!("opening {}: {e}", self.in1.display()))
-        })?;
-        let mut w1 = writer(&self.out1)?;
-        let mut wm = self.outm.as_deref().map(writer).transpose()?;
+        let threads = self.common.threads.unwrap_or(0);
+        if threads > 0 {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build_global()
+                .ok();
+        }
 
         if let Some(in2) = &self.in2 {
-            let mut r2 = parse_fastx_file(in2).map_err(|e| {
-                RsomicsError::InvalidInput(format!("opening {}: {e}", in2.display()))
-            })?;
-            let mut w2 = writer(self.out2.as_deref().expect("paired ⇒ out2 set"))?;
-            loop {
-                match (r1.next(), r2.next()) {
-                    (Some(a), Some(b)) => {
-                        let a = a.map_err(|e| {
-                            RsomicsError::InvalidInput(format!("{}: {e}", self.in1.display()))
-                        })?;
-                        let b = b.map_err(|e| {
-                            RsomicsError::InvalidInput(format!("{}: {e}", in2.display()))
-                        })?;
-                        let q1 = a.qual().ok_or_else(|| no_qual(&self.in1))?;
-                        let q2 = b.qual().ok_or_else(|| no_qual(in2))?;
-                        let (s1, s2) = (a.raw_seq(), b.raw_seq());
-                        // BBDuk removeifeitherbad=t: a pair is kept/dropped as a unit.
-                        match (process(s1, q1, &refs, &cfg), process(s2, q2, &refs, &cfg)) {
-                            (Some(t1), Some(t2)) => {
-                                write_fq(&mut w1, a.id(), &s1[t1.0..t1.1], &q1[t1.0..t1.1])?;
-                                write_fq(&mut w2, b.id(), &s2[t2.0..t2.1], &q2[t2.0..t2.1])?;
-                            }
-                            _ => {
-                                if let Some(wm) = wm.as_mut() {
-                                    write_fq(wm, a.id(), s1, q1)?;
-                                    write_fq(wm, b.id(), s2, q2)?;
-                                }
+            self.run_pe(&refs, &cfg, in2)?;
+        } else {
+            self.run_se(&refs, &cfg)?;
+        }
+        Ok(())
+    }
+
+    fn run_se(&self, refs: &RefKmers, cfg: &Config) -> Result<()> {
+        let mut reader = open_fastq(&self.in1)?;
+        let mut w1 = ChunkedWriter::create(&self.out1, 4)?;
+        let mut wm = self.outm.as_ref().map(|p| ChunkedWriter::create(p, 4)).transpose()?;
+        let has_outm = wm.is_some();
+
+        let mut chunk: Vec<OwnedRecord> = Vec::with_capacity(CHUNK_RECORDS);
+        let mut done = false;
+
+        while !done {
+            chunk.clear();
+            while chunk.len() < CHUNK_RECORDS {
+                match reader.next() {
+                    Some(rec) => chunk.push(rec?),
+                    None => { done = true; break; }
+                }
+            }
+            if chunk.is_empty() { break; }
+
+            // Each result: (trimmed_or_none, original_if_outm_needed)
+            let results: Vec<(Option<OwnedRecord>, Option<OwnedRecord>)> = chunk
+                .par_drain(..)
+                .map(|rec| {
+                    match process(&rec.seq, &rec.qual, refs, cfg) {
+                        Some((s, e)) => (Some(OwnedRecord {
+                            id: rec.id,
+                            seq: rec.seq[s..e].to_vec(),
+                            qual: rec.qual[s..e].to_vec(),
+                        }), None),
+                        None => {
+                            if has_outm {
+                                (None, Some(rec))
+                            } else {
+                                (None, None)
                             }
                         }
                     }
-                    (None, None) => break,
-                    _ => {
-                        return Err(RsomicsError::InvalidInput(
-                            "in1 and in2 have different read counts (not properly paired)".into(),
-                        ));
-                    }
-                }
-            }
-            w2.flush().map_err(RsomicsError::Io)?;
-        } else {
-            while let Some(rec) = r1.next() {
-                let rec = rec.map_err(|e| {
-                    RsomicsError::InvalidInput(format!("{}: {e}", self.in1.display()))
-                })?;
-                let q = rec.qual().ok_or_else(|| no_qual(&self.in1))?;
-                let s = rec.raw_seq();
-                if let Some((a, e)) = process(s, q, &refs, &cfg) {
-                    write_fq(&mut w1, rec.id(), &s[a..e], &q[a..e])?;
-                } else if let Some(wm) = wm.as_mut() {
-                    write_fq(wm, rec.id(), s, q)?;
-                }
-            }
-        }
+                })
+                .collect();
 
-        if let Some(mut wm) = wm {
-            wm.flush().map_err(RsomicsError::Io)?;
+            for (pass, fail) in results {
+                if let Some(rec) = pass {
+                    w1.write_record(&rec.id, &rec.seq, &rec.qual)?;
+                } else if let (Some(rec), Some(wm)) = (fail, wm.as_mut()) {
+                    wm.write_record(&rec.id, &rec.seq, &rec.qual)?;
+                }
+            }
         }
-        w1.flush().map_err(RsomicsError::Io)
+        w1.finalize()?;
+        if let Some(wm) = wm { wm.finalize()?; }
+        Ok(())
+    }
+
+    fn run_pe(&self, refs: &RefKmers, cfg: &Config, in2: &PathBuf) -> Result<()> {
+        let mut r1 = open_fastq(&self.in1)?;
+        let mut r2 = open_fastq(in2)?;
+        let out2 = self.out2.as_ref().expect("paired ⇒ out2 set");
+        let mut w1 = ChunkedWriter::create(&self.out1, 4)?;
+        let mut w2 = ChunkedWriter::create(out2, 4)?;
+
+        let mut chunk: Vec<(OwnedRecord, OwnedRecord)> = Vec::with_capacity(CHUNK_RECORDS);
+        let mut done = false;
+
+        while !done {
+            chunk.clear();
+            while chunk.len() < CHUNK_RECORDS {
+                match (r1.next(), r2.next()) {
+                    (Some(a), Some(b)) => chunk.push((a?, b?)),
+                    (None, None) => { done = true; break; }
+                    _ => return Err(RsomicsError::InvalidInput(
+                        "in1 and in2 have different read counts (not properly paired)".into(),
+                    )),
+                }
+            }
+            if chunk.is_empty() { break; }
+
+            // BBDuk removeifeitherbad=t: pair kept/dropped as unit
+            let results: Vec<Option<(OwnedRecord, OwnedRecord)>> = chunk
+                .par_drain(..)
+                .map(|(a, b)| {
+                    match (process(&a.seq, &a.qual, refs, cfg), process(&b.seq, &b.qual, refs, cfg)) {
+                        (Some(t1), Some(t2)) => Some((
+                            OwnedRecord { id: a.id, seq: a.seq[t1.0..t1.1].to_vec(), qual: a.qual[t1.0..t1.1].to_vec() },
+                            OwnedRecord { id: b.id, seq: b.seq[t2.0..t2.1].to_vec(), qual: b.qual[t2.0..t2.1].to_vec() },
+                        )),
+                        _ => None,
+                    }
+                })
+                .collect();
+
+            for opt in results {
+                if let Some((a, b)) = opt {
+                    w1.write_record(&a.id, &a.seq, &a.qual)?;
+                    w2.write_record(&b.id, &b.seq, &b.qual)?;
+                }
+            }
+        }
+        w1.finalize()?;
+        w2.finalize()?;
+        Ok(())
     }
 }
 
-fn no_qual(path: &std::path::Path) -> RsomicsError {
-    RsomicsError::InvalidInput(format!(
-        "{}: a record has no quality — not FASTQ",
-        path.display()
-    ))
-}
-
-fn write_fq(w: &mut dyn Write, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
-    w.write_all(b"@").map_err(RsomicsError::Io)?;
-    w.write_all(id).map_err(RsomicsError::Io)?;
-    w.write_all(b"\n").map_err(RsomicsError::Io)?;
-    w.write_all(seq).map_err(RsomicsError::Io)?;
-    w.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
-    w.write_all(qual).map_err(RsomicsError::Io)?;
-    w.write_all(b"\n").map_err(RsomicsError::Io)
-}
 
 pub const HELP: HelpSpec = HelpSpec {
     name: META.name,
