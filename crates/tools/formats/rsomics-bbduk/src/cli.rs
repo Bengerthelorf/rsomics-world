@@ -203,34 +203,78 @@ impl Cli {
     }
 
     fn run_se_serial(&self, refs: &RefKmers, cfg: &Config) -> Result<()> {
-        use std::io::{BufWriter, Write};
+        use std::fs::File;
+        use std::io::{BufRead, BufReader, BufWriter, Write};
 
-        let mut reader = open_fastq(&self.in1)?;
+        let file = File::open(&self.in1)
+            .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", self.in1.display())))?;
+        let mut rdr = BufReader::with_capacity(256 * 1024, file);
 
-        if self.out1 == "-" {
-            let mut out = BufWriter::new(std::io::stdout().lock());
-            for rec in reader.by_ref() {
-                let rec = rec?;
-                if let Some((s, e)) = process(&rec.seq, &rec.qual, refs, cfg) {
-                    out.write_all(b"@").map_err(RsomicsError::Io)?;
-                    out.write_all(&rec.id).map_err(RsomicsError::Io)?;
-                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
-                    out.write_all(&rec.seq[s..e]).map_err(RsomicsError::Io)?;
-                    out.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
-                    out.write_all(&rec.qual[s..e]).map_err(RsomicsError::Io)?;
-                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
-                }
-            }
-            out.flush().map_err(RsomicsError::Io)?;
+        let stdout_mode = self.out1 == "-";
+        let mut stdout_out =
+            stdout_mode.then(|| BufWriter::with_capacity(256 * 1024, std::io::stdout().lock()));
+        let mut file_out = if stdout_mode {
+            None
         } else {
-            let mut w = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
-            for rec in reader.by_ref() {
-                let rec = rec?;
-                if let Some((s, e)) = process(&rec.seq, &rec.qual, refs, cfg) {
-                    w.write_record(&rec.id, &rec.seq[s..e], &rec.qual[s..e])?;
+            Some(BufWriter::with_capacity(
+                256 * 1024,
+                File::create(&self.out1).map_err(RsomicsError::Io)?,
+            ))
+        };
+
+        let mut hdr = Vec::with_capacity(256);
+        let mut seq = Vec::with_capacity(256);
+        let mut sep = Vec::with_capacity(8);
+        let mut qual = Vec::with_capacity(256);
+
+        loop {
+            hdr.clear();
+            if rdr.read_until(b'\n', &mut hdr).map_err(RsomicsError::Io)? == 0 {
+                break;
+            }
+            seq.clear();
+            rdr.read_until(b'\n', &mut seq).map_err(RsomicsError::Io)?;
+            sep.clear();
+            rdr.read_until(b'\n', &mut sep).map_err(RsomicsError::Io)?;
+            qual.clear();
+            rdr.read_until(b'\n', &mut qual).map_err(RsomicsError::Io)?;
+
+            // trim trailing \n (and \r\n)
+            trim_nl(&mut hdr);
+            trim_nl(&mut seq);
+            trim_nl(&mut qual);
+
+            let id = if hdr.first() == Some(&b'@') {
+                &hdr[1..]
+            } else {
+                &hdr[..]
+            };
+
+            if let Some((s, e)) = process(&seq, &qual, refs, cfg) {
+                if let Some(out) = stdout_out.as_mut() {
+                    out.write_all(b"@").map_err(RsomicsError::Io)?;
+                    out.write_all(id).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&seq[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&qual[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                } else if let Some(out) = file_out.as_mut() {
+                    out.write_all(b"@").map_err(RsomicsError::Io)?;
+                    out.write_all(id).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&seq[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&qual[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
                 }
             }
-            w.finalize()?;
+        }
+        if let Some(out) = stdout_out.as_mut() {
+            out.flush().map_err(RsomicsError::Io)?;
+        }
+        if let Some(out) = file_out.as_mut() {
+            out.flush().map_err(RsomicsError::Io)?;
         }
         Ok(())
     }
@@ -391,6 +435,16 @@ impl Cli {
         w1.finalize()?;
         w2.finalize()?;
         Ok(())
+    }
+}
+
+#[inline]
+fn trim_nl(buf: &mut Vec<u8>) {
+    if buf.last() == Some(&b'\n') {
+        buf.pop();
+    }
+    if buf.last() == Some(&b'\r') {
+        buf.pop();
     }
 }
 
