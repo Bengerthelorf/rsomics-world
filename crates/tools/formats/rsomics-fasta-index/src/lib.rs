@@ -94,7 +94,6 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
 
         if line_buf.starts_with('>') {
             let name = line_buf[1..]
-                .trim_end()
                 .split_whitespace()
                 .next()
                 .unwrap_or("")
