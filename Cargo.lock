@@ -1168,6 +1168,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsomics-fastqc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "criterion",
+ "needletail",
+ "rsomics-common",
+ "rsomics-help",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "rsomics-fm-index"
 version = "0.1.0"
 dependencies = [
