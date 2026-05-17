@@ -5,15 +5,19 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Per sequence GC content" — distribution of per-read GC% (0..=100)
-/// against a theoretical normal centered on the *observed modal* GC. WARN if
-/// the summed absolute deviation from that normal exceeds 15% of reads,
-/// FAIL if it exceeds 30% (clean-room `FastQC` contract).
+/// `FastQC` "Per sequence GC content" — the per-read GC% distribution
+/// (0..=100) compared to a theoretical normal fitted to the observed data.
+/// WARN if the deviation from that normal exceeds 15% of reads, FAIL if it
+/// exceeds 30% (clean-room `FastQC` contract).
 ///
-/// `FastQC` derives the reference curve from the observed data (modal GC as
-/// the mean); the exact curve shape is calibrated against the `FastQC` binary
-/// at the black-box compat step. The pass/warn/fail decision (the summed
-/// deviation thresholds) is implemented per the documented contract here.
+/// The reference is a normal with the observed mean and standard deviation,
+/// evaluated on the discrete 0..=100 GC% support and renormalised so it
+/// sums to the read total. Comparing like-with-like (both distributions
+/// over the same discrete support, same total) is what makes a clean
+/// unimodal library deviate ≈0 (PASS) while a bimodal/contaminated library
+/// deviates sharply. The deviation is the total-variation distance
+/// `Σ|obs−theo| / 2 / total` ∈ [0,1] — the fraction of reads that would
+/// have to move to turn the observed distribution into the reference.
 pub struct PerSeqGc {
     /// Observed read count per integer GC% bucket, 0..=100.
     obs: [u64; 101],
@@ -29,26 +33,45 @@ impl PerSeqGc {
         }
     }
 
-    /// Theoretical read count per GC% bucket: a normal centered on the
-    /// observed mode with the observed standard deviation, scaled to the
-    /// read total.
+    /// Reference read count per GC% bucket: a normal with the observed mean
+    /// and SD over the discrete 0..=100 support, renormalised so the total
+    /// equals the read count. A zero-variance library (every read the same
+    /// GC%) collapses to a single spike at that bucket.
     fn theoretical(&self) -> [f64; 101] {
         let mut theo = [0.0_f64; 101];
         if self.total == 0 {
             return theo;
         }
         let total = self.total as f64;
-        let mode = (0..=100).max_by_key(|&i| self.obs[i]).unwrap_or(50) as f64;
+        let mut mean = 0.0_f64;
+        for (g, &c) in self.obs.iter().enumerate() {
+            mean += g as f64 * c as f64;
+        }
+        mean /= total;
         let mut var = 0.0_f64;
         for (g, &c) in self.obs.iter().enumerate() {
-            let d = g as f64 - mode;
-            var += d * d * (c as f64);
+            let d = g as f64 - mean;
+            var += d * d * c as f64;
         }
-        let sigma = (var / total).sqrt().max(1.0);
-        let norm = 1.0 / (sigma * (2.0 * std::f64::consts::PI).sqrt());
+        let sigma = (var / total).sqrt();
+        if sigma == 0.0 {
+            // Degenerate: all reads share one GC% — the reference is a
+            // single spike there, matching the observed spike exactly.
+            // mean ∈ 0.0..=100.0 ⇒ round() is a valid index into theo[101].
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let spike = mean.round() as usize;
+            theo[spike] = total;
+            return theo;
+        }
+        let mut raw = [0.0_f64; 101];
+        let mut sum_raw = 0.0_f64;
+        for (g, r) in raw.iter_mut().enumerate() {
+            let z = (g as f64 - mean) / sigma;
+            *r = (-0.5 * z * z).exp();
+            sum_raw += *r;
+        }
         for (g, t) in theo.iter_mut().enumerate() {
-            let z = (g as f64 - mode) / sigma;
-            *t = total * norm * (-0.5 * z * z).exp();
+            *t = raw[g] * total / sum_raw;
         }
         theo
     }
@@ -62,8 +85,9 @@ impl PerSeqGc {
         for (g, &t) in theo.iter().enumerate() {
             dev += (self.obs[g] as f64 - t).abs();
         }
-        // Each differing read is counted on both the observed and the
-        // theoretical side, so halve to get the fraction of reads.
+        // Σtheo == Σobs == total, so the absolute difference double-counts
+        // every moved read (once as a deficit, once as a surplus); halving
+        // gives the total-variation distance = fraction of reads moved.
         dev / 2.0 / self.total as f64
     }
 }

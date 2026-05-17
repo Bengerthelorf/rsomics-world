@@ -14,9 +14,10 @@ use super::{ModuleStatus, QcModule, Record};
 /// (clean-room `FastQC` contract).
 ///
 /// The duplication-level binning and the "Total Deduplicated Percentage"
-/// follow `FastQC`'s documented behaviour; exact curve values are calibrated
-/// against the `FastQC` binary at the black-box compat step. The status
-/// decision is the documented non-unique-fraction threshold.
+/// follow `FastQC`'s documented behaviour. `FastQC` additionally thins its
+/// tracked set by sequence size, not only by read index, so the displayed
+/// curve can differ; the status decision is the documented
+/// non-unique-fraction threshold and is unaffected.
 pub struct DuplicationLevels {
     counts: HashMap<Vec<u8>, u64>,
     seen_reads: u64,

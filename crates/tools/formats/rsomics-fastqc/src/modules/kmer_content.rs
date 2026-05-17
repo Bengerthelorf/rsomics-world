@@ -6,21 +6,24 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Kmer Content" — 7-mers over a 2% read sample (reads truncated to
-/// 500 bp). For each k-mer a binomial test looks for a position with more
-/// occurrences than an even spread predicts. WARN if any k-mer's most
-/// enriched position has binomial p < 0.01, FAIL if p < 1e-5; the top 6
-/// most biased k-mers are reported (clean-room `FastQC` contract).
+/// `FastQC` "Kmer Content" — 7-mers over a 2% read sample (reads truncated
+/// to 500 bp). For each k-mer an exact binomial upper-tail test on its most
+/// enriched position asks whether it occurs there more than an even spread
+/// over positions predicts. WARN if any k-mer's p < 0.01, FAIL if p < 1e-5;
+/// the top 6 most biased k-mers are reported (clean-room `FastQC` contract).
 ///
-/// `FastQC` uses an exact binomial; this uses the normal approximation with
-/// continuity correction (n is large) — exact p-values are calibrated
-/// against the `FastQC` binary at the black-box compat step, the pass/warn/
-/// fail thresholds are implemented per the documented contract.
+/// The position support is the widest position span seen in the sample
+/// (`n_positions`); for fixed-length reads this is exact. With heavily
+/// variable read lengths a short-read k-mer's expectation is taken over the
+/// full span, which is conservative — `FastQC`'s exact per-length support
+/// model is not in its public documentation, and uniform-length data (the
+/// dominant case) is exact.
 pub struct KmerContent {
     /// k-mer (2-bit packed, 7 bases) → per-position observed counts.
     counts: HashMap<u32, Vec<u64>>,
     read_idx: u64,
     n_positions: usize,
+    stats_cache: Vec<KmerStat>,
 }
 
 const K: usize = 7;
@@ -46,18 +49,106 @@ fn unpack(mut code: u32) -> String {
     String::from_utf8_lossy(&s).into_owned()
 }
 
-/// Upper-tail standard-normal probability via `erfc` (Abramowitz & Stegun
-/// 7.1.26) — the binomial normal approximation's survival function.
-fn norm_sf(z: f64) -> f64 {
-    let x = z / std::f64::consts::SQRT_2;
-    let t = 1.0 / (1.0 + 0.327_591_1 * x.abs());
-    let y = 1.0
-        - (((((1.061_405_429 * t - 1.453_152_027) * t) + 1.421_413_741) * t - 0.284_496_736) * t
-            + 0.254_829_592)
-            * t
-            * (-x * x).exp();
-    let erf = if x >= 0.0 { y } else { -y };
-    0.5 * (1.0 - erf)
+/// Log-gamma via the Lanczos approximation (g=5, 6 terms) — standard
+/// public-domain coefficients; accurate to ~1e-10 for the a,b used here.
+fn gammaln(x: f64) -> f64 {
+    const C: [f64; 6] = [
+        76.180_091_729_471_46,
+        -86.505_320_329_416_77,
+        24.014_098_240_830_91,
+        -1.231_739_572_450_155,
+        0.001_208_650_973_866_179,
+        -0.000_005_395_239_384_953,
+    ];
+    let mut ser = 1.000_000_000_190_015;
+    let mut y = x;
+    for c in C {
+        y += 1.0;
+        ser += c / y;
+    }
+    let tmp = x + 5.5 - (x + 0.5) * (x + 5.5).ln();
+    -tmp + (2.506_628_274_631_000_5 * ser / x).ln()
+}
+
+/// Continued fraction for the incomplete beta (modified Lentz). The
+/// recurrence is the canonical textbook method, written from the math;
+/// the single-letter names are its standard mathematical notation
+/// (a, b, x, and the Lentz state c, d, h) — verbose names would obscure
+/// the algorithm.
+#[allow(clippy::many_single_char_names)]
+fn betacf(a: f64, b: f64, x: f64) -> f64 {
+    let tiny = 1e-30;
+    let qab = a + b;
+    let qap = a + 1.0;
+    let qam = a - 1.0;
+    let mut c = 1.0;
+    let mut d = 1.0 - qab * x / qap;
+    if d.abs() < tiny {
+        d = tiny;
+    }
+    d = 1.0 / d;
+    let mut h = d;
+    for m in 1..200 {
+        let m = f64::from(m);
+        let m2 = 2.0 * m;
+        let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d;
+        if d.abs() < tiny {
+            d = tiny;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < tiny {
+            c = tiny;
+        }
+        d = 1.0 / d;
+        h *= d * c;
+        let aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d;
+        if d.abs() < tiny {
+            d = tiny;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < tiny {
+            c = tiny;
+        }
+        d = 1.0 / d;
+        let del = d * c;
+        h *= del;
+        if (del - 1.0).abs() < 1e-12 {
+            break;
+        }
+    }
+    h
+}
+
+/// Regularised incomplete beta `I_x(a, b)`.
+fn betai(a: f64, b: f64, x: f64) -> f64 {
+    if x <= 0.0 {
+        return 0.0;
+    }
+    if x >= 1.0 {
+        return 1.0;
+    }
+    let bt = (gammaln(a + b) - gammaln(a) - gammaln(b) + a * x.ln() + b * (1.0 - x).ln()).exp();
+    if x < (a + 1.0) / (a + b + 2.0) {
+        bt * betacf(a, b, x) / a
+    } else {
+        1.0 - bt * betacf(b, a, 1.0 - x) / b
+    }
+}
+
+/// Exact binomial upper tail `P(X >= k)`, `X ~ Binomial(n, p)`, via the
+/// identity `P(X >= k) = I_p(k, n-k+1)` (k >= 1). `FastQC` uses the exact
+/// binomial — a normal approximation is invalid where the per-position
+/// expectation is small (`n*p << 5`), the regime that decides WARN/FAIL.
+fn binom_sf(k: u64, n: u64, p: f64) -> f64 {
+    if k == 0 {
+        return 1.0;
+    }
+    if k > n {
+        return 0.0;
+    }
+    betai(k as f64, (n - k + 1) as f64, p)
 }
 
 struct KmerStat {
@@ -75,10 +166,11 @@ impl KmerContent {
             counts: HashMap::new(),
             read_idx: 0,
             n_positions: 0,
+            stats_cache: Vec::new(),
         }
     }
 
-    fn stats(&self) -> Vec<KmerStat> {
+    fn compute_stats(&self) -> Vec<KmerStat> {
         let mut v = Vec::with_capacity(self.counts.len());
         for (&code, per_pos) in &self.counts {
             let total: u64 = per_pos.iter().sum();
@@ -87,7 +179,6 @@ impl KmerContent {
             }
             let p0 = 1.0 / self.n_positions as f64;
             let mean = total as f64 * p0;
-            let sd = (total as f64 * p0 * (1.0 - p0)).sqrt().max(1e-9);
             let mut max_pos = 0usize;
             let mut max_obs = 0u64;
             for (i, &c) in per_pos.iter().enumerate() {
@@ -96,11 +187,10 @@ impl KmerContent {
                     max_pos = i;
                 }
             }
-            let z = (max_obs as f64 - mean - 0.5) / sd;
             v.push(KmerStat {
                 seq: unpack(code),
                 count: total,
-                p: norm_sf(z),
+                p: binom_sf(max_obs, total, p0),
                 obs_exp_max: if mean > 0.0 {
                     max_obs as f64 / mean
                 } else {
@@ -159,11 +249,13 @@ impl QcModule for KmerContent {
         }
     }
 
-    fn finalize(&mut self) {}
+    fn finalize(&mut self) {
+        self.stats_cache = self.compute_stats();
+    }
 
     fn status(&self) -> ModuleStatus {
         let mut worst_p = 1.0_f64;
-        for s in self.stats() {
+        for s in &self.stats_cache {
             worst_p = worst_p.min(s.p);
         }
         if worst_p < 1e-5 {
@@ -177,7 +269,7 @@ impl QcModule for KmerContent {
 
     fn write_data(&self, out: &mut String) {
         out.push_str("#Sequence\tCount\tPValue\tObs/Exp Max\tMax Obs/Exp Position\n");
-        for s in self.stats().into_iter().take(6) {
+        for s in self.stats_cache.iter().take(6) {
             let _ = writeln!(
                 out,
                 "{}\t{}\t{:.6E}\t{:.6}\t{}",

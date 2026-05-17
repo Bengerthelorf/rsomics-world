@@ -30,15 +30,19 @@ impl PerTileQuality {
         }
     }
 
-    /// Illumina 1.8+ id: `inst:run:fc:lane:tile:x:y` (≥7 colon fields,
-    /// tile = field 4). The id is the token before the first space.
+    /// Tile from the read id (the token before the first space). Illumina
+    /// 1.8+ `inst:run:fc:lane:tile:x:y` has ≥7 colon fields, tile = field 4;
+    /// classic pre-1.8 `inst:lane:tile:x:y[#index/mate]` has 5, tile =
+    /// field 2. Anything else is non-Illumina ⇒ no tile (module skips).
     fn parse_tile(id: &[u8]) -> Option<u32> {
         let head = id.split(|&b| b == b' ').next()?;
         let fields: Vec<&[u8]> = head.split(|&b| b == b':').collect();
-        if fields.len() < 7 {
-            return None;
-        }
-        std::str::from_utf8(fields[4]).ok()?.parse::<u32>().ok()
+        let tile = match fields.len() {
+            n if n >= 7 => fields[4],
+            5 => fields[2],
+            _ => return None,
+        };
+        std::str::from_utf8(tile).ok()?.parse::<u32>().ok()
     }
 
     /// Worst (most negative) per-(tile,pos) deviation from the overall
