@@ -17,6 +17,16 @@ upstream_bin     = "seqkit"
 upstream_args    = "stats -j 1 FIX"
 upstream_version = "seqkit version"
 
+[spec.rsomics-fastq-stats]
+# The --all path is FASTQ's distinguishing cost: a per-base quality scan
+# (Q20/Q30/AvgQual) on top of the length/GC pass. The enforced gate must
+# cover it, so both sides run the extended path single-threaded.
+fixture          = "fastq:200000:150"
+ours_args        = "-t 1 --all FIX"
+upstream_bin     = "seqkit"
+upstream_args    = "stats -j 1 -a FIX"
+upstream_version = "seqkit version"
+
 [spec.rsomics-fastq-filter]
 # gz input: .fastq.gz is the real workload rsomics-seqio's igzip backend
 # wins; the enforced gate must cover the gz read+filter hot path this crate

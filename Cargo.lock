@@ -1025,7 +1025,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-fasta-stats"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1107,6 +1107,22 @@ dependencies = [
  "rsomics-fqgz",
  "rsomics-help",
  "rsomics-seqio",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "rsomics-fastq-stats"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "criterion",
+ "needletail",
+ "rsomics-common",
+ "rsomics-help",
+ "rsomics-seqstats",
  "serde",
  "serde_json",
  "tempfile",
@@ -1277,7 +1293,7 @@ dependencies = [
 
 [[package]]
 name = "rsomics-seqstats"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytecount",
  "serde",
