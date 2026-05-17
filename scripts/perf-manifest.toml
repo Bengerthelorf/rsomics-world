@@ -182,8 +182,13 @@ reason = "Reads BAI index metadata only (no full-BAM scan). Runtime is dominated
 [exempt.rsomics-fasta-index]
 reason = "No FASTA fixture generator in mkfixture.py yet. faidx indexing is IO-bound sequential scan; fetch is a seek+read. Covered by compat test vs samtools faidx. Perfgate will activate when FASTA fixture generator lands."
 
+# gz input: .fastq.gz is the real-world workload (universal sequencer
+# distribution); the gate must cover gz decode + k-mer scan. Both sides
+# read the same gzip; bbduk.sh uses Java's GZIPInputStream, we use
+# rsomics-seqio's igzip (ISA-L SIMD). Output is plain (only read path
+# differs). JVM heap bounded to 1g; single-thread both sides.
 [spec.rsomics-bbduk]
-fixture          = "fastq:1000000:150"
+fixture          = "fastqgz:1000000:150"
 ours_args        = "-t 1 --literal AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT"
 upstream_bin     = "bbduk.sh"
 upstream_args    = "-Xmx1g in=FIX out=OUT literal=AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC k=27 threads=1 overwrite=t"
