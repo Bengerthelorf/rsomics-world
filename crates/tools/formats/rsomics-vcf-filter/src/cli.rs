@@ -54,10 +54,7 @@ impl Cli {
         let stats = filter_vcf(&self.input, &mut out, &cfg)?;
 
         if !self.common.json {
-            eprintln!(
-                "{}/{} variants passed filter",
-                stats.passed, stats.total
-            );
+            eprintln!("{}/{} variants passed filter", stats.passed, stats.total);
         }
 
         Ok(())
@@ -113,12 +110,10 @@ pub static HELP: HelpSpec = HelpSpec {
             },
         ],
     }],
-    examples: &[
-        Example {
-            description: "Keep only PASS variants with QUAL >= 30",
-            command: "rsomics-vcf-filter --pass-only --min-qual 30 input.vcf > filtered.vcf",
-        },
-    ],
+    examples: &[Example {
+        description: "Keep only PASS variants with QUAL >= 30",
+        command: "rsomics-vcf-filter --pass-only --min-qual 30 input.vcf > filtered.vcf",
+    }],
     json_result_schema_doc: None,
 };
 
