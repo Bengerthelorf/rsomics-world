@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use rsomics_common::{Result, RsomicsError};
@@ -42,9 +42,7 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
 
     loop {
         line_buf.clear();
-        let n = reader
-            .read_line(&mut line_buf)
-            .map_err(RsomicsError::Io)?;
+        let n = reader.read_line(&mut line_buf).map_err(RsomicsError::Io)?;
         if n == 0 {
             break;
         }
@@ -54,7 +52,12 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
             continue;
         }
 
-        let name = line_buf[1..].trim_end().split_whitespace().next().unwrap_or("").to_string();
+        let name = line_buf[1..]
+            .trim_end()
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string();
         byte_offset += n as u64;
         let seq_start = byte_offset;
 
@@ -65,9 +68,7 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
 
         loop {
             line_buf.clear();
-            let ln = reader
-                .read_line(&mut line_buf)
-                .map_err(RsomicsError::Io)?;
+            let ln = reader.read_line(&mut line_buf).map_err(RsomicsError::Io)?;
             if ln == 0 || line_buf.starts_with('>') {
                 break;
             }
@@ -91,7 +92,12 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
         });
 
         if line_buf.starts_with('>') {
-            let name = line_buf[1..].trim_end().split_whitespace().next().unwrap_or("").to_string();
+            let name = line_buf[1..]
+                .trim_end()
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_string();
             byte_offset += line_buf.len() as u64;
             let seq_start2 = byte_offset;
 
@@ -102,9 +108,7 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
 
             loop {
                 line_buf.clear();
-                let ln = reader
-                    .read_line(&mut line_buf)
-                    .map_err(RsomicsError::Io)?;
+                let ln = reader.read_line(&mut line_buf).map_err(RsomicsError::Io)?;
                 if ln == 0 || line_buf.starts_with('>') {
                     break;
                 }
@@ -138,11 +142,7 @@ pub fn write_index(index: &FaiIndex, path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn fetch_region(
-    fasta_path: &Path,
-    fai_path: &Path,
-    region: &str,
-) -> Result<Vec<u8>> {
+pub fn fetch_region(fasta_path: &Path, fai_path: &Path, region: &str) -> Result<Vec<u8>> {
     let index = read_index(fai_path)?;
     let (name, start, end) = parse_region(region)?;
 
@@ -177,9 +177,8 @@ pub fn fetch_region(
     let mut remaining = (end - start) as u64;
 
     while remaining > 0 {
-        let n = file
-            .read(&mut buf[..buf.len().min(remaining as usize + 1024)])
-            .map_err(RsomicsError::Io)?;
+        let read_len = buf.len().min(remaining as usize + 1024);
+        let n = file.read(&mut buf[..read_len]).map_err(RsomicsError::Io)?;
         if n == 0 {
             break;
         }
@@ -213,18 +212,18 @@ pub fn read_index(path: &Path) -> Result<FaiIndex> {
         }
         entries.push(FaiEntry {
             name: fields[0].to_string(),
-            length: fields[1].parse().map_err(|e| {
-                RsomicsError::InvalidInput(format!("bad length in .fai: {e}"))
-            })?,
-            offset: fields[2].parse().map_err(|e| {
-                RsomicsError::InvalidInput(format!("bad offset in .fai: {e}"))
-            })?,
-            line_bases: fields[3].parse().map_err(|e| {
-                RsomicsError::InvalidInput(format!("bad line_bases in .fai: {e}"))
-            })?,
-            line_width: fields[4].parse().map_err(|e| {
-                RsomicsError::InvalidInput(format!("bad line_width in .fai: {e}"))
-            })?,
+            length: fields[1]
+                .parse()
+                .map_err(|e| RsomicsError::InvalidInput(format!("bad length in .fai: {e}")))?,
+            offset: fields[2]
+                .parse()
+                .map_err(|e| RsomicsError::InvalidInput(format!("bad offset in .fai: {e}")))?,
+            line_bases: fields[3]
+                .parse()
+                .map_err(|e| RsomicsError::InvalidInput(format!("bad line_bases in .fai: {e}")))?,
+            line_width: fields[4]
+                .parse()
+                .map_err(|e| RsomicsError::InvalidInput(format!("bad line_width in .fai: {e}")))?,
         });
     }
 
