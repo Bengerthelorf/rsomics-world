@@ -3,7 +3,6 @@ use std::path::Path;
 
 use noodles::bam;
 use noodles::bam::bai;
-use noodles::sam::header::record::value::map::ReferenceSequence;
 use rsomics_common::{Result, RsomicsError};
 use serde::Serialize;
 
@@ -51,7 +50,7 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         )));
     };
 
-    let index = bai::read(&index_path)
+    let index = bai::fs::read(&index_path)
         .map_err(|e| RsomicsError::InvalidInput(format!("reading index {}: {e}", index_path.display())))?;
 
     let file = File::open(bam_path)
@@ -68,8 +67,9 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
     };
 
     for (i, (name, map)) in ref_seqs.iter().enumerate() {
-        let length = map.length();
-        let (mapped, unmapped) = if let Some(ref_idx) = index.indices().get(i) {
+        let length = map.length().get();
+        let idx_refs = index.reference_sequences();
+        let (mapped, unmapped) = if let Some(ref_idx) = idx_refs.get(i) {
             let m = ref_idx
                 .metadata()
                 .map_or(0, |md| md.mapped_record_count());
@@ -88,8 +88,9 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         });
     }
 
-    if let Some(n_no_coor) = index.unplaced_unmapped_record_count() {
-        stats.unmapped_no_ref = n_no_coor;
+    use noodles::csi::BinningIndex;
+    if let Some(n) = index.unplaced_unmapped_record_count() {
+        stats.unmapped_no_ref = n;
     }
 
     Ok(stats)
