@@ -82,12 +82,17 @@ mod tests {
         let k = 4;
         let results: Vec<Option<u64>> = RollingKmers::new(seq, k).collect();
         assert_eq!(results.len(), 9);
-        assert!(results[0].is_some());
-        assert!(results[4].is_none());
-        assert!(results[5].is_none());
-        assert!(results[6].is_none());
-        assert!(results[7].is_none());
-        assert!(results[8].is_some());
+        // First valid k-mer at index k-1=3 (ACGT)
+        assert!(results[0].is_none());
+        assert!(results[1].is_none());
+        assert!(results[2].is_none());
+        assert!(results[3].is_some()); // ACGT
+        // N at index 4 resets; need 4 more valid bases to recover
+        assert!(results[4].is_none()); // N resets
+        assert!(results[5].is_none()); // A (valid=1)
+        assert!(results[6].is_none()); // C (valid=2)
+        assert!(results[7].is_none()); // G (valid=3)
+        assert!(results[8].is_some()); // T (valid=4 → ACGT)
     }
 
     #[test]
