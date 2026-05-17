@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_truncation)]
+
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -53,7 +55,6 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
         }
 
         let name = line_buf[1..]
-            .trim_end()
             .split_whitespace()
             .next()
             .unwrap_or("")
