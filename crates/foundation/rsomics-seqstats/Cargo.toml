@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-seqstats"
-version = "0.1.0"
+version = "0.2.0"
 description = "Format-agnostic sequence statistics primitives (length distribution: N50/L50/Nx + quartiles, base composition, alphabet guess). Layer-A, shared verbatim by the rsomics-* *-stats tools so output byte-agrees with `seqkit stats -a`."
 edition.workspace = true
 rust-version.workspace = true

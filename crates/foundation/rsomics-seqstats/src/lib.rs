@@ -19,8 +19,10 @@ pub enum SeqType {
     Rna,
     #[serde(rename = "Protein")]
     Protein,
-    #[serde(rename = "Other")]
-    Other,
+    // seqkit's catch-all alphabet is "Unlimit" (empty or non-bio sequence);
+    // it never emits "Other", so byte-equality requires this exact string.
+    #[serde(rename = "Unlimit")]
+    Unlimit,
 }
 
 impl SeqType {
@@ -30,10 +32,16 @@ impl SeqType {
             Self::Dna => "DNA",
             Self::Rna => "RNA",
             Self::Protein => "Protein",
-            Self::Other => "Other",
+            Self::Unlimit => "Unlimit",
         }
     }
 }
+
+/// seqkit guesses the sequence type from the **first record only**, scanning
+/// at most this many bytes of it (`seq.AlphabetGuessSeqLengthThreshold`,
+/// seqkit's `--alphabet-guess-seq-length` default). Callers pass the first
+/// record's sequence truncated to this; accumulating across records diverges.
+pub const DEFAULT_ALPHABET_GUESS_LEN: usize = 10_000;
 
 /// Count every byte of `haystack` equal to any byte in `needles`, deduping
 /// `needles` so overlapping classes (e.g. `b"GCgc"`) are not double-counted.
@@ -54,12 +62,14 @@ pub fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
     total
 }
 
-/// seqkit's alphabet guess: any protein-only residue ⇒ Protein; else U-without-T
-/// ⇒ RNA; else DNA. Ambiguity codes and gaps do not decide the type.
+/// seqkit's alphabet guess over one sequence (pass the first record's prefix —
+/// see [`DEFAULT_ALPHABET_GUESS_LEN`]): any protein-only residue ⇒ Protein;
+/// else U-without-T ⇒ RNA; else DNA. An empty or non-bio sequence ⇒ Unlimit.
+/// Ambiguity codes and gaps do not decide the type.
 #[must_use]
 pub fn classify(sample: &[u8]) -> SeqType {
     if sample.is_empty() {
-        return SeqType::Other;
+        return SeqType::Unlimit;
     }
     let mut has_t = false;
     let mut has_u = false;
@@ -74,7 +84,7 @@ pub fn classify(sample: &[u8]) -> SeqType {
             }
             b'A' | b'C' | b'G' | b'N' | b'-' | b'.' | b' ' | b'\n' | b'\r' | b'R' | b'Y' | b'S'
             | b'W' | b'K' | b'M' | b'B' | b'D' | b'H' | b'V' => {}
-            _ => return SeqType::Other,
+            _ => return SeqType::Unlimit,
         }
     }
     if has_protein_only {
@@ -281,11 +291,12 @@ mod tests {
     }
 
     #[test]
-    fn classify_rna_protein_dna_other() {
+    fn classify_rna_protein_dna_unlimit() {
         assert_eq!(classify(b"ACGU"), SeqType::Rna);
         assert_eq!(classify(b"MEEPSILQRT"), SeqType::Protein);
         assert_eq!(classify(b"ACGTN"), SeqType::Dna);
-        assert_eq!(classify(b""), SeqType::Other);
-        assert_eq!(classify(b"@#$"), SeqType::Other);
+        // seqkit prints "Unlimit" (not "Other") for empty / non-bio input.
+        assert_eq!(classify(b""), SeqType::Unlimit);
+        assert_eq!(classify(b"@#$"), SeqType::Unlimit);
     }
 }

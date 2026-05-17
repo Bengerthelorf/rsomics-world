@@ -16,7 +16,10 @@ composition.
 - `count_any_of(haystack, needles)` — deduped multi-byte count
   (GC bases, N runs, gap letters).
 - `classify(sample)` / `SeqType` — seqkit's alphabet guess
-  (DNA / RNA / Protein / Other), `Serialize` with seqkit's JSON names.
+  (DNA / RNA / Protein / Unlimit), `Serialize` with seqkit's exact JSON
+  names. seqkit guesses from the **first record only**, scanning at most
+  `DEFAULT_ALPHABET_GUESS_LEN` bytes — callers pass the first record's
+  sequence prefix, never a cross-record accumulation.
 
 ## Origin
 
