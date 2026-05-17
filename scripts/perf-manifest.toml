@@ -17,6 +17,17 @@ upstream_bin     = "seqkit"
 upstream_args    = "stats -j 1 FIX"
 upstream_version = "seqkit version"
 
+# Paired-end overlap merge vs fastp --merge. FIX=R1, FIX2=R2 (the harness
+# generates both). All non-merge fastp processing is disabled so only the
+# overlap detect+merge pipeline (the hot path) is timed; single-threaded.
+[spec.rsomics-fastq-merge]
+fixture          = "fastq:1000000:150"
+fixture2         = "fastq:1000000:150"
+ours_args        = "--in1 FIX --in2 FIX2 -m OUT"
+upstream_bin     = "fastp"
+upstream_args    = "--merge --merged_out OUT --in1 FIX --in2 FIX2 --overlap_len_require 30 --overlap_diff_limit 5 --overlap_diff_percent_limit 20 --disable_adapter_trimming --disable_quality_filtering --disable_length_filtering --disable_trim_poly_g --json /dev/null --html /dev/null --thread 1"
+upstream_version = "fastp --version"
+
 [spec.rsomics-fastq-stats]
 # The --all path is FASTQ's distinguishing cost: a per-base quality scan
 # (Q20/Q30/AvgQual) on top of the length/GC pass. The enforced gate must
@@ -152,3 +163,16 @@ ours_args        = "-t 1 -o OUTDIR FIX"
 upstream_bin     = "fastqc"
 upstream_args    = "--quiet --extract --threads 1 -o OUTDIR FIX"
 upstream_version = "fastqc --version"
+
+# BBDuk (BBTools, Java) is the reference. The hot path is the per-read
+# k-mer scan against the reference set; a `literal=` adapter exercises it
+# without needing a ref-file placeholder. Default kfilter path (ktrim=f),
+# single-thread both sides; bbduk.sh JVM heap bounded to 1g so it does not
+# auto-grab runner RAM (the bfc -s lesson). Random fixture ⇒ ~no matches,
+# so both emit all reads — the timed work is the identical k-mer scan.
+[spec.rsomics-bbduk]
+fixture          = "fastq:1000000:150"
+ours_args        = "-t 1 --literal AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC -i FIX -o OUT"
+upstream_bin     = "bbduk.sh"
+upstream_args    = "-Xmx1g in=FIX out=OUT literal=AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC k=27 threads=1 overwrite=t"
+upstream_version = "bbduk.sh --version"
