@@ -16,7 +16,11 @@ impl<'a> RollingKmers<'a> {
         Self {
             seq,
             k,
-            mask: if k == 32 { u64::MAX } else { (1u64 << (2 * k)) - 1 },
+            mask: if k == 32 {
+                u64::MAX
+            } else {
+                (1u64 << (2 * k)) - 1
+            },
             pos: 0,
             current: 0,
             valid: 0,
@@ -66,13 +70,8 @@ mod tests {
     fn rolling_matches_encode() {
         let seq = b"ACGTACGTACGT";
         let k = 4;
-        let rolling: Vec<u64> = RollingKmers::new(seq, k)
-            .flatten()
-            .collect();
-        let naive: Vec<u64> = seq
-            .windows(k)
-            .map(|w| encode(w).unwrap())
-            .collect();
+        let rolling: Vec<u64> = RollingKmers::new(seq, k).flatten().collect();
+        let naive: Vec<u64> = seq.windows(k).map(|w| encode(w).unwrap()).collect();
         assert_eq!(rolling, naive);
     }
 

@@ -200,71 +200,103 @@ impl Cli {
     }
 
     fn run_se(&self, refs: &RefKmers, cfg: &Config) -> Result<()> {
-        let mut reader = open_fastq(&self.in1)?;
-        let mut w1 = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
-        let mut wm = self
-            .outm
-            .as_ref()
-            .map(|p| ChunkedWriter::create(std::path::Path::new(p), 4))
-            .transpose()?;
-        let has_outm = wm.is_some();
+        use std::io::{BufWriter, Write};
 
+        let mut reader = open_fastq(&self.in1)?;
+        let has_outm = self.outm.is_some();
         let mut chunk: Vec<OwnedRecord> = Vec::with_capacity(CHUNK_RECORDS);
         let mut done = false;
 
-        while !done {
-            chunk.clear();
-            while chunk.len() < CHUNK_RECORDS {
-                match reader.next() {
-                    Some(rec) => chunk.push(rec?),
-                    None => {
-                        done = true;
-                        break;
+        if self.out1 == "-" {
+            let mut out = BufWriter::new(std::io::stdout().lock());
+            while !done {
+                chunk.clear();
+                while chunk.len() < CHUNK_RECORDS {
+                    match reader.next() {
+                        Some(rec) => chunk.push(rec?),
+                        None => {
+                            done = true;
+                            break;
+                        }
                     }
                 }
-            }
-            if chunk.is_empty() {
-                break;
-            }
-
-            // Each result: (trimmed_or_none, original_if_outm_needed)
-            let results: Vec<(Option<OwnedRecord>, Option<OwnedRecord>)> = chunk
-                .par_drain(..)
-                .map(|rec| match process(&rec.seq, &rec.qual, refs, cfg) {
-                    Some((s, e)) => (
-                        Some(OwnedRecord {
+                if chunk.is_empty() {
+                    break;
+                }
+                let results: Vec<Option<OwnedRecord>> = chunk
+                    .par_drain(..)
+                    .map(|rec| match process(&rec.seq, &rec.qual, refs, cfg) {
+                        Some((s, e)) => Some(OwnedRecord {
                             id: rec.id,
                             seq: rec.seq[s..e].to_vec(),
                             qual: rec.qual[s..e].to_vec(),
                         }),
-                        None,
-                    ),
-                    None => {
-                        if has_outm {
-                            (None, Some(rec))
-                        } else {
-                            (None, None)
-                        }
-                    }
-                })
-                .collect();
-
-            for (pass, fail) in results {
-                if let Some(rec) = pass {
-                    w1.write_record(&rec.id, &rec.seq, &rec.qual)?;
-                } else if let (Some(rec), Some(wm)) = (fail, wm.as_mut()) {
-                    wm.write_record(&rec.id, &rec.seq, &rec.qual)?;
+                        None => None,
+                    })
+                    .collect();
+                for rec in results.into_iter().flatten() {
+                    out.write_all(b"@").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.id).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.seq).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.qual).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
                 }
             }
-        }
-        w1.finalize()?;
-        if let Some(wm) = wm {
-            wm.finalize()?;
+            out.flush().map_err(RsomicsError::Io)?;
+        } else {
+            let mut w1 = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
+            let mut wm = self
+                .outm
+                .as_ref()
+                .map(|p| ChunkedWriter::create(std::path::Path::new(p), 4))
+                .transpose()?;
+            while !done {
+                chunk.clear();
+                while chunk.len() < CHUNK_RECORDS {
+                    match reader.next() {
+                        Some(rec) => chunk.push(rec?),
+                        None => {
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+                if chunk.is_empty() {
+                    break;
+                }
+                let results: Vec<(Option<OwnedRecord>, Option<OwnedRecord>)> = chunk
+                    .par_drain(..)
+                    .map(|rec| match process(&rec.seq, &rec.qual, refs, cfg) {
+                        Some((s, e)) => (
+                            Some(OwnedRecord {
+                                id: rec.id,
+                                seq: rec.seq[s..e].to_vec(),
+                                qual: rec.qual[s..e].to_vec(),
+                            }),
+                            None,
+                        ),
+                        None => (None, if has_outm { Some(rec) } else { None }),
+                    })
+                    .collect();
+                for (pass, fail) in results {
+                    if let Some(rec) = pass {
+                        w1.write_record(&rec.id, &rec.seq, &rec.qual)?;
+                    } else if let (Some(rec), Some(wm)) = (fail, wm.as_mut()) {
+                        wm.write_record(&rec.id, &rec.seq, &rec.qual)?;
+                    }
+                }
+            }
+            w1.finalize()?;
+            if let Some(wm) = wm {
+                wm.finalize()?;
+            }
         }
         Ok(())
     }
 
-    fn run_pe(&self, refs: &RefKmers, cfg: &Config, in2: &PathBuf) -> Result<()> {
+    fn run_pe(&self, refs: &RefKmers, cfg: &Config, in2: &std::path::Path) -> Result<()> {
         let mut r1 = open_fastq(&self.in1)?;
         let mut r2 = open_fastq(in2)?;
         let out2 = self.out2.as_ref().expect("paired ⇒ out2 set");
