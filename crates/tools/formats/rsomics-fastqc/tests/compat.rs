@@ -144,7 +144,17 @@ fn statuses_and_basic_stats_match_fastqc() {
             our.1
         );
     }
-    assert_eq!(fq_sum.len(), 12, "expected 12 FastQC modules");
+    // FastQC v0.12.1 emits only the modules it ran: "Per tile sequence
+    // quality" is absent without Illumina tile IDs and "Kmer Content" is
+    // off by default, so a non-tiled fixture yields ~10, not 12. The
+    // contract is that every module FastQC *did* report matches ours (the
+    // loop above) and that we emit the full set.
+    assert!(
+        fq_sum.len() >= 8,
+        "FastQC produced too few modules ({}) — broken oracle run",
+        fq_sum.len()
+    );
+    assert_eq!(our_sum.len(), 12, "rsomics-fastqc must emit all 12 modules");
 
     let fq_data = read_to_string_in(&fq_out, "fastqc_data.txt").expect("fastqc data");
     let our_data = read_to_string_in(&ours_out, "fastqc_data.txt").expect("our data");
