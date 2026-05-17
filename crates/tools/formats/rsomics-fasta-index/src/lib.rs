@@ -41,6 +41,7 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
     let mut entries = Vec::new();
     let mut line_buf = String::new();
     let mut byte_offset: u64 = 0;
+    let mut pending_header: Option<String> = None;
 
     loop {
         line_buf.clear();
@@ -48,18 +49,19 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
         if n == 0 {
             break;
         }
-
-        if !line_buf.starts_with('>') {
+        if line_buf.starts_with('>') {
+            pending_header = Some(line_buf.clone());
             byte_offset += n as u64;
-            continue;
+        } else {
+            byte_offset += n as u64;
         }
+        if pending_header.is_some() {
+            break;
+        }
+    }
 
-        let name = line_buf[1..]
-            .split_whitespace()
-            .next()
-            .unwrap_or("")
-            .to_string();
-        byte_offset += n as u64;
+    while let Some(hdr) = pending_header.take() {
+        let name = hdr[1..].split_whitespace().next().unwrap_or("").to_string();
         let seq_start = byte_offset;
 
         let mut length: u64 = 0;
@@ -70,7 +72,12 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
         loop {
             line_buf.clear();
             let ln = reader.read_line(&mut line_buf).map_err(RsomicsError::Io)?;
-            if ln == 0 || line_buf.starts_with('>') {
+            if ln == 0 {
+                break;
+            }
+            if line_buf.starts_with('>') {
+                pending_header = Some(line_buf.clone());
+                byte_offset += ln as u64;
                 break;
             }
             let raw_len = ln as u64;
@@ -91,45 +98,6 @@ pub fn build_index(fasta_path: &Path) -> Result<FaiIndex> {
             line_bases,
             line_width,
         });
-
-        if line_buf.starts_with('>') {
-            let name = line_buf[1..]
-                .split_whitespace()
-                .next()
-                .unwrap_or("")
-                .to_string();
-            byte_offset += line_buf.len() as u64;
-            let seq_start2 = byte_offset;
-
-            let mut length2: u64 = 0;
-            let mut lb2: u64 = 0;
-            let mut lw2: u64 = 0;
-            let mut first2 = true;
-
-            loop {
-                line_buf.clear();
-                let ln = reader.read_line(&mut line_buf).map_err(RsomicsError::Io)?;
-                if ln == 0 || line_buf.starts_with('>') {
-                    break;
-                }
-                let raw_len = ln as u64;
-                let bases = line_buf.trim_end_matches(&['\n', '\r'][..]).len() as u64;
-                length2 += bases;
-                if first2 {
-                    lb2 = bases;
-                    lw2 = raw_len;
-                    first2 = false;
-                }
-                byte_offset += raw_len;
-            }
-            entries.push(FaiEntry {
-                name,
-                length: length2,
-                offset: seq_start2,
-                line_bases: lb2,
-                line_width: lw2,
-            });
-        }
     }
 
     Ok(FaiIndex { entries })
