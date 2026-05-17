@@ -140,11 +140,20 @@ jobs:
             "https://github.com/shenwei356/seqkit/releases/download/v2.13.0/seqkit_linux_${seqkit_arch}.tar.gz"
           tar -xzf /tmp/seqkit.tar.gz -C /tmp
           sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
+          # FastQC (Java, GPL) — rsomics-fastqc clean-room compat oracle.
+          # Version-pinned: the compat test is gated to this exact release.
+          sudo apt-get install -y --no-install-recommends default-jre-headless
+          curl -fsSL -o /tmp/fastqc.zip \
+            "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip"
+          sudo unzip -q /tmp/fastqc.zip -d /opt
+          sudo chmod 0755 /opt/FastQC/fastqc
+          sudo ln -sf /opt/FastQC/fastqc /usr/local/bin/fastqc
           fastp --version
           samtools --version | head -1
           seqkit version
           bedtools --version
           bfc -v 2>&1 | head -1 || true
+          fastqc --version
       - name: Install upstream binaries for compat tests (macOS)
         if: runner.os == 'macOS'
         run: |

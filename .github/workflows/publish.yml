@@ -68,11 +68,21 @@ jobs:
           tar -xzf /tmp/seqkit.tar.gz -C /tmp
           sudo install -m 0755 /tmp/seqkit /usr/local/bin/seqkit
           sudo apt-get install -y --no-install-recommends hyperfine
+          # FastQC (Java, GPL) — the clean-room compat + perfgate oracle for
+          # rsomics-fastqc. Pinned: rsomics-fastqc's compat test is version-
+          # gated to this exact release.
+          sudo apt-get install -y --no-install-recommends default-jre-headless
+          curl -fsSL -o /tmp/fastqc.zip \
+            "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.12.1.zip"
+          sudo unzip -q /tmp/fastqc.zip -d /opt
+          sudo chmod 0755 /opt/FastQC/fastqc
+          sudo ln -sf /opt/FastQC/fastqc /usr/local/bin/fastqc
           fastp --version
           seqkit version
           bedtools --version
           hyperfine --version
           bfc -v 2>&1 | head -1 || true
+          fastqc --version
 
       - name: cargo test
         run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features
