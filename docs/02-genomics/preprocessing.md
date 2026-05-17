@@ -80,10 +80,10 @@ and largely closed-source) and post-alignment QC (samtools stats, mosdepth
   - Consumes primitives: `needletail`, `noodles-fastq`, `block-aligner` for adapter SW
   - Notes: Reference implementation for adapter alignment semantics. `fastp` and `fasterp` implement adapter trimming differently (overlap-based) — for protocols that need cutadapt's specific semantics (small RNA, single-cell linker handling) a Rust port matters. MIT licence.
 
-- [ ] **`BBDuk`** — k-mer-based contaminant removal + trimmer.
+- [x] **`BBDuk`** — k-mer-based contaminant removal + trimmer.
   - Reference impl: `Java` · [BBTools (JGI)](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/) · proprietary-but-free
-  - Existing Rust: none verified
-  - Existing Rust kind: `none`
+  - Existing Rust: `rsomics-bbduk` 0.1.0 (clean-room reimpl, published)
+  - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: —
   - Parallelism: JVM threading
   - SIMD: none significant
@@ -95,10 +95,10 @@ and largely closed-source) and post-alignment QC (samtools stats, mosdepth
   - Consumes primitives: `rsomics-kmer` (`nthash-rs`), `fastbloom`, `needletail`, `noodles-fastq`
   - Notes: Unique among trimmers for k-mer contaminant matching against a reference (phiX, rRNA, host). The Java is slow and memory-hungry; a Rust port using `fastbloom` + `nthash` for the k-mer side would be a clear win.
 
-- [ ] **`BFC`** — k-mer-spectrum substitution-error corrector for Illumina reads.
+- [x] **`BFC`** — k-mer-spectrum substitution-error corrector for Illumina reads.
   - Reference impl: `C` · [lh3/bfc](https://github.com/lh3/bfc) · `MIT`
-  - Existing Rust: none verified (`cargo search "error correction fastq"` → only filter/simulate/split-kmer crates; no read corrector)
-  - Existing Rust kind: `none`
+  - Existing Rust: `rsomics-fastq-correct` 0.1.0 (faithful port of bfc, published)
+  - Existing Rust kind: `pure-port`
   - Existing non-C alternatives: `Lighter` ([mourisl/Lighter](https://github.com/mourisl/Lighter), C++, `GPL-3.0` — Bloom-cardinality corrector; clean-room only); `Karect`, `Musket`, `Bloocoo` (older, lower priority)
   - Parallelism: BFC pthreads over reads; ours rayon over read batches
   - SIMD: k-mer roll (ntHash) auto-vectorises; correction-decision path is branchy
@@ -140,10 +140,10 @@ and largely closed-source) and post-alignment QC (samtools stats, mosdepth
   - Consumes primitives: `needletail`, `noodles-fastq`, `block-aligner`
   - Notes: Distinctive value for ancient-DNA workflows (collapse paired reads, deal with short fragments). GPL-3.0. Lower priority than fastp.
 
-- [~] **`FastQC`** — per-base QC report generator.
+- [x] **`FastQC`** — per-base QC report generator.
   - Reference impl: `Java` · [s-andrews/FastQC](https://github.com/s-andrews/FastQC) · `GPL-3.0`
-  - Existing Rust: [`fastqc-rs`](https://crates.io/crates/fastqc-rs) `0.3.4` ([fastqc-rs/fastqc-rs](https://github.com/fastqc-rs/fastqc-rs)); [`RastQC`](https://github.com/Huang-lab/RastQC) (binary tool, install from source, 2-3× faster, streaming, single static binary)
-  - Existing Rust kind: `pure-port`
+  - Existing Rust: `rsomics-fastqc` 0.1.0 (clean-room 12-module reimpl, published)
+  - Existing Rust kind: `rust-native`
   - Existing non-C alternatives: `falco` (C++ port); `seqkit stats` (Go)
   - Parallelism: fastqc-rs is rayon-able per-chunk; RastQC streaming
   - SIMD: auto-vectorize on quality histograms
