@@ -1,10 +1,6 @@
-//! Semantic compatibility vs BFC. BFC's byte output depends on its own
-//! counting-hash collision profile, so a byte diff is not well-defined
-//! across counter implementations (see README "Implementation decisions").
-//! Instead: on a golden dataset whose coverage makes the corrected base
-//! implementation-independent, assert ours and `bfc` reach the SAME
-//! correction outcome. Skipped (loud) when `bfc` is not on PATH; the
-//! authoritative run is 4090/CI where `bfc` is installed.
+// BFC byte output depends on its counting-hash collision profile → byte diff is undefined
+// across counter impls. Test: on a high-coverage golden fixture, ours and bfc must agree on
+// the corrected base (implementation-independent). Skipped when bfc not on PATH; authoritative on 4090/CI.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -20,8 +16,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn bfc_available() -> bool {
-    // `bfc -v` prints the version; its exit status varies by build, so
-    // "the binary ran at all" is the availability signal.
+    // exit status varies by bfc build; "binary ran at all" is the signal.
     Command::new("bfc")
         .arg("-v")
         .stdout(Stdio::null())
@@ -30,7 +25,6 @@ fn bfc_available() -> bool {
         .is_ok()
 }
 
-/// Read a FASTQ's sequence lines (record order preserved).
 fn seqs(bytes: &[u8]) -> Vec<Vec<u8>> {
     let text = String::from_utf8_lossy(bytes);
     text.lines()

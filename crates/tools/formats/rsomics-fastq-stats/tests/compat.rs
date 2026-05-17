@@ -173,10 +173,7 @@ fn tabular_all_matches_seqkit() {
     );
 }
 
-// Heterogeneous fixture (DNA first record, protein-looking later record).
-// seqkit guesses `type` from the first record only — this would fail with a
-// cross-record alphabet sample, so it pins the first-record-scope contract
-// against the real binary (the homogeneous golden masks it).
+// Pins first-record-scope type contract against the real binary; homogeneous golden masks this case.
 #[test]
 fn heterogeneous_type_is_first_record_like_seqkit() {
     assert!(

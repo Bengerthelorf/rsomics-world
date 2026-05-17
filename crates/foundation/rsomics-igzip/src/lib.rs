@@ -1,5 +1,3 @@
-//! Quadrant-② FFI wrapper over Intel ISA-L igzip.
-
 use std::io::{self, Read};
 use std::path::Path;
 
@@ -25,11 +23,6 @@ pub struct GzReader;
 
 #[cfg(not(target_os = "linux"))]
 impl GzReader {
-    /// Open a gzip file for streaming decompression.
-    ///
-    /// # Errors
-    ///
-    /// Always `io::ErrorKind::Unsupported` on non-Linux targets.
     pub fn new(_path: &Path) -> io::Result<Self> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -45,10 +38,6 @@ impl Read for GzReader {
     }
 }
 
-/// Safe streaming gzip decompressor backed by Intel ISA-L igzip.
-///
-/// Concatenated gzip members are handled transparently.  Any ISA-L error,
-/// truncated stream, or I/O failure surfaces as `io::Error`.
 #[cfg(target_os = "linux")]
 pub struct GzReader {
     file: File,
@@ -63,11 +52,6 @@ pub struct GzReader {
 
 #[cfg(target_os = "linux")]
 impl GzReader {
-    /// Open a gzip file and parse its first header.
-    ///
-    /// # Errors
-    ///
-    /// Returns `io::Error` if the file cannot be opened or the gzip header is malformed.
     pub fn new(path: &Path) -> io::Result<Self> {
         let mut file = File::open(path)
             .map_err(|e| io::Error::new(e.kind(), format!("igzip open {}: {e}", path.display())))?;
@@ -129,9 +113,7 @@ impl GzReader {
             if self.state.avail_in == 0 {
                 let n = self.file.read(&mut self.in_buf)?;
                 if n == 0 {
-                    // ISAL_BLOCK_FINISH is set only after the gzip trailer checksum
-                    // validates — it is the sole clean-EOF signal. Any other state
-                    // here means the stream was truncated.
+                    // ISAL_BLOCK_FINISH is set only after the gzip trailer checksum validates — the sole clean-EOF signal; any other state at n==0 means truncation
                     if self.state.block_state == ISAL_BLOCK_FINISH {
                         return Ok(false);
                     }
@@ -403,8 +385,7 @@ mod tests {
 
     #[test]
     fn multi_member_large_spanning_input_buffer() {
-        // Pseudo-random ACGT via xorshift64 — compresses poorly so the stream
-        // genuinely exceeds the 4 MiB input buffer.
+        // xorshift64 pseudo-random ACGT compresses poorly so the stream really exceeds the 4 MiB input buffer
         let mut s: u64 = 0x9E37_79B9_7F4A_7C15;
         let mut rng_acgt = |n: usize| -> Vec<u8> {
             (0..n)

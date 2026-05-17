@@ -1,5 +1,3 @@
-//! Chunked parallel-libdeflate gzip / plain FASTQ-record writer.
-
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -29,9 +27,6 @@ fn compress_member(plain: &[u8], level: i32) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// # Errors
-///
-/// `UpstreamError` if libdeflate compression fails; `Io` on write failure.
 pub fn write_chunks_gz<W: Write>(out: &mut W, chunks: Vec<Vec<u8>>, level: i32) -> Result<()> {
     let compressed: Vec<Result<Vec<u8>>> = chunks
         .into_par_iter()
@@ -68,9 +63,6 @@ pub struct ChunkedWriter {
 }
 
 impl ChunkedWriter {
-    /// # Errors
-    ///
-    /// `Io` if the file cannot be created.
     pub fn create(path: &Path, level: i32) -> Result<Self> {
         let f =
             File::create(path).rs_with_context(|| format!("creating output {}", path.display()))?;
@@ -86,9 +78,6 @@ impl ChunkedWriter {
         })
     }
 
-    /// # Errors
-    ///
-    /// `Io` on plain-text write failure; `UpstreamError` if libdeflate fails.
     pub fn write_record(&mut self, id: &[u8], seq: &[u8], qual: &[u8]) -> Result<()> {
         if self.gzipped {
             self.buffer.push(b'@');
@@ -121,9 +110,6 @@ impl ChunkedWriter {
         write_chunks_gz(&mut self.inner, chunks, self.level)
     }
 
-    /// # Errors
-    ///
-    /// `Io` or `UpstreamError` if compression / write fails.
     pub fn flush_pending(&mut self) -> Result<()> {
         if !self.gzipped {
             self.inner.flush().rs_context("flushing plain writer")?;
@@ -138,9 +124,6 @@ impl ChunkedWriter {
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// `Io` or `UpstreamError` if the final flush / compression fails.
     pub fn finalize(mut self) -> Result<()> {
         self.flush_pending()
     }

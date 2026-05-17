@@ -11,13 +11,7 @@ pub(crate) enum InputKind {
     Bgzf,
 }
 
-/// Read the first 18 bytes of the file and classify the input format.
-///
-/// BGZF detection checks for the gzip `BC` extra subfield per the SAM spec
-/// §4.1 (BGZF format).  A plain gzip file that happens to start with `0x1f 0x8b`
-/// but lacks the BC field is correctly classified as Gz, not Bgzf.  The 18-byte
-/// probe window covers the full fixed gzip header (10 bytes) + 2-byte XLEN +
-/// the 4-byte BC subfield header (`BC` + 2-byte little-endian size) fully.
+// BGZF = gzip BC extra subfield, SAM spec §4.1; the 18-byte probe spans the fixed header + XLEN + the BC subfield header
 pub(crate) fn detect(path: &Path) -> Result<InputKind> {
     let mut f = File::open(path).map_err(|e| {
         RsomicsError::Io(std::io::Error::new(
@@ -25,9 +19,7 @@ pub(crate) fn detect(path: &Path) -> Result<InputKind> {
             format!("opening {}: {e}", path.display()),
         ))
     })?;
-    // A single `read` may legally return fewer bytes than requested even when
-    // more are available; a 1-byte short read here would misclassify a .gz as
-    // plain and feed it raw to the parser. Fill the probe across short reads.
+    // a short read here would misclassify a .gz as plain — fill the probe across short reads
     let mut probe = [0u8; 18];
     let mut n = 0;
     while n < probe.len() {
@@ -80,11 +72,6 @@ mod tests {
         f
     }
 
-    // Minimal valid BGZF block header:
-    // ID1=0x1f ID2=0x8b CM=0x08 FLG=0x04 (FEXTRA)
-    // MTIME=0 XFL=0 OS=0xff
-    // XLEN=6 (LE) | SI1='B' SI2='C' | SLEN=2 (LE)
-    // BSIZE placeholder + padding to make 18 bytes total
     const BGZF_HEADER: &[u8] = &[
         0x1f, 0x8b, // ID1, ID2
         0x08, // CM = deflate

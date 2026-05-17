@@ -1,15 +1,3 @@
-//! Black-box compatibility vs the `FastQC` binary. Version-gated to the
-//! pinned release (CI/publish install exactly this); on any other or
-//! absent `FastQC` the test loud-skips rather than asserting against an
-//! unknown oracle.
-//!
-//! The fixture is synthesised to be unambiguous for *any* correct `FastQC`
-//! implementation — uniform-length, base-balanced, uniformly high quality,
-//! all-distinct reads, no adapters — so every module is PASS and the Basic
-//! Statistics values are exact. That makes the 12 module statuses + the
-//! Basic Statistics block a deterministic cross-check that needs no
-//! pre-observed `FastQC` output.
-
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -33,9 +21,7 @@ fn fastqc_pinned() -> bool {
     String::from_utf8_lossy(&out.stdout).contains(PINNED)
 }
 
-/// Deterministic balanced 150 bp reads, Phred+33 `I` (Q40), every read
-/// unique (the index is encoded in the first bases) so duplication and
-/// overrepresentation are trivially zero.
+// balanced bases, uniform Q40, all-distinct reads — all modules PASS and Basic Statistics values are deterministic
 fn synth_clean(path: &Path) {
     let f = fs::File::create(path).expect("create fixture");
     let mut w = BufWriter::new(f);
@@ -54,8 +40,6 @@ fn synth_clean(path: &Path) {
     }
 }
 
-/// Parse a `FastQC` `summary.txt` (`STATUS<TAB>Module<TAB>file`) into
-/// `(module, status)` pairs in order.
 fn parse_summary(text: &str) -> Vec<(String, String)> {
     text.lines()
         .filter_map(|l| {
@@ -68,8 +52,7 @@ fn parse_summary(text: &str) -> Vec<(String, String)> {
 }
 
 fn read_to_string_in(dir: &Path, leaf: &str) -> Option<String> {
-    // FastQC names the dir "<base-without-ext>_fastqc"; ours uses the full
-    // basename. Find the single *_fastqc dir and read `leaf` from it.
+    // FastQC strips the extension for its dir name; ours uses the full basename — search by suffix
     let entry = fs::read_dir(dir)
         .ok()?
         .filter_map(Result::ok)
@@ -131,8 +114,6 @@ fn statuses_and_basic_stats_match_fastqc() {
     let fq_sum = parse_summary(&read_to_string_in(&fq_out, "summary.txt").expect("fastqc summary"));
     let our_sum = parse_summary(&read_to_string_in(&ours_out, "summary.txt").expect("our summary"));
 
-    // Every module FastQC reports must be present in ours with the same
-    // status (the synthetic fixture is unambiguous ⇒ all PASS on both).
     for (module, fq_status) in &fq_sum {
         let our = our_sum
             .iter()
@@ -144,11 +125,7 @@ fn statuses_and_basic_stats_match_fastqc() {
             our.1
         );
     }
-    // FastQC v0.12.1 emits only the modules it ran: "Per tile sequence
-    // quality" is absent without Illumina tile IDs and "Kmer Content" is
-    // off by default, so a non-tiled fixture yields ~10, not 12. The
-    // contract is that every module FastQC *did* report matches ours (the
-    // loop above) and that we emit the full set.
+    // FastQC skips "Per tile sequence quality" (no tile IDs) and "Kmer Content" (off by default) — non-tiled fixture yields ~10, not 12
     assert!(
         fq_sum.len() >= 8,
         "FastQC produced too few modules ({}) — broken oracle run",

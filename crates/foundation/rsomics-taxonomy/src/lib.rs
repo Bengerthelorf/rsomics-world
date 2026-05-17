@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -126,8 +124,6 @@ impl Taxonomy {
         Ok(self)
     }
 
-    /// Walk merged-redirects until a live node is reached; returns `id` when
-    /// no merge entry exists.
     #[must_use]
     pub fn resolve(&self, id: TaxId) -> TaxId {
         let mut cur = id;
@@ -145,7 +141,7 @@ impl Taxonomy {
         cur
     }
 
-    /// Path from `id` to root (id first, root last).
+    // id first, root last
     pub fn lineage(&self, id: TaxId) -> Result<Vec<TaxId>> {
         let resolved = self.resolve(id);
         if !self.nodes.contains_key(&resolved) {
@@ -166,7 +162,6 @@ impl Taxonomy {
         Ok(path)
     }
 
-    /// Lowest common ancestor of two or more `tax_ids`.
     pub fn lca(&self, ids: &[TaxId]) -> Result<TaxId> {
         if ids.is_empty() {
             return Err(TaxonomyError::Unknown(0));

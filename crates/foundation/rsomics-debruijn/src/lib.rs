@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::collections::{HashMap, HashSet};
 
 use rsomics_kmer::encode::{Kmer, canonical};
@@ -26,9 +24,7 @@ pub struct DbgNode {
     pub out_degree: u8,
 }
 
-/// Canonical de Bruijn graph: nodes are canonical (k-1)-mers; each input
-/// k-mer contributes one edge `prefix(k-1) → suffix(k-1)`. Canonical form
-/// means a sequence and its reverse-complement share the same graph.
+// canonical de Bruijn: nodes = canonical (k-1)-mers, edge prefix→suffix; a seq and its revcomp share the graph
 #[derive(Debug, Clone, Default)]
 pub struct Dbg {
     pub k: usize,
@@ -87,8 +83,7 @@ impl Dbg {
         self.edges.len()
     }
 
-    /// Maximal non-branching paths. Each unitig is a vector of (k-1)-mer
-    /// keys; materialise as sequences by joining via the (k-2) overlap.
+    // unitigs = (k-1)-mer key vectors; join via the (k-2) overlap to get sequences
     #[must_use]
     pub fn unitigs(&self) -> Vec<Vec<Kmer>> {
         let mut succ: HashMap<Kmer, Vec<Kmer>> = HashMap::new();

@@ -1,5 +1,3 @@
-//! Tier-2 fixture management: manifest-driven download + sha256 verification.
-
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -26,13 +24,6 @@ struct Manifest {
     fixtures: Vec<Fixture>,
 }
 
-/// Resolve the Tier-2 cache directory, creating it if absent.
-///
-/// Precedence: `RSOMICS_TIER2_CACHE` > `$CARGO_TARGET_DIR/tier2-cache` > `~/.cache/rsomics-fixtures`.
-///
-/// # Errors
-///
-/// `RsomicsError::Io` if mkdir fails; `RsomicsError::ConfigError` if `HOME` is unset.
 pub fn cache_dir() -> Result<PathBuf> {
     resolve_cache_dir(
         std::env::var("RSOMICS_TIER2_CACHE").ok().as_deref(),
@@ -61,9 +52,6 @@ fn resolve_cache_dir(
     Ok(dir)
 }
 
-/// # Errors
-///
-/// `Err` if the file can't be read or doesn't parse.
 pub fn load_manifest(path: &Path) -> Result<Vec<Fixture>> {
     let mut buf = String::new();
     File::open(path)
@@ -75,12 +63,7 @@ pub fn load_manifest(path: &Path) -> Result<Vec<Fixture>> {
     Ok(m.fixtures)
 }
 
-/// Ensure fixture `name` is present and sha256-verified in the cache, downloading if needed.
-/// Verification happens before the rename — a partial download cannot poison the cache.
-///
-/// # Errors
-///
-/// `Err` if not found in manifest, download fails, sha256 mismatches, or filesystem ops fail.
+// verify sha256 before the rename — a partial download cannot poison the cache
 pub fn fetch(manifest_path: &Path, name: &str) -> Result<PathBuf> {
     let fixtures = load_manifest(manifest_path)?;
     let fx = fixtures.iter().find(|f| f.name == name).ok_or_else(|| {

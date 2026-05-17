@@ -3,8 +3,7 @@ use std::io::{self, Write};
 
 use crate::flags::CommonFlags;
 
-/// Stderr sink respecting `--quiet` / `--verbose`. `error` always prints;
-/// `info` respects quiet; `debug` requires verbose.
+// stderr sink: error always; info suppressed by --quiet; debug requires --verbose
 #[derive(Debug, Clone, Copy)]
 pub struct StderrLog {
     pub quiet: bool,

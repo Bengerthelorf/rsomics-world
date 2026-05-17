@@ -6,20 +6,8 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Kmer Content" — 7-mers over a 2% read sample (reads truncated
-/// to 500 bp). For each k-mer an exact binomial upper-tail test on its most
-/// enriched position asks whether it occurs there more than an even spread
-/// over positions predicts. WARN if any k-mer's p < 0.01, FAIL if p < 1e-5;
-/// the top 6 most biased k-mers are reported (clean-room `FastQC` contract).
-///
-/// The position support is the widest position span seen in the sample
-/// (`n_positions`); for fixed-length reads this is exact. With heavily
-/// variable read lengths a short-read k-mer's expectation is taken over the
-/// full span, which is conservative — `FastQC`'s exact per-length support
-/// model is not in its public documentation, and uniform-length data (the
-/// dominant case) is exact.
+// variable-length reads: expectation over widest span seen is conservative; fixed-length (dominant) is exact
 pub struct KmerContent {
-    /// k-mer (2-bit packed, 7 bases) → per-position observed counts.
     counts: HashMap<u32, Vec<u64>>,
     read_idx: u64,
     n_positions: usize,
@@ -49,8 +37,7 @@ fn unpack(mut code: u32) -> String {
     String::from_utf8_lossy(&s).into_owned()
 }
 
-/// Log-gamma via the Lanczos approximation (g=5, 6 terms) — standard
-/// public-domain coefficients; accurate to ~1e-10 for the a,b used here.
+// Lanczos log-gamma (g=5, 6 terms); public-domain coefficients accurate to ~1e-10
 fn gammaln(x: f64) -> f64 {
     const C: [f64; 6] = [
         76.180_091_729_471_46,
@@ -70,11 +57,7 @@ fn gammaln(x: f64) -> f64 {
     -tmp + (2.506_628_274_631_000_5 * ser / x).ln()
 }
 
-/// Continued fraction for the incomplete beta (modified Lentz). The
-/// recurrence is the canonical textbook method, written from the math;
-/// the single-letter names are its standard mathematical notation
-/// (a, b, x, and the Lentz state c, d, h) — verbose names would obscure
-/// the algorithm.
+// modified Lentz continued fraction for incomplete beta; single-letter names are standard math notation — do not rename
 #[allow(clippy::many_single_char_names)]
 fn betacf(a: f64, b: f64, x: f64) -> f64 {
     let tiny = 1e-30;
@@ -121,7 +104,6 @@ fn betacf(a: f64, b: f64, x: f64) -> f64 {
     h
 }
 
-/// Regularised incomplete beta `I_x(a, b)`.
 fn betai(a: f64, b: f64, x: f64) -> f64 {
     if x <= 0.0 {
         return 0.0;
@@ -137,10 +119,7 @@ fn betai(a: f64, b: f64, x: f64) -> f64 {
     }
 }
 
-/// Exact binomial upper tail `P(X >= k)`, `X ~ Binomial(n, p)`, via the
-/// identity `P(X >= k) = I_p(k, n-k+1)` (k >= 1). `FastQC` uses the exact
-/// binomial — a normal approximation is invalid where the per-position
-/// expectation is small (`n*p << 5`), the regime that decides WARN/FAIL.
+// P(X≥k) = I_p(k, n-k+1); exact binomial required — normal approx invalid when n*p << 5 (the WARN/FAIL regime)
 fn binom_sf(k: u64, n: u64, p: f64) -> f64 {
     if k == 0 {
         return 1.0;

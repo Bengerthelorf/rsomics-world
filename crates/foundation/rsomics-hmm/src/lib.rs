@@ -64,7 +64,6 @@ impl Hmm {
         })
     }
 
-    /// Most-likely state path via log-space Viterbi.
     pub fn viterbi(&self, obs: &[usize]) -> Result<Vec<usize>> {
         if obs.is_empty() {
             return Err(HmmError::Empty);
@@ -122,7 +121,6 @@ impl Hmm {
         Ok(path)
     }
 
-    /// `ln P(obs | model)` via scaled forward algorithm.
     pub fn log_likelihood(&self, obs: &[usize]) -> Result<f64> {
         if obs.is_empty() {
             return Err(HmmError::Empty);

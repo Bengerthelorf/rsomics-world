@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::fmt::Write as _;
 
 pub type NodeId = usize;

@@ -6,18 +6,7 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Sequence Duplication Levels". Only sequences first seen within
-/// the first 100 000 reads are tracked (but counted through the whole
-/// file); reads longer than 75 bp use their first 50 bp as the key (longer
-/// reads accumulate errors that inflate apparent diversity). WARN if
-/// non-unique sequences exceed 20% of the tracked total, FAIL if over 50%
-/// (clean-room `FastQC` contract).
-///
-/// The duplication-level binning and the "Total Deduplicated Percentage"
-/// follow `FastQC`'s documented behaviour. `FastQC` additionally thins its
-/// tracked set by sequence size, not only by read index, so the displayed
-/// curve can differ; the status decision is the documented
-/// non-unique-fraction threshold and is unaffected.
+// FastQC also thins by sequence size beyond the read-index limit, so displayed curves may differ; status threshold is unaffected
 pub struct DuplicationLevels {
     counts: HashMap<Vec<u8>, u64>,
     seen_reads: u64,
@@ -44,7 +33,6 @@ impl DuplicationLevels {
         }
     }
 
-    /// `(distinct, total)` over the tracked sequences.
     fn distinct_total(&self) -> (u64, u64) {
         let distinct = self.counts.len() as u64;
         let total: u64 = self.counts.values().sum();
@@ -60,7 +48,6 @@ impl DuplicationLevels {
         }
     }
 
-    /// `FastQC` duplication-level bucket label for an occurrence count.
     fn level_label(n: u64) -> &'static str {
         match n {
             0 => "0",
@@ -128,12 +115,11 @@ impl QcModule for DuplicationLevels {
         let _ = writeln!(out, "#Total Deduplicated Percentage\t{dedup_pct:.6}");
         out.push_str("#Duplication Level\tPercentage of deduplicated\tPercentage of total\n");
 
-        // Aggregate tracked sequences by their occurrence-count bucket.
         let mut by_level: HashMap<&'static str, (u64, u64)> = HashMap::new();
         for &c in self.counts.values() {
             let e = by_level.entry(Self::level_label(c)).or_insert((0, 0));
-            e.0 += 1; // distinct sequences in this level
-            e.1 += c; // reads contributed
+            e.0 += 1;
+            e.1 += c;
         }
         for label in [
             "1", "2", "3", "4", "5", "6", "7", "8", "9", ">10", ">50", ">100", ">500", ">1k",

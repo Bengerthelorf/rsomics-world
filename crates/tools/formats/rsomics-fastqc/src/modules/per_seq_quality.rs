@@ -2,14 +2,7 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Per sequence quality scores" — distribution of each read's mean
-/// quality. WARN if the most frequent mean quality (the mode) is below 27,
-/// FAIL if below 20 (clean-room `FastQC` contract).
-///
-/// The per-read mean is taken over raw quality bytes (offset-independent);
-/// the Phred offset is resolved in `finalize` from the lowest byte seen
-/// (Phred+33 unless the lowest byte is ≥ 64), matching `FastQC`'s encoding
-/// inference, then the histogram is shifted into Phred space.
+// raw byte mean collected in process; finalize resolves offset (Phred+33 unless min byte ≥ 64) and shifts histogram into Phred space
 pub struct PerSeqQuality {
     raw_mean_hist: [u64; 256],
     min_byte: u8,

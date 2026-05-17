@@ -9,16 +9,8 @@ use rsomics_fqgz::ChunkedWriter;
 
 const CHUNK_RECORDS: usize = 8192; // ≈12 MB per chunk at 150 bp; amortises rayon dispatch
 
-/// fastp filter check order (fastp `src/filter.cpp` `Filter::passFilter`):
-///   when qualFilter enabled: 1. low-qual-percent  2. n-base
-///   when lengthFilter enabled: 3. length (too short / too long)
-///
-/// Order matters for reads that fail multiple criteria: the per-reason counter
-/// that increments must match the first failure fastp would attribute, so JSON
-/// report counters agree with fastp output.
-///
-/// The discriminated return lets callers increment the exact counter that matches
-/// the failure reason instead of always returning bool and leaving counters at zero.
+// fastp check order (src/filter.cpp Filter::passFilter): low-qual-percent → n-base → length.
+// Order determines which failure counter increments when a read fails multiple criteria.
 pub enum FilterOutcome {
     Pass,
     FailLength,
@@ -26,25 +18,17 @@ pub enum FilterOutcome {
     FailNBase,
 }
 
-/// Exact fastp filter semantics — sourced from fastp `src/filter.cpp` and
-/// `src/options.h` (fastp MIT license; reading permitted, cited here).
-///
-/// A base at position i is "unqualified" iff `qual[i] < qual_threshold_ascii`,
-/// where `qual_threshold_ascii = qualified_quality_phred + 33` (Phred+33 encoding).
-/// fastp stores `qualifiedQual` as the ASCII character directly and compares
-/// `qual_char < qualifiedQual` (simd.cpp `CountQualityMetricsImpl`).
-///
-/// `qual_threshold_ascii` is `u16` to prevent overflow: Phred 222 + 33 = 255 fits
-/// u8, but Phred 223 + 33 = 256 wraps to 0 in u8 — silent wrong output in release.
-/// The widened comparison `u16::from(qual_byte) < threshold` is zero-cost.
+// fastp src/filter.cpp + src/options.h (MIT; reading permitted).
+// qual_threshold_ascii is u16 to prevent overflow: Phred 223 + 33 = 256 wraps in u8,
+// emitting silent wrong output in release. The widened comparison is zero-cost.
 #[derive(Debug, Clone, Copy)]
 pub struct FilterConfig {
-    /// ASCII threshold: a quality byte strictly less than this is low-quality.
+    // ASCII threshold: a quality byte strictly less than this is low-quality.
     pub qual_threshold_ascii: u16,
     pub unqualified_percent_limit: u8,
     pub n_base_limit: usize,
     pub required_length: usize,
-    /// 0 = no upper bound.
+    // 0 = no upper bound.
     pub max_length: usize,
     pub quality_enabled: bool,
     pub length_enabled: bool,

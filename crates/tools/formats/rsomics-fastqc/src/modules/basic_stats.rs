@@ -2,10 +2,6 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Basic Statistics" — never warns or fails (always Pass). The
-/// `%GC` it reports is an integer over all called bases; encoding is
-/// inferred from the lowest quality byte (clean-room: modern Phred+33 data
-/// reports "Sanger / Illumina 1.9").
 pub struct BasicStats {
     filename: String,
     n_seqs: u64,

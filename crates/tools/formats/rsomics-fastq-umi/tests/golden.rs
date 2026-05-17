@@ -1,6 +1,4 @@
-//! fastp-independent golden: hand-computed fastp-0.20.1 UMI output so
-//! correctness is gated everywhere, not only where fastp is installed.
-
+// Hand-computed fastp-0.20.1 UMI golden fixtures: gates correctness where fastp is not installed.
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -31,9 +29,6 @@ fn se_umi_len6_golden() {
         .unwrap();
     assert!(st.success());
 
-    // readA: umi=AACCGG, name has a space → tag before it; seq/qual lose 6 at 5'
-    // readB: umi=TTGGCC, no space → appended
-    // readC: umi=GGGGCC, space after "readC" → tag before it
     let expected = "\
 @readA:AACCGG 1:N:0:ACGT
 TTACGTACGTACGT
@@ -70,7 +65,6 @@ fn se_umi_len5_skip2_golden() {
         .unwrap();
     assert!(st.success());
 
-    // umi = first 5 bases; trimFront = 5 + 2 = 7 from seq+qual (20 → 13).
     let expected = "\
 @readA:AACCG 1:N:0:ACGT
 TACGTACGTACGT
@@ -88,8 +82,7 @@ HHHHHHHHHHHHH
     assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
 }
 
-/// Reads SHORTER than `umi_len` + skip: fastp 0.20.1 `Read::trimFront` clamps
-/// to `length()-1`, so every read keeps at least its last base (never emptied).
+// fastp 0.20.1 Read::trimFront clamps to length()-1 — reads shorter than umi_len keep their last base.
 #[test]
 fn se_umi_short_len8_golden() {
     let tmp = tempfile::tempdir().unwrap();
@@ -107,8 +100,6 @@ fn se_umi_short_len8_golden() {
         .unwrap();
     assert!(st.success());
 
-    // shortA len5 umi=AACCG trim min(5,4)=4 → G/I; shortB len3 umi=TTG trim
-    // min(3,2)=2 → G/F; shortC len1 umi=A trim min(1,0)=0 → A/I kept.
     let expected = "\
 @shortA:AACCG
 G
@@ -126,10 +117,7 @@ I
     assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
 }
 
-/// `--umi_loc index1`: the UMI is the read-name trailing index field
-/// (fastp 0.20.1 `Read::firstIndex`, backward scan to the last `:`/`+`),
-/// stamped without trimming seq/qual. A name with no index field is a
-/// pass-through (fastp's `if(!umi.empty())` guard), not an error.
+// index1: UMI from firstIndex (backward scan to last ':'/'+''), stamped without trimming seq/qual; no index field → pass-through (fastp if(!umi.empty()) guard).
 #[test]
 fn se_umi_index1_golden() {
     let tmp = tempfile::tempdir().unwrap();
@@ -147,9 +135,6 @@ fn se_umi_index1_golden() {
         .unwrap();
     assert!(st.success());
 
-    // readA name=`readA 1:N:0:ACGT` → firstIndex=ACGT, tag before first space,
-    //   seq/qual untouched. readB=`readB` / readC=`readC desc here` have no
-    //   index field → empty UMI → pass-through unchanged.
     let expected = "\
 @readA:ACGT 1:N:0:ACGT
 AACCGGTTACGTACGTACGT
@@ -167,8 +152,7 @@ HHHHHHHHHHHHHHHHHHHH
     assert_eq!(std::fs::read_to_string(&out).unwrap(), expected);
 }
 
-/// A zero-length UMI source read has no defined fastp 0.20.1 output (fastp's
-/// `trimFront` throws). We fail loud rather than fabricate a record.
+// fastp 0.20.1 trimFront throws on zero-length reads; fail loud rather than fabricate a record.
 #[test]
 fn empty_source_read_errors_cli() {
     let tmp = tempfile::tempdir().unwrap();
@@ -190,9 +174,7 @@ fn empty_source_read_errors_cli() {
     );
 }
 
-/// fastp 0.20.1 rejects `read2` / `index2` / `per_index` / `per_read`
-/// without a paired input at option-validation time. Match it: SE with a
-/// PE-only location must fail loud, not silently emit a partial UMI.
+// fastp 0.20.1 rejects PE-only locations (read2/index2/per_index/per_read) without paired input at validation time.
 #[test]
 fn pe_only_loc_in_se_rejected_cli() {
     for loc in ["per_index", "per_read", "read2", "index2"] {

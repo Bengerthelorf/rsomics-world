@@ -8,9 +8,6 @@ use rsomics_common::{Result, RsomicsError};
 
 use modules::{QcModule, Record, default_modules};
 
-/// Run the full `FastQC` module pipeline over one FASTQ file. The returned
-/// modules are finalized and ready for `report::fastqc_data` / `summary`.
-#[allow(clippy::missing_errors_doc)]
 pub fn analyze(path: &Path) -> Result<Vec<Box<dyn QcModule>>> {
     let mut reader = parse_fastx_file(path)
         .map_err(|e| RsomicsError::InvalidInput(format!("opening {}: {e}", path.display())))?;

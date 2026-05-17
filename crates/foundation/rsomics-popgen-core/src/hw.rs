@@ -1,7 +1,6 @@
 use crate::{PopgenError, Result};
 
-/// Exact HWE p-value (Wigginton, Cutler & Abecasis 2005, AJHG 76:887–893).
-/// `obs_hets` / `obs_hom1` / `obs_hom2` are observed genotype counts.
+// exact HWE p-value — Wigginton, Cutler & Abecasis 2005, AJHG 76:887–893
 pub fn hwe_exact(obs_hets: u64, obs_hom1: u64, obs_hom2: u64) -> Result<f64> {
     let n = obs_hets + obs_hom1 + obs_hom2;
     if n == 0 {
@@ -17,9 +16,7 @@ pub fn hwe_exact(obs_hets: u64, obs_hom1: u64, obs_hom2: u64) -> Result<f64> {
         return Ok(1.0);
     }
 
-    // Het-count distribution under HWE conditional on rare-allele count;
-    // sum p(k) ≤ p(observed) for the two-sided p-value.
-    // het parity: hets and rare allele share parity.
+    // het-count distribution under HWE given rare-allele count; two-sided p = Σ p(k) ≤ p(obs). hets and rare allele share parity
     let mut het_probs: Vec<f64> = vec![0.0; (rare as usize) + 1];
     let mid: u64 = rare * (2 * total_genotypes - rare) / (2 * total_genotypes); // HWE midpoint
     let mid = if mid & 1 == rare & 1 { mid } else { mid + 1 };

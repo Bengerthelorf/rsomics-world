@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
@@ -7,14 +5,10 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Genotype {
-    /// Homozygous for allele 1 (PLINK code 0b00).
-    HomA1,
-    /// Missing genotype (PLINK code 0b01).
-    Missing,
-    /// Heterozygous (PLINK code 0b10).
-    Het,
-    /// Homozygous for allele 2 (PLINK code 0b11).
-    HomA2,
+    HomA1,   // PLINK 0b00
+    Missing, // PLINK 0b01
+    Het,     // PLINK 0b10
+    HomA2,   // PLINK 0b11
 }
 
 #[derive(Debug, Clone)]
@@ -41,8 +35,7 @@ pub struct Sample {
 pub struct Pgen {
     pub variants: Vec<Variant>,
     pub samples: Vec<Sample>,
-    /// Variant-major matrix: rows = variants, cols = samples. Length =
-    /// `n_variants × n_samples`; access via `gt[v_idx * n_samples + s_idx]`.
+    // variant-major: gt[v_idx * n_samples + s_idx], len = n_variants * n_samples
     pub gt: Vec<Genotype>,
 }
 
@@ -77,7 +70,7 @@ pub enum PgenError {
 pub type Result<T> = std::result::Result<T, PgenError>;
 
 impl Pgen {
-    /// Load a PLINK1 fileset by `prefix` (`<prefix>.bim`, `.fam`, `.bed`).
+    // PLINK1 fileset: <prefix>.bim + .fam + .bed
     pub fn load(prefix: &Path) -> Result<Self> {
         let bim = prefix.with_extension("bim");
         let fam = prefix.with_extension("fam");
@@ -101,10 +94,6 @@ impl Pgen {
         self.samples.len()
     }
 
-    /// Genotype call for `(variant_idx, sample_idx)`.
-    ///
-    /// # Panics
-    /// Panics on out-of-range indices.
     #[must_use]
     pub fn get(&self, v: usize, s: usize) -> Genotype {
         self.gt[v * self.samples.len() + s]

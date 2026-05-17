@@ -2,17 +2,7 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Per base sequence quality" — per-position Phred distribution
-/// (mean, median, 25/75 quartiles, 10/90 percentiles). WARN if any
-/// position's lower quartile < 10 or median < 25; FAIL if any lower
-/// quartile < 5 or median < 20 (clean-room `FastQC` contract).
-///
-/// Per-position raw-byte histograms are kept (offset-independent); the
-/// Phred offset is resolved in `finalize` from the lowest byte (Phred+33
-/// unless ≥ 64). `FastQC` bins distant positions into base groups for long
-/// reads; this keeps per-position resolution — the status is exact (it is
-/// the per-position extreme); matching `FastQC`'s group layout for very long
-/// reads is a separate compat step.
+// FastQC bins distant positions into groups for long reads; we emit per-position — status is exact, display layout differs for very long reads
 pub struct PerBaseQuality {
     hist: Vec<[u64; 256]>,
     min_byte: u8,
@@ -38,8 +28,6 @@ impl PerBaseQuality {
         }
     }
 
-    /// Nearest-rank percentile over the Phred histogram of one position:
-    /// the smallest score whose cumulative share reaches `pct`.
     fn percentile(counts: &[u64; 256], offset: u8, total: u64, pct: f64) -> f64 {
         #[allow(clippy::cast_precision_loss)]
         let target = pct / 100.0 * total as f64;

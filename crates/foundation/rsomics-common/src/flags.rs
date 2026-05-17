@@ -9,7 +9,7 @@ use crate::error::Result;
 #[cfg(feature = "rayon")]
 use crate::error::RsomicsError;
 
-/// Common flags for every tool. Flatten with `#[command(flatten)]` at the top level only.
+// flatten with #[command(flatten)] at the top level only — these are global args
 #[derive(Debug, Clone, Args)]
 pub struct CommonFlags {
     /// Number of worker threads (default: available parallelism).
@@ -67,7 +67,7 @@ impl CommonFlags {
         Ok(())
     }
 
-    /// `--seed 0` is preserved verbatim — explicit zero is not treated as "no seed".
+    // --seed 0 is preserved verbatim — explicit zero is not "no seed"
     #[must_use]
     pub fn seed_rng(&self) -> u64 {
         static FRESH_SEED: OnceLock<u64> = OnceLock::new();

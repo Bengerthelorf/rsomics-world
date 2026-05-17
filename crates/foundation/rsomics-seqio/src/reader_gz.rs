@@ -1,8 +1,6 @@
-// Slab boundary invariant: every slab the producer sends contains an integer
-// number of complete FASTQ records (4 lines each). Boundaries are found by
-// 4-line counting, which is immune to `@` or `+` appearing as quality chars.
-// Carry holds the tail after the last complete record and is prepended to the
-// next block. A record larger than OUT_BUF accumulates until a boundary is found.
+// Slab invariant: each slab the producer sends holds whole FASTQ records (4-line
+// counting, immune to @/+ in quality). Carry holds the tail into the next block;
+// a record larger than OUT_BUF accumulates until a boundary.
 use std::collections::VecDeque;
 use std::io::{BufReader, Cursor, Read};
 use std::path::Path;
@@ -148,8 +146,7 @@ fn record_start_offsets(slab: &[u8]) -> Vec<usize> {
 }
 
 fn producer(path: &Path, tx: &crossbeam_channel::Sender<Result<Vec<u8>>>) {
-    // Without catch_unwind a panicking decode thread drops `tx`, which the
-    // consumer's recv() sees as clean EOF — silently truncating the stream.
+    // without catch_unwind a panicking decode thread drops tx — consumer's recv() reads that as clean EOF, silently truncating
     let outcome =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| produce_inner(path, tx)));
     match outcome {

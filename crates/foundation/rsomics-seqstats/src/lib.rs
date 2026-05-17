@@ -1,12 +1,5 @@
-//! Format-agnostic sequence-statistics primitives shared by the
-//! `rsomics-*-stats` tools. The N50/L50/quartile math is a port of
-//! `shenwei356/bio` `util/length-stats.go`; the alphabet guess mirrors
-//! seqkit's `seq.GuessAlphabet`. Sharing this verbatim (rather than
-//! re-deriving per format) is what lets `--all --tabular` byte-agree with
-//! `seqkit stats -a -T` for both FASTA and FASTQ.
-
-// u64→f64 cast: lengths/counts fit in 52-bit mantissa for any real genome;
-// cast only at final quartile/N50/percentage stage.
+// one shared implementation for every rsomics-*-stats tool — re-deriving the math per format would silently break --all --tabular byte-agreement with seqkit stats -a -T
+// lengths/counts fit f64's 52-bit mantissa for any real genome
 #![allow(clippy::cast_precision_loss)]
 
 use serde::Serialize;
@@ -19,8 +12,7 @@ pub enum SeqType {
     Rna,
     #[serde(rename = "Protein")]
     Protein,
-    // seqkit's catch-all alphabet is "Unlimit" (empty or non-bio sequence);
-    // it never emits "Other", so byte-equality requires this exact string.
+    // seqkit's catch-all is "Unlimit" not "Other" — byte-equality needs this exact string
     #[serde(rename = "Unlimit")]
     Unlimit,
 }
@@ -37,14 +29,10 @@ impl SeqType {
     }
 }
 
-/// seqkit guesses the sequence type from the **first record only**, scanning
-/// at most this many bytes of it (`seq.AlphabetGuessSeqLengthThreshold`,
-/// seqkit's `--alphabet-guess-seq-length` default). Callers pass the first
-/// record's sequence truncated to this; accumulating across records diverges.
+// seqkit AlphabetGuessSeqLengthThreshold; first record only — accumulating across records diverges
 pub const DEFAULT_ALPHABET_GUESS_LEN: usize = 10_000;
 
-/// Count every byte of `haystack` equal to any byte in `needles`, deduping
-/// `needles` so overlapping classes (e.g. `b"GCgc"`) are not double-counted.
+// dedup needles: overlapping classes (e.g. b"GCgc") must not double-count
 #[must_use]
 pub fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
     let mut seen = [false; 256];
@@ -54,18 +42,13 @@ pub fn count_any_of(haystack: &[u8], needles: &[u8]) -> u64 {
             continue;
         }
         seen[n as usize] = true;
-        // Per-needle bytecount SIMD (4-pass over the slice) beats a scalar
-        // single-pass LUT: NEON/AVX2 recoups the extra bandwidth.
-        // (M2: scalar LUT 83 ms vs 53 ms on a chr22 fixture.)
+        // per-needle bytecount SIMD (4 passes) beats a scalar single-pass LUT — NEON/AVX2 recoups the bandwidth (host-M: 83 ms vs 53 ms, chr22 fixture)
         total += bytecount::count(haystack, n) as u64;
     }
     total
 }
 
-/// seqkit's alphabet guess over one sequence (pass the first record's prefix —
-/// see [`DEFAULT_ALPHABET_GUESS_LEN`]): any protein-only residue ⇒ Protein;
-/// else U-without-T ⇒ RNA; else DNA. An empty or non-bio sequence ⇒ Unlimit.
-/// Ambiguity codes and gaps do not decide the type.
+// seqkit seq.GuessAlphabet — pass the first record's prefix only
 #[must_use]
 pub fn classify(sample: &[u8]) -> SeqType {
     if sample.is_empty() {
@@ -96,8 +79,7 @@ pub fn classify(sample: &[u8]) -> SeqType {
     }
 }
 
-/// Port of `bio/util/length-stats.go`. seqkit's L50 counts unique-length
-/// buckets, not records — reproduced so `--tabular --all` agrees with seqkit.
+// port of shenwei356/bio length-stats.go — L50 = unique-length-bucket count (not records), matches seqkit --tabular --all
 pub struct LengthStats {
     counts: Vec<(u64, u64)>,
     sum: u64,
@@ -145,8 +127,7 @@ impl LengthStats {
                 }
             }
         }
-        // Callers pass i_med_l < self.count, so the last bucket's acc always
-        // terminates the loop. Reaching here means a caller broke the invariant.
+        // callers pass i_med_l < self.count, so the last bucket's acc always terminates the loop
         unreachable!(
             "LengthStats::get_value: i_med_l={i_med_l} not bracketed in counts (count={}, flag={flag}, prev={prev})",
             self.count
@@ -215,8 +196,6 @@ impl LengthStats {
         }
     }
 
-    /// `(N50, L50)` where L50 is seqkit's `N50_num` (unique-length-bucket
-    /// count, not record count — see the struct doc).
     #[must_use]
     pub fn n50_l50(&self) -> (u64, u64) {
         if self.counts.is_empty() {
@@ -295,7 +274,6 @@ mod tests {
         assert_eq!(classify(b"ACGU"), SeqType::Rna);
         assert_eq!(classify(b"MEEPSILQRT"), SeqType::Protein);
         assert_eq!(classify(b"ACGTN"), SeqType::Dna);
-        // seqkit prints "Unlimit" (not "Other") for empty / non-bio input.
         assert_eq!(classify(b""), SeqType::Unlimit);
         assert_eq!(classify(b"@#$"), SeqType::Unlimit);
     }

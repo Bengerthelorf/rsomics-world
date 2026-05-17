@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc)]
-
 pub mod dedup;
 pub mod report;
 

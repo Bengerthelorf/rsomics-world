@@ -1,7 +1,6 @@
 use crate::{PopgenError, Result};
 
-/// LD r² between two biallelic loci. `genotypes[hap_index] = [allele_A, allele_B]`,
-/// values ∈ {0, 1} (0 = major, 1 = minor).
+// LD r²; genotypes[hap] = [allele_A, allele_B], 0 = major / 1 = minor
 pub fn r_squared(genotypes: &[[u8; 2]]) -> Result<f64> {
     if genotypes.is_empty() {
         return Err(PopgenError::Empty);

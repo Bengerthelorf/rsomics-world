@@ -64,7 +64,7 @@ fn sub(a: u8, b: u8, p: &ScoreParams) -> i32 {
     }
 }
 
-/// Global alignment; Gotoh affine-gap DP, O(n·m).
+// global alignment — Gotoh affine-gap DP, O(n·m)
 pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {
@@ -133,7 +133,7 @@ pub fn needleman_wunsch(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment
     })
 }
 
-/// Local alignment; Smith-Waterman affine-gap DP.
+// local alignment — Smith-Waterman, affine gaps
 pub fn smith_waterman(a: &[u8], b: &[u8], p: &ScoreParams) -> Result<Alignment> {
     if a.is_empty() || b.is_empty() {
         return Err(AlignError::Empty {

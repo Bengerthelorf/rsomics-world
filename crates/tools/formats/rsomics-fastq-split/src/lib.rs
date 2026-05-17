@@ -6,33 +6,21 @@ use serde::Serialize;
 
 use rsomics_fqgz::ChunkedWriter;
 
-/// How to partition the input.
-///
-/// fastp 0.20.1 exposes `--split N` (byFileNumber) and `--split_by_lines L`
-/// (byFileLines). fastp's byFileNumber distributes by a *file-size estimate*
-/// (not an exact read count), so it is not a deterministic byte-compat oracle;
-/// `ByNumber` here is **exact-count** (one counting pass → `ceil(total/N)`
-/// contiguous reads per file), a deliberate, documented improvement. `ByLines`
-/// is deterministic on both sides and is byte-equal to fastp 0.20.1.
+// ByNumber uses exact ceil(total/N) read counts; fastp's byFileNumber uses a file-size
+// estimate and is non-deterministic. ByLines is byte-equal to fastp 0.20.1.
 #[derive(Debug, Clone, Copy)]
 pub enum SplitMode {
-    /// `--split_by_lines L`: each file gets `L/4` reads (last file the
-    /// remainder). `L` must be a multiple of 4 (a FASTQ record is 4 lines).
     ByLines(usize),
-    /// `--split N`: exactly enough files of `ceil(total/N)` reads each.
     ByNumber(usize),
 }
 
 #[derive(Debug, Clone)]
 pub struct SplitConfig {
     pub mode: SplitMode,
-    /// fastp `--split_prefix_digits` (zero-pad width of the numeric prefix).
     pub digits: usize,
 }
 
-/// fastp 0.20.1 split-file name: `<zero-padded 1-based index>.<basename(out)>`
-/// in `out`'s parent directory (so `out.fq.gz` → `0001.out.fq.gz`, keeping the
-/// `.gz` suffix so the per-file writer still gzip-compresses).
+// Naming: `<zero-padded 1-based idx>.<basename(out)>` in out's parent — fastp 0.20.1 convention.
 fn split_path(out: &Path, idx: usize, digits: usize) -> PathBuf {
     let base = out.file_name().map_or_else(
         || std::ffi::OsString::from("out"),
@@ -162,9 +150,6 @@ impl<'cfg> Pipeline<'cfg> {
         Self { cfg, compression }
     }
 
-    /// # Errors
-    ///
-    /// Propagates input parse / output write errors and config errors.
     pub fn run_se(&self, input: &Path, out: &Path) -> Result<SplitReport> {
         let total = match self.cfg.mode {
             SplitMode::ByNumber(_) => Some(count_reads(input)?),
@@ -187,10 +172,6 @@ impl<'cfg> Pipeline<'cfg> {
         Ok(report)
     }
 
-    /// # Errors
-    ///
-    /// Propagates parse / write / config errors; errors if the two inputs have
-    /// a differing record count.
     pub fn run_pe(&self, in1: &Path, in2: &Path, out1: &Path, out2: &Path) -> Result<SplitReport> {
         let total = match self.cfg.mode {
             SplitMode::ByNumber(_) => Some(count_reads(in1)?),

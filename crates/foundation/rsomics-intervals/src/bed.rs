@@ -4,8 +4,7 @@ use rsomics_common::{Context, Result, RsomicsError};
 
 use crate::interval::{Interval, Strand};
 
-/// Read BED3/BED6 lines. Empty lines and `#`-prefixed comment lines are
-/// skipped, matching bedtools behaviour.
+// skip empty + #-comment lines — matches bedtools
 #[allow(clippy::missing_errors_doc)]
 pub fn read<R: Read>(r: R) -> Result<Vec<Interval>> {
     let mut out = Vec::new();
@@ -52,7 +51,7 @@ pub fn write_bed3<W: Write, I: IntoIterator<Item = Interval>>(mut w: W, ivs: I) 
     Ok(())
 }
 
-/// Write as BED6. `name`/`score` emit `.`/`0`; strand emits `+`/`-`/`.`.
+// BED6 out: missing name/score → ./0, strand → +/-/.
 #[allow(clippy::missing_errors_doc)]
 pub fn write_bed6<W: Write, I: IntoIterator<Item = Interval>>(mut w: W, ivs: I) -> Result<()> {
     for iv in ivs {
@@ -72,9 +71,7 @@ pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Interval>> {
     read(io::Cursor::new(bytes))
 }
 
-/// Single-pass merge over pre-sorted BED3 input (sorted by chrom then start).
-/// Out-of-order input or a reappearing chrom fails loud. `track`/`browser`/`#`
-/// preamble lines are skipped. Chrom is treated as opaque bytes (no UTF-8 validation).
+// requires pre-sorted BED3 (chrom then start) — out-of-order or reappearing chrom fails loud; chrom is opaque bytes
 #[allow(clippy::missing_errors_doc)]
 pub fn merge_sorted<R: Read, W: Write>(r: R, mut w: W) -> Result<()> {
     let mut rdr = BufReader::new(r);

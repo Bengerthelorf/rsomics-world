@@ -4,12 +4,7 @@ use rsomics_common::{Result, RsomicsError};
 
 use crate::OwnedRecord;
 
-/// Parse one FASTQ record from `reader`.
-///
-/// Returns `Ok(None)` at clean EOF (no bytes consumed for this record).
-/// Returns `Err` for truncated input, missing `@`/`+` markers, or seq/qual
-/// length mismatch.  Trailing `\r` on any line is stripped; otherwise line
-/// content is kept verbatim.
+// Ok(None) only at clean EOF; trailing \r?\n stripped, otherwise verbatim
 pub(crate) fn parse_record<R: BufRead>(reader: &mut R) -> Result<Option<OwnedRecord>> {
     let mut header = Vec::new();
     let n = reader

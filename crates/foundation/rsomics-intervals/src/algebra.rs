@@ -11,9 +11,7 @@ fn mk(chrom: &str, start: u64, end: u64) -> Interval {
     }
 }
 
-/// Merge overlapping or touching intervals within each chromosome.
-/// Touching intervals `[a, b)` and `[b, c)` collapse into `[a, c)` — matches `bedtools merge -d 0`.
-/// Strand is dropped on output.
+// merge overlapping/touching half-open intervals per chrom — bedtools merge -d 0; strand dropped
 #[must_use]
 pub fn merge(input: &IntervalSet) -> IntervalSet {
     let mut work = input.clone();
@@ -40,12 +38,10 @@ pub fn merge(input: &IntervalSet) -> IntervalSet {
     out
 }
 
-/// Intersect two interval sets — each overlapping pair emits an interval clipped to the overlap.
-/// Mirrors `bedtools intersect` default (duplicates retained when one `a` interval hits multiple `b`).
+// clip each overlapping pair to the overlap — bedtools intersect default (a-duplicates retained)
 #[must_use]
 pub fn intersect(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
-    // coitrees index over b: O(n_a·log n_b + output) regardless of interval length distribution.
-    // An active-set sweep degrades to O(n_a·n_b) on long-a/dense-b shapes (e.g. CNV vs SNP).
+    // coitrees index over b: O(n_a·log n_b + output); an active-set sweep degrades to O(n_a·n_b) on long-a/dense-b (CNV vs SNP)
     let bx = IntervalIndex::build(b);
     let mut out = IntervalSet::new();
     for (chrom, a_ivs) in a.iter_chroms() {
@@ -63,7 +59,7 @@ pub fn intersect(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
     out
 }
 
-/// Subtract `b`'s coverage from `a`. Mirrors `bedtools subtract` without `-A`.
+// subtract b's coverage from a — bedtools subtract (without -A)
 #[must_use]
 pub fn subtract(a: &IntervalSet, b: &IntervalSet) -> IntervalSet {
     let b_merged = merge(b);
@@ -111,7 +107,7 @@ fn subtract_one(a: &Interval, b_ivs: &[Interval]) -> Vec<(u64, u64)> {
     out
 }
 
-/// Complement: uncovered regions of each chromosome, bounded by `chrom_sizes`. Mirrors `bedtools complement -g`.
+// uncovered regions per chrom, bounded by chrom_sizes — bedtools complement -g
 #[must_use]
 pub fn complement(input: &IntervalSet, chrom_sizes: &[(String, u64)]) -> IntervalSet {
     let merged = merge(input);

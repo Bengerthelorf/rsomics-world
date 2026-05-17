@@ -1,8 +1,3 @@
-//! The `FastQC` analysis-module set. Each module consumes every record once
-//! (`process`), is `finalize`d, then reports a `ModuleStatus` and its
-//! `fastqc_data.txt` section. Thresholds are the clean-room `FastQC` contract
-//! (public Help docs); see each module's doc for the exact pass/warn/fail.
-
 mod adapter_content;
 mod basic_stats;
 mod dup_levels;
@@ -29,7 +24,6 @@ pub use per_seq_quality::PerSeqQuality;
 pub use per_tile_quality::PerTileQuality;
 pub use seq_length::SeqLengthDistribution;
 
-/// One parsed FASTQ record, borrowed for the duration of a `process` call.
 pub struct Record<'a> {
     pub id: &'a [u8],
     pub seq: &'a [u8],
@@ -44,7 +38,6 @@ pub enum ModuleStatus {
 }
 
 impl ModuleStatus {
-    /// `FastQC` `summary.txt` token.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -54,7 +47,6 @@ impl ModuleStatus {
         }
     }
 
-    /// `FastQC` `fastqc_data.txt` `>>Module\t<token>` token (lower-case).
     #[must_use]
     pub const fn as_data_token(self) -> &'static str {
         match self {
@@ -66,24 +58,20 @@ impl ModuleStatus {
 }
 
 pub trait QcModule {
-    /// `FastQC` module name, verbatim (e.g. `"Basic Statistics"`) — it is the
-    /// `>>` header in `fastqc_data.txt` and the column in `summary.txt`.
+    // verbatim FastQC name — used as the `>>` header in fastqc_data.txt and the column in summary.txt
     fn name(&self) -> &'static str;
 
     fn process(&mut self, rec: &Record);
 
-    /// Compute derived results once all records are seen.
     fn finalize(&mut self);
 
     fn status(&self) -> ModuleStatus;
 
-    /// Append this module's `fastqc_data.txt` body (between the `>>name`
-    /// header and `>>END_MODULE`, which the report writer emits).
+    // appends the fastqc_data.txt body between `>>name` and `>>END_MODULE`
     fn write_data(&self, out: &mut String);
 }
 
-/// The default `FastQC` module pipeline, in `FastQC`'s report order. `filename`
-/// is the value Basic Statistics reports in its `Filename` field.
+// modules in FastQC's report order; `filename` becomes the Basic Statistics `Filename` field
 #[must_use]
 pub fn default_modules(filename: &str) -> Vec<Box<dyn QcModule>> {
     vec![

@@ -9,12 +9,7 @@ use rsomics_fqgz::ChunkedWriter;
 
 const CHUNK_RECORDS: usize = 8192;
 
-/// Where the UMI is taken from — the full fastp 0.20.1 `--umi_loc` set.
-///
-/// `Read1`/`Read2`: 5' of that read's sequence (the read is trimmed).
-/// `Index1`/`Index2`: the read-name trailing index field (`firstIndex` of R1
-/// / `lastIndex` of R2), no trim. `PerIndex`: `firstIndex(R1) "_" lastIndex(R2)`.
-/// `PerRead`: 5' of both reads' sequences merged `umi1 "_" umi2`, both trimmed.
+// fastp 0.20.1 --umi_loc set: Read1/Read2 trim 5' seq; Index1/Index2 use read-name index field (no trim); PerIndex = firstIndex_lastIndex; PerRead = umi1_umi2, both trimmed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UmiLoc {
     Read1,
@@ -25,10 +20,7 @@ pub enum UmiLoc {
     PerRead,
 }
 
-/// fastp 0.20.1 `Read::lastIndex` (src/read.cpp), verbatim: scan the name
-/// backward from `len-3` for the last `:`/`+`; return everything after it.
-/// Empty when the name is < 5 bytes or has no delimiter. The C `substr`
-/// length is clamped to the end, which the slice replicates.
+// fastp 0.20.1 Read::lastIndex (src/read.cpp): backward from len-3, returns everything after last ':'/'+''; empty when name < 5 bytes or no delimiter.
 fn last_index(name: &[u8]) -> Vec<u8> {
     let len = name.len();
     if len < 5 {
@@ -42,10 +34,7 @@ fn last_index(name: &[u8]) -> Vec<u8> {
     Vec::new()
 }
 
-/// fastp 0.20.1 `Read::firstIndex` (src/read.cpp), verbatim: backward from
-/// `len-3`, a `+` sets the field end to its index-1 (dual-index split), the
-/// last `:` ends the scan; return the `:`..`+` (or `:`..end) field. Bounds
-/// are clamped exactly as the C `substr` would.
+// fastp 0.20.1 Read::firstIndex (src/read.cpp): backward from len-3; '+' sets field end to index-1 (dual-index split), last ':' ends scan; returns the ':'..'+' (or ':'..end) field.
 fn first_index(name: &[u8]) -> Vec<u8> {
     let len = name.len();
     if len < 5 {
@@ -66,28 +55,14 @@ fn first_index(name: &[u8]) -> Vec<u8> {
     Vec::new()
 }
 
-/// Exact fastp UMI semantics — sourced from fastp `src/umiprocessor.cpp`
-/// (`UmiProcessor::process` / `addUmiToName`) and `src/options.h` `UMIOptions`
-/// (fastp MIT; reading + citing permitted). `umi_tools` (Smith et al. 2017,
-/// doi:10.1101/gr.209601.116, MIT) is the secondary behavioural reference.
-///
-/// fastp: `umiLength = min(read.length, umi_len)`; the source read is then
-/// `trimFront(umiLength + umi_skip)` (UMI + skip removed from the 5' of both
-/// seq and qual); the UMI is appended to the read name as
-/// `delimiter + [prefix + "_"] + umi`, inserted before the first space if the
-/// name has one, else appended. The non-source mate is not trimmed but its
-/// name is stamped with the same UMI so the pair stays consistent.
+// fastp src/umiprocessor.cpp (MIT): umiLength = min(read.length, umi_len); source read trimFront(umiLength+skip); tag = delimiter[+prefix+"_"]+umi inserted before first space or appended; non-source mate stamped but not trimmed.
 #[derive(Debug, Clone)]
 pub struct UmiConfig {
     pub loc: UmiLoc,
-    /// fastp `--umi_len`. Bounded per-read by the read length.
-    pub len: usize,
-    /// fastp `--umi_skip`: extra 5' bases removed after the UMI.
-    pub skip: usize,
-    /// fastp `--umi_prefix`: joined to the UMI with `_` when non-empty.
-    pub prefix: Vec<u8>,
-    /// Read-name / UMI separator. fastp default `:`.
-    pub delimiter: u8,
+    pub len: usize,        // fastp --umi_len
+    pub skip: usize,       // fastp --umi_skip: extra 5' bases removed after the UMI
+    pub prefix: Vec<u8>,   // fastp --umi_prefix: joined to the UMI with _ when non-empty
+    pub delimiter: u8,     // read-name / UMI separator; fastp default :
 }
 
 impl UmiConfig {
@@ -103,8 +78,6 @@ impl UmiConfig {
     }
 }
 
-/// Insert `tag` before the first space in `id`, else append (fastp
-/// `addUmiToName` placement).
 fn stamp(id: &[u8], tag: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(id.len() + tag.len());
     if let Some(sp) = id.iter().position(|&b| b == b' ') {
@@ -118,17 +91,7 @@ fn stamp(id: &[u8], tag: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Take the 5' UMI from `src`'s sequence and trim it (+ skip) off seq & qual.
-///
-/// Byte-faithful to fastp 0.20.1: `umi = seq[..min(umi_len, read_len)]`; fastp
-/// `Read::trimFront` clamps to `length()-1` (keeps ≥1 base) so the trim is
-/// `min(umi_len + skip, read_len - 1)`. fastp's `trimFront` on a zero-length
-/// read throws (no defined output), so a zero-length seq-UMI source fails loud
-/// rather than fabricate a record fastp never emits.
-///
-/// # Errors
-///
-/// `InvalidInput` if the seq-UMI source read has zero length.
+// fastp 0.20.1 trimFront clamps to length()-1 (keeps ≥1 base); trim = min(umi_len+skip, read_len-1). Zero-length read has no defined fastp output — fail loud.
 fn take_seq_umi(src: &mut OwnedRecord, cfg: &UmiConfig) -> Result<Vec<u8>> {
     let read_len = src.seq.len();
     let umi_len = cfg.len.min(read_len);
@@ -144,16 +107,7 @@ fn take_seq_umi(src: &mut OwnedRecord, cfg: &UmiConfig) -> Result<Vec<u8>> {
     Ok(umi)
 }
 
-/// Apply the UMI transform to a record (PE: pass `mate`) per `cfg.loc`,
-/// mirroring fastp 0.20.1 `UmiProcessor::process`: build the UMI for the
-/// location, trim only the sequence-UMI source read(s), then — iff the UMI is
-/// non-empty (fastp's `if(!umi.empty())` guard, so a missing index field is a
-/// pass-through, not an error) — stamp the same tag into both names.
-///
-/// # Errors
-///
-/// `InvalidInput` if a sequence-UMI source read has zero length, or the
-/// location needs a mate that is absent (rejected earlier by the CLI).
+// fastp 0.20.1 UmiProcessor::process: if(!umi.empty()) guard means a missing index field is a pass-through, not an error.
 fn process(
     rec: &mut OwnedRecord,
     mut mate: Option<&mut OwnedRecord>,
@@ -236,9 +190,6 @@ impl<'cfg> Pipeline<'cfg> {
         Self { cfg, compression }
     }
 
-    /// # Errors
-    ///
-    /// Propagates input parse / output write errors.
     pub fn run_se(&self, input: &Path, output: &Path) -> Result<UmiReport> {
         let mut reader = open_fastq(input)?;
         let mut writer = ChunkedWriter::create(output, self.compression)?;
@@ -279,10 +230,6 @@ impl<'cfg> Pipeline<'cfg> {
         Ok(report)
     }
 
-    /// # Errors
-    ///
-    /// Propagates input parse / output write errors; errors if the two inputs
-    /// have a differing record count.
     pub fn run_pe(&self, in1: &Path, in2: &Path, out1: &Path, out2: &Path) -> Result<UmiReport> {
         let mut r1 = open_fastq(in1)?;
         let mut r2 = open_fastq(in2)?;
@@ -396,8 +343,7 @@ mod tests {
         assert_eq!(r.id, b"r:UMI_ACGT");
     }
 
-    /// fastp `Read::trimFront` clamps to `length()-1`, so a read shorter than
-    /// the requested trim keeps its last base — it is never emptied.
+    // fastp Read::trimFront clamps to length()-1 — a short read always keeps its last base.
     #[test]
     fn umi_len_clamped_keeps_last_base() {
         let mut r = rec("r", "ACG", "III");
@@ -476,7 +422,7 @@ mod tests {
         process(&mut r1, Some(&mut r2), &cfg(UmiLoc::PerIndex, 0, 0, "")).unwrap();
         assert_eq!(r1.id, b"p:AAA_CCC 1:N:0:AAA+CCC");
         assert_eq!(r2.id, b"p:AAA_CCC 2:N:0:AAA+CCC");
-        assert_eq!(r1.seq, b"GGGG"); // index mode: no trim either mate
+        assert_eq!(r1.seq, b"GGGG");
         assert_eq!(r2.seq, b"TTTT");
     }
 
@@ -487,7 +433,7 @@ mod tests {
         process(&mut r1, Some(&mut r2), &cfg(UmiLoc::PerRead, 4, 0, "")).unwrap();
         assert_eq!(r1.id, b"p:AACC_TTGG 1");
         assert_eq!(r2.id, b"p:AACC_TTGG 2");
-        assert_eq!(r1.seq, b"GGGG"); // both trimmed by 4
+        assert_eq!(r1.seq, b"GGGG");
         assert_eq!(r2.seq, b"CCCC");
     }
 

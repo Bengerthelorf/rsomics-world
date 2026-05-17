@@ -2,8 +2,7 @@ use std::process;
 
 use crate::error::RsomicsError;
 
-/// Exit codes are part of the tool contract — callers branch on them.
-/// New variants are additions, not renumberings.
+// exit codes are a stable contract — add variants, never renumber
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ExitCode {

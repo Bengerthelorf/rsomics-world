@@ -2,7 +2,7 @@ use statrs::distribution::{ChiSquared, ContinuousCDF, Normal};
 
 use crate::{Result, StatsError};
 
-/// Fisher's method: combines independent p-values via `-2 Σ ln(p_i)` χ²(2k).
+// Fisher's method — -2 Σ ln(p_i) ~ χ²(2k)
 pub fn fisher_combine(pvalues: &[f64]) -> Result<f64> {
     if pvalues.is_empty() {
         return Err(StatsError::Empty);
@@ -22,7 +22,6 @@ pub fn fisher_combine(pvalues: &[f64]) -> Result<f64> {
     Ok((1.0 - chi2.cdf(stat)).clamp(0.0, 1.0))
 }
 
-/// Stouffer's Z-score method with optional per-study weights.
 pub fn stouffer_combine(pvalues: &[f64], weights: Option<&[f64]>) -> Result<f64> {
     if pvalues.is_empty() {
         return Err(StatsError::Empty);

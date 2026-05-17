@@ -5,12 +5,7 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Adapter Content" — cumulative % of reads in which each adapter
-/// has appeared at or before each position (once seen in a read it stays
-/// positive to the read's end). WARN if any adapter exceeds 5% at any
-/// position, FAIL if it exceeds 10% (clean-room `FastQC` contract).
-///
-/// Adapter k-mers are `FastQC`'s public `adapter_list.txt` (12 bp each).
+// 12-bp k-mers from FastQC's public adapter_list.txt
 const ADAPTERS: &[(&str, &[u8])] = &[
     ("Illumina Universal Adapter", b"AGATCGGAAGAG"),
     ("Illumina Small RNA 3' Adapter", b"TGGAATTCTCGG"),
@@ -21,8 +16,7 @@ const ADAPTERS: &[(&str, &[u8])] = &[
 ];
 
 pub struct AdapterContent {
-    /// Per adapter, per position: count of reads whose first match index
-    /// is exactly that position (prefix-summed in `write_data`/status).
+    // first_hit[adapter][pos] = reads whose first match is exactly at pos; prefix-summed on read in cumulative()
     first_hit: Vec<Vec<u64>>,
     total: u64,
     max_len: usize,
@@ -38,7 +32,6 @@ impl AdapterContent {
         }
     }
 
-    /// Per-adapter cumulative positive fraction at each position.
     fn cumulative(&self) -> Vec<Vec<f64>> {
         let mut out = Vec::with_capacity(ADAPTERS.len());
         for hits in &self.first_hit {

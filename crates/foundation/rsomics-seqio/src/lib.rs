@@ -8,14 +8,7 @@ use rsomics_common::Result;
 
 use detect::InputKind;
 
-/// One FASTQ record, fully owned.
-///
-/// `id` is the header line after `@` with the trailing `\n` and a preceding
-/// `\r` (if any) stripped, otherwise verbatim — spaces, slashes, and
-/// description fields are preserved (matching needletail's
-/// `SequenceRecord::id()`). `seq` and `qual` are the sequence and quality
-/// line bytes with the same line-terminator stripping, otherwise verbatim.
-/// The parser enforces `seq.len() == qual.len()`.
+// id/seq/qual: line terminator (\r?\n) stripped, otherwise verbatim — matches needletail SequenceRecord::id(); parser enforces seq.len() == qual.len()
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnedRecord {
     pub id: Vec<u8>,
@@ -23,11 +16,7 @@ pub struct OwnedRecord {
     pub qual: Vec<u8>,
 }
 
-/// An iterator of [`OwnedRecord`]s over a FASTQ source.
-///
-/// Created by [`open_fastq`].  On any parse or I/O error the iterator yields
-/// `Err(RsomicsError)` and then terminates.  Truncated or corrupt gzip data
-/// surfaces as `Err` rather than silently stopping.
+// fail-loud: a parse / IO / truncated-gzip error yields Err then terminates — never silently stops short
 pub enum FastqSource {
     Plain(reader_plain::PlainReader),
     Gz(reader_gz::GzReader),
@@ -44,18 +33,7 @@ impl Iterator for FastqSource {
     }
 }
 
-/// Open a FASTQ file and return an iterator of owned records.
-///
-/// Detection is by magic bytes only — the file extension is ignored:
-/// - gzip (`0x1f 0x8b`), including BGZF (its `BC`-subfield blocks are
-///   concatenated gzip members the igzip backend decodes transparently):
-///   `FastqSource::Gz`, a dedicated decode thread + parallel slab parse.
-/// - Anything else: `FastqSource::Plain` backed by a `BufReader`.
-///
-/// # Errors
-///
-/// Returns `RsomicsError::Io` if the file cannot be opened or if the first
-/// bytes cannot be read for detection.
+// detection is by magic bytes only — file extension is ignored
 pub fn open_fastq(path: &Path) -> Result<FastqSource> {
     let kind = detect::detect(path)?;
     match kind {
@@ -63,8 +41,7 @@ pub fn open_fastq(path: &Path) -> Result<FastqSource> {
             let r = reader_plain::PlainReader::open(path)?;
             Ok(FastqSource::Plain(r))
         }
-        // BGZF is a stream of concatenated gzip members with BC extra subfields;
-        // the igzip backend's multi-member handling decodes it correctly.
+        // BGZF = concatenated gzip members with BC subfields; igzip's multi-member path decodes it
         InputKind::Gz | InputKind::Bgzf => {
             let r = reader_gz::GzReader::open(path)?;
             Ok(FastqSource::Gz(r))

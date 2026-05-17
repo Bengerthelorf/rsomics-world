@@ -7,16 +7,6 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Overrepresented sequences" — sequences that are >0.1% of the
-/// total are listed; WARN if any sequence exceeds 0.1%, FAIL if any
-/// exceeds 1% (clean-room `FastQC` contract). Tracking mirrors the
-/// duplication module: only sequences first seen within the first 100 000
-/// reads are kept, reads >75 bp keyed by their first 50 bp.
-///
-/// Each hit is labelled with the best match in `FastQC`'s public
-/// `contaminant_list` (a hit must be ≥20 bp with ≤1 mismatch). The
-/// pass/warn/fail decision is purely count-based and is exact regardless
-/// of the label table.
 pub struct OverrepresentedSeqs {
     counts: HashMap<Vec<u8>, u64>,
     seen_reads: u64,
@@ -27,12 +17,7 @@ const TRACK_LIMIT: u64 = 100_000;
 const KEY_TRUNC_OVER: usize = 75;
 const KEY_LEN: usize = 50;
 
-/// `(name, sequence)` — `FastQC`'s public `contaminant_list.txt` verbatim
-/// (public config data, not GPL source), used to label the `Possible
-/// Source` of an overrepresented sequence. A hit must be ≥20 bp with ≤1
-/// mismatch. Names are kept exactly as `FastQC`'s file (including its
-/// spelling) so the label column byte-matches. The pass/warn/fail decision
-/// is count-based and independent of this table.
+// names verbatim from FastQC's contaminant_list.txt — byte-equality of the "Possible Source" column requires exact spelling
 const CONTAMINANTS: &[(&str, &[u8])] = &[
     (
         "Illumina Single End Adapter 1",
@@ -578,11 +563,7 @@ const CONTAMINANTS: &[(&str, &[u8])] = &[
 ];
 
 fn matches_contaminant(seq: &[u8]) -> Option<&'static str> {
-    // FastQC rule: slide the shorter sequence along the longer; a hit is a
-    // window with ≤1 mismatch. The overlap must be ≥20 bp, except a
-    // contaminant shorter than 20 bp (the 12 bp adapters) must match in
-    // full. `short` is whichever of (read, contaminant) is shorter, so its
-    // whole length is the overlap.
+    // FastQC: slide shorter over longer, hit = ≤1 mismatch; overlap must be ≥20 bp (or full length for contaminants shorter than 20)
     for &(name, cont) in CONTAMINANTS {
         let (short, long) = if seq.len() <= cont.len() {
             (seq, cont)

@@ -6,7 +6,6 @@ pub fn bonferroni_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(pvalues.iter().map(|p| (p * n).min(1.0)).collect())
 }
 
-/// Benjamini–Hochberg FDR adjustment. Returns values in input order.
 pub fn bh_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();
@@ -25,7 +24,7 @@ pub fn bh_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(adj)
 }
 
-/// Holm step-down. R: `pmin(1, cummax((n-i+1)*p[order(p)]))[ro]`.
+// Holm step-down — R: pmin(1, cummax((n-i+1)*p[order(p)]))[ro]
 pub fn holm_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();
@@ -44,7 +43,7 @@ pub fn holm_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(adj)
 }
 
-/// Hochberg step-up. R: `pmin(1, cummin((n-i+1)*p[order(p,decr=T)]))[ro]`.
+// Hochberg step-up — R: pmin(1, cummin((n-i+1)*p[order(p,decr=T)]))[ro]
 pub fn hochberg_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();
@@ -63,8 +62,7 @@ pub fn hochberg_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(adj)
 }
 
-/// Benjamini–Yekutieli (BH scaled by the harmonic number, dependency-robust).
-/// R: `pmin(1, cummin(q*n/i*p[order(p,decr=T)]))[ro]`, `q = sum(1/(1:n))`.
+// Benjamini–Yekutieli — R: pmin(1, cummin(q*n/i*p[order(p,decr=T)]))[ro], q = sum(1/(1:n))
 pub fn by_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();
@@ -85,13 +83,13 @@ pub fn by_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     Ok(adj)
 }
 
-/// `none`: identity (validated, already clamped to `[0,1]`). R's `"none"`.
+// R p.adjust method="none" — identity (input already validated to [0,1])
 pub fn none_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     Ok(pvalues.to_vec())
 }
 
-/// Hommel (1988), a direct port of R `stats::p.adjust` `method = "hommel"`.
+// Hommel (1988) — direct port of R stats::p.adjust(method="hommel")
 pub fn hommel_adjust(pvalues: &[f64]) -> Result<Vec<f64>> {
     validate(pvalues)?;
     let n = pvalues.len();
@@ -258,8 +256,7 @@ mod tests {
             &[0.03, 0.03],
             1e-9
         ));
-        // R invariants: p ≤ hommel ≤ 1, and hommel ≤ hochberg (uniformly
-        // more powerful). Order-preserving. Larger vector.
+        // R invariants: p ≤ hommel ≤ 1; hommel ≤ hochberg (uniformly more powerful); order-preserving
         let v = [0.001, 0.2, 0.04, 0.5, 0.005, 0.03];
         let hm = hommel_adjust(&v).unwrap();
         let hb = hochberg_adjust(&v).unwrap();
@@ -283,7 +280,6 @@ mod tests {
         ] {
             assert!(matches!(f(&[0.5, 1.5]), Err(StatsError::InvalidPValue(_))));
         }
-        // order preserved: input [0.5, 0.01, 0.1] keeps adj[1] smallest.
         let a = holm_adjust(&[0.5, 0.01, 0.1]).unwrap();
         assert!(a[1] <= a[2] && a[2] <= a[0]);
     }

@@ -6,18 +6,9 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Per tile sequence quality" — per (tile, position) mean quality
-/// minus the overall per-position mean. WARN if any tile is >2 below the
-/// mean for that base, FAIL if >5 below (clean-room `FastQC` contract).
-///
-/// Needs Illumina-style read IDs (`…:lane:tile:x:y`); the deviation is a
-/// difference of means so the Phred offset cancels and raw quality bytes
-/// are used directly. Non-Illumina IDs ⇒ no tile data ⇒ Pass (`FastQC` skips
-/// the module).
+// Phred offset cancels in the mean difference; raw bytes used directly. Non-Illumina IDs ⇒ no tile data ⇒ Pass.
 pub struct PerTileQuality {
-    /// (tile, pos) → (sum of raw qual bytes, count).
     tile: HashMap<(u32, usize), (u64, u64)>,
-    /// pos → (sum, count) over all reads.
     overall: Vec<(u64, u64)>,
 }
 
@@ -30,10 +21,7 @@ impl PerTileQuality {
         }
     }
 
-    /// Tile from the read id (the token before the first space). Illumina
-    /// 1.8+ `inst:run:fc:lane:tile:x:y` has ≥7 colon fields, tile = field 4;
-    /// classic pre-1.8 `inst:lane:tile:x:y[#index/mate]` has 5, tile =
-    /// field 2. Anything else is non-Illumina ⇒ no tile (module skips).
+    // Illumina 1.8+ (≥7 colon fields): tile = field[4]; classic pre-1.8 (5 fields): tile = field[2]
     fn parse_tile(id: &[u8]) -> Option<u32> {
         let head = id.split(|&b| b == b' ').next()?;
         let fields: Vec<&[u8]> = head.split(|&b| b == b':').collect();
@@ -45,8 +33,6 @@ impl PerTileQuality {
         std::str::from_utf8(tile).ok()?.parse::<u32>().ok()
     }
 
-    /// Worst (most negative) per-(tile,pos) deviation from the overall
-    /// per-position mean.
     fn worst_deviation(&self) -> f64 {
         let mut worst = 0.0_f64;
         for (&(_, pos), &(s, c)) in &self.tile {

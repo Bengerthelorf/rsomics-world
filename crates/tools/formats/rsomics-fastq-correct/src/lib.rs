@@ -1,9 +1,5 @@
-// This crate is a faithful port of BFC's C corrector (lh3/bfc, MIT). The
-// single-character names, positional indexing, and signed/unsigned casts
-// mirror the source deliberately so the algorithm stays diff-able against
-// it; the same allow-set is used by rsomics-stats for its R ports. The
-// modules mirror the upstream files: `kmer` ↔ kmer.h, `count` ↔ htab.c,
-// `correct` ↔ correct.c; this `lib.rs` is the bfc.c driver + public API.
+// Faithful port of lh3/bfc (MIT); single-char names + signed/unsigned casts mirror source
+// so the algorithm stays diff-able. Modules: kmer↔kmer.h, count↔htab.c, correct↔correct.c.
 #![allow(
     clippy::many_single_char_names,
     clippy::needless_range_loop,
@@ -30,11 +26,7 @@ use count::{build_table, has_unique_kmer};
 
 const CHUNK_RECORDS: usize = 4096;
 
-/// Configuration for one correction run. Field names and defaults are the
-/// BFC 0.1 `bfc_opt_init` values (`-k` 33, `-c` 3, `-w` 10, `-q` 20, the
-/// fixed `w_*` penalty weights, `max_path_diff` 15, `max_heap` 100,
-/// `max_end_ext` 5). The `w_*` weights are not exposed on the CLI — BFC
-/// marks them "cannot be changed on command line"; we keep that contract.
+// BFC bfc_opt_init defaults; w_* weights are not CLI-exposed (BFC: "cannot be changed on command line").
 #[derive(Debug, Clone)]
 pub struct CorrectConfig {
     pub k: usize,
@@ -86,9 +78,6 @@ impl<'cfg> Pipeline<'cfg> {
         Self { cfg, compression }
     }
 
-    /// # Errors
-    /// Propagates FASTQ read / write errors; never silently drops a record
-    /// for an IO reason (only BFC's defined uncorrectable/policy drops).
     pub fn run(&self, input: &Path, output: &Path) -> Result<CorrectReport> {
         if self.cfg.k < 11 || self.cfg.k > 63 || self.cfg.k.is_multiple_of(2) {
             return Err(RsomicsError::ConfigError(format!(
@@ -97,8 +86,7 @@ impl<'cfg> Pipeline<'cfg> {
             )));
         }
         let ch = build_table(&[input], self.cfg)?;
-        // BFC `bfc_correct`: the count-histogram mode is computed once and
-        // shared by every per-read worker — never per read (that is O(N²)).
+        // mode computed once here (BFC bfc_correct) — per-read would be O(reads × table).
         let mode = ch.hist_mode(self.cfg.min_cov);
         let mut reader = open_fastq(input)?;
         let mut w = ChunkedWriter::create(output, self.compression)?;
@@ -192,7 +180,6 @@ mod tests {
         for c in [0u64, 1, 2, 3, 0, 3] {
             x.append(5, c);
         }
-        // last 5 bases = C,G,T,A,T → low/high bit planes consistent, masked to k.
         let mask = (1u64 << 5) - 1;
         assert_eq!(x.x[0], x.x[0] & mask);
         assert_eq!(x.x[1], x.x[1] & mask);
@@ -266,9 +253,7 @@ mod tests {
         );
     }
 
-    /// BFC `bfc_ec_greedy_k` rescue: with exactly one strongly-supported
-    /// single substitution of the probed k-mer (best `> mode/3`, 2nd `< 3`)
-    /// it returns `pos<<2 | base`; with no confident alternative, `-1`.
+    // BFC bfc_ec_greedy_k: best > mode/3 and 2nd < 3 → returns pos<<2|base; else -1.
     #[test]
     fn greedy_rescue_picks_the_one_supported_substitution() {
         let k = 11;
@@ -277,7 +262,6 @@ mod tests {
             k,
             map: KmerMap::default(),
         };
-        // Heavily cover the truth k-mer; nothing else seen.
         let mut tx = BfcKmer::NULL;
         for &b in truth {
             tx.append(k, u64::from(SEQ_NT4[b as usize]));
@@ -285,9 +269,7 @@ mod tests {
         for _ in 0..20 {
             ch.add(&tx, true);
         }
-        // Probe the truth k-mer with its 3'-most base corrupted A→T (truth
-        // ends in 'A'=0; corrupt to 'T'=3 at pos k-1, i.e. bit 0 / d=0).
-        // greedy must propose restoring it to the truth base 'A'.
+        // 3'-most base corrupted A→T (A=0, T=3, pos k-1 = d=0); greedy must restore A.
         let mut corrupt = BfcKmer::NULL;
         for (i, &b) in truth.iter().enumerate() {
             let base = if i == k - 1 {

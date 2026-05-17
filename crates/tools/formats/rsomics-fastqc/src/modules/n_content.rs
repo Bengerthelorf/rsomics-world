@@ -2,13 +2,7 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Per base N content" — %N at each position. WARN if any position
-/// exceeds 5%, FAIL if any exceeds 20% (clean-room `FastQC` contract).
-///
-/// `FastQC` bins distant positions into base groups for display on long
-/// reads; this emits per-position counts. The pass/warn/fail decision is
-/// the per-position maximum so the status is exact regardless of binning;
-/// matching `FastQC`'s `BaseGroup` display layout is a separate compat step.
+// FastQC bins distant positions into groups for long reads; we emit per-position — status is exact, display layout differs for very long reads
 pub struct PerBaseNContent {
     n: Vec<u64>,
     total: Vec<u64>,

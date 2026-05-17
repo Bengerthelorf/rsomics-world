@@ -16,9 +16,7 @@ pub use rsomics_seqstats::SeqType;
 pub struct Config {
     pub extended: bool,
     pub gap_letters: Vec<u8>,
-    /// Phred ASCII offset (sanger / illumina-1.8+ = 33; older Illumina = 64).
     pub qual_offset: u8,
-    /// Show only the file's basename in the `file` column (seqkit -b).
     pub basename: bool,
 }
 
@@ -73,17 +71,12 @@ pub struct ExtendedStats {
     pub sum_n: u64,
 }
 
-/// seqkit stores Q20(%)/Q30(%) as `Round(x, 2)` then prints them `%.0f`;
-/// replicate the two-step so boundary values round identically.
+// seqkit rounds to 2 decimals first, then prints %.0f — two-step matches boundary values.
 fn round2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
-/// Per-phred error probability `10^(-q/10)`, indexed by `q = byte - offset`
-/// (a `u8`, so `0..=255`; bytes below the offset fail loud before indexing).
-/// A transcendental call per quality base dominates this hot path; seqkit
-/// avoids it with the same lookup (`qual_map`), so this table is required
-/// to match — let alone beat — it.
+// 10^(-q/10) lookup by phred q; avoids per-base transcendental call — same approach as seqkit's qual_map.
 static ERR_PROB: LazyLock<[f64; 256]> = LazyLock::new(|| {
     let mut t = [0.0f64; 256];
     for (q, e) in t.iter_mut().enumerate() {
@@ -207,9 +200,6 @@ struct QualCounts {
     err_sum: f64,
 }
 
-/// Per-record quality scan: phred = byte − offset (a byte below the offset
-/// is a fail-loud encoding error, not a silent clamp); count Q20/Q30 at the
-/// inclusive ≥20/≥30 thresholds and sum the per-base error probabilities.
 fn accumulate_qual(qual: &[u8], offset: u8, qc: &mut QualCounts, path: &Path) -> Result<()> {
     for &qb in qual {
         let Some(q) = qb.checked_sub(offset) else {
@@ -326,9 +316,6 @@ mod tests {
         assert!((e.gc_percent - 19.0 * 100.0 / 28.0).abs() < 1e-9);
     }
 
-    // seqkit guesses `type` from the FIRST record only — a protein-looking
-    // first read makes the file Protein even if every later read is DNA, and
-    // vice-versa. A cross-record sample would diverge here.
     #[test]
     fn type_is_first_record_only() {
         let dna_then_protein =
@@ -342,7 +329,6 @@ mod tests {
         assert_eq!(s.seq_type, SeqType::Protein);
     }
 
-    // A zero-length first record → seqkit prints `Unlimit` (not DNA/Other).
     #[test]
     fn empty_first_record_is_unlimit() {
         let f = write_fq("@z\n\n+\n\n@b\nACGTACGT\n+\nIIIIIIII\n");

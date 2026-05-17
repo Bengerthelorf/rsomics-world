@@ -1,6 +1,3 @@
-//! Byte-compat of `--split_by_lines` vs the pinned fastp 0.20.1 oracle
-//! (deterministic both sides); skipped, not asserted, on a non-0.20 fastp.
-
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -57,8 +54,7 @@ fn run(bin: &Path, args: &[&str]) {
     );
 }
 
-/// The sorted `(file_name, bytes)` of every split file in `dir` whose name
-/// ends with `.<base>` (fastp split naming is `<digits>.<base>`).
+// fastp split naming is <digits>.<base>
 fn split_set(dir: &Path, base: &str) -> Vec<(String, Vec<u8>)> {
     let suffix = format!(".{base}");
     let mut v: Vec<(String, Vec<u8>)> = std::fs::read_dir(dir)

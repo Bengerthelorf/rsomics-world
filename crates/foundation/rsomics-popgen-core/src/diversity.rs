@@ -1,8 +1,6 @@
 use crate::{PopgenError, Result};
 
-/// Nucleotide diversity π (average pairwise difference per site).
-/// `derived_counts[i]` = derived/minor allele count at site i; `n` = sample
-/// size (haploid chromosomes; diploid samples contribute 2).
+// θπ — n = haploid sample size (diploid samples contribute 2); derived_counts[i] = minor-allele count at site i
 pub fn theta_pi(derived_counts: &[u64], n: u64) -> Result<f64> {
     if derived_counts.is_empty() {
         return Err(PopgenError::Empty);
@@ -28,7 +26,7 @@ pub fn theta_pi(derived_counts: &[u64], n: u64) -> Result<f64> {
     Ok(total / derived_counts.len() as f64)
 }
 
-/// Watterson's θ per site. `s` = segregating sites, `n` = sample size, `sites` = window length.
+// Watterson θ per site — s = segregating sites, n = sample size, sites = window length
 pub fn watterson_theta(s: u64, n: u64, sites: u64) -> Result<f64> {
     if n < 2 {
         return Err(PopgenError::SampleTooSmall {
@@ -43,7 +41,6 @@ pub fn watterson_theta(s: u64, n: u64, sites: u64) -> Result<f64> {
     Ok(s as f64 / (a1 * sites as f64))
 }
 
-/// Tajima's D over a window; `n` = sample size.
 pub fn tajimas_d(derived_counts: &[u64], n: u64) -> Result<f64> {
     if derived_counts.is_empty() {
         return Err(PopgenError::Empty);

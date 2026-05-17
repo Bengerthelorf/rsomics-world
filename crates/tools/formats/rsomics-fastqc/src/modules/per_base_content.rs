@@ -14,9 +14,7 @@ fn pct(n: u64, total: u64) -> f64 {
     }
 }
 
-/// `FastQC` "Per base sequence content" — %A/C/G/T at each position. WARN if
-/// |%A−%T| or |%G−%C| exceeds 10 at any position; FAIL if it exceeds 20
-/// (clean-room `FastQC` contract). `FastQC` emits columns in G,A,T,C order.
+// FastQC emits columns in G,A,T,C order — changing this breaks MultiQC parsing
 pub struct PerBaseContent {
     a: Vec<u64>,
     c: Vec<u64>,
@@ -37,7 +35,6 @@ impl PerBaseContent {
         }
     }
 
-    /// Largest (|A−T|, |G−C|) percentage gap over all positions.
     fn worst_gap(&self) -> f64 {
         let mut worst = 0.0_f64;
         for i in 0..self.total.len() {

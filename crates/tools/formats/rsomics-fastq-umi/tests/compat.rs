@@ -1,6 +1,3 @@
-//! Byte-compat vs fastp 0.20.1 (the pinned oracle); UMI output is
-//! version-specific so a non-0.20 fastp is skipped, not asserted against.
-
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -14,10 +11,7 @@ fn ours() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_rsomics-fastq-umi"))
 }
 
-/// The compat oracle is version-pinned: fastp's UMI read-name format and flag
-/// semantics differ across major versions, and the perfgate/CI reference is
-/// fastp 0.20.x (4090/Linux apt). A different local fastp (e.g. 1.x) is not a
-/// valid oracle — skip loudly there, enforce byte-equality where 0.20 runs.
+// UMI read-name format and flag semantics differ across major fastp versions; oracle is pinned to 0.20.x (CI/4090 reference).
 fn fastp_reference() -> Option<bool> {
     let out = Command::new("fastp")
         .arg("--version")
@@ -32,8 +26,6 @@ fn fastp_reference() -> Option<bool> {
     Some(v.contains("0.20"))
 }
 
-/// Skip-or-enforce gate. Returns true to run the byte assertion; prints a loud
-/// skip and returns false when fastp is absent or not the 0.20 reference.
 fn require_reference_fastp() -> bool {
     match fastp_reference() {
         None => {
@@ -228,8 +220,7 @@ fn pe_umi_read1_matches_fastp() {
     );
 }
 
-/// Reads shorter than `umi_len` + skip: byte-equality here proves the fastp
-/// 0.20.1 `Read::trimFront` clamp-to-`length()-1` (keep ≥1 base) is matched.
+// Byte-equality proves fastp 0.20.1 Read::trimFront clamp-to-length()-1 (keep ≥1 base) is matched for reads shorter than umi_len+skip.
 #[test]
 fn se_umi_short_matches_fastp() {
     if !require_reference_fastp() {

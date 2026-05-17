@@ -119,7 +119,6 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64], alt: Alternative) -> Result<TestResu
     })
 }
 
-/// Fisher's exact test on a 2×2 table. P-value via the hypergeometric tail.
 pub fn fisher_exact_2x2(a: u64, b: u64, c: u64, d: u64, alt: Alternative) -> Result<TestResult> {
     let n = a + b + c + d;
     let kk = a + c;

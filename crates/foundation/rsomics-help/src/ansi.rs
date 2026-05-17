@@ -18,7 +18,7 @@ impl Palette {
     pub const YELLOW: (u8, u8, u8) = (250, 204, 21);
     pub const SLATE: (u8, u8, u8) = (148, 163, 184);
 
-    // RGB approximations of ANSI-16 `\x1b[96m → [36m → [94m → [95m` (pikpaktui dMP art)
+    // RGB approximations of ANSI-16 \x1b[96m → [36m → [94m → [95m
     pub const FAMILY_GRADIENT: [(u8, u8, u8); 4] = [
         (85, 255, 255),
         (0, 205, 205),

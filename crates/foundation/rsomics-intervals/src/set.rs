@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::interval::Interval;
 
-/// Chromosome-grouped collection of intervals. `BTreeMap` gives lexicographic chrom order — matches `bedtools sort` default.
+// BTreeMap → lexicographic chrom order, matches bedtools sort default
 #[derive(Debug, Default, Clone)]
 pub struct IntervalSet {
     by_chrom: BTreeMap<String, Vec<Interval>>,

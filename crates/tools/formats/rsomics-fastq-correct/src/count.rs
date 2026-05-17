@@ -1,4 +1,4 @@
-//! BFC counting table — port of `htab.c`/`bbf.c` + the count pass.
+// Port of htab.c/bbf.c (lh3/bfc, MIT).
 
 use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
@@ -11,12 +11,8 @@ use crate::CorrectConfig;
 use crate::correct::seq_conv;
 use crate::kmer::{BfcKmer, bfc_kmer_hash};
 
-/// The map key is already a `bfc_kmer_hash` value (a full `Thomas-Wang`
-/// double-hash) — re-hashing it with `SipHash` on every `occ()`/`add()`
-/// is pure waste and was ~half the hot path. BFC's own `bfc_ch` indexes
-/// directly by the hash with no second hash, so passing the `u64` through
-/// unchanged is both faster and closer to BFC. Non-`u64` writes are a bug
-/// (the only key type is `u64`) and panic loudly.
+// Key is already a Thomas-Wang double-hash (bfc_kmer_hash); SipHash re-hash was ~half the
+// hot path. BFC's bfc_ch also indexes directly by hash. Only u64 keys are valid.
 #[derive(Default)]
 pub(crate) struct IdentityHasher(u64);
 
@@ -34,17 +30,13 @@ impl Hasher for IdentityHasher {
 
 pub(crate) type KmerMap = HashMap<u64, Occ, BuildHasherDefault<IdentityHasher>>;
 
-/// Per-k-mer occupancy: low byte = coverage, bits 8..14 = high-quality
-/// coverage, both saturating — the layout BFC's `bfc_ch_kmer_occ` returns
-/// (`r&0xff`, `r>>8&0x3f`).
+// BFC bfc_ch_kmer_occ layout: cov = r&0xff, hi = r>>8&0x3f; both saturating.
 #[derive(Default, Clone, Copy)]
 pub(crate) struct Occ {
     pub(crate) cov: u8,
     pub(crate) hi: u8,
 }
 
-/// The trusted-k-mer count table (BFC `bfc_ch`, modelled as a map keyed by
-/// `bfc_kmer_hash`). Built once over every input read before correction.
 pub(crate) struct CountTable {
     pub(crate) k: usize,
     pub(crate) map: KmerMap,
@@ -66,10 +58,7 @@ impl CountTable {
         }
     }
 
-    /// BFC `bfc_ch_hist` mode: the peak of the coverage histogram (the
-    /// genomic coverage), used by the greedy probe's confidence gate. The
-    /// peak is taken over `cov ≥ min_cov` so the error-noise spike at low
-    /// coverage does not dominate.
+    // BFC bfc_ch_hist: peak over cov ≥ min_cov to skip the error-noise spike at low coverage.
     pub(crate) fn hist_mode(&self, min_cov: i32) -> i32 {
         let mut hist = [0u64; 256];
         for o in self.map.values() {

@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
-
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -23,8 +21,7 @@ pub struct Model {
     pub url: String,
     pub sha256: String,
     pub format: Format,
-    /// Cache path stem (without extension); the loader appends the format-
-    /// appropriate suffix.
+    // path stem without extension — loader appends the format suffix
     pub stem: String,
 }
 
@@ -53,8 +50,6 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Platform cache root, e.g. `~/.cache/rsomics/models` (Linux) or
-    /// `~/Library/Caches/rsomics/models` (macOS).
     #[must_use]
     pub fn default_root() -> PathBuf {
         if let Some(home) = std::env::var_os("HOME") {
@@ -89,8 +84,7 @@ impl Cache {
         self.root.join(format!("{}.{ext}", model.stem))
     }
 
-    /// `Some(path)` if cached and sha256 matches; `None` if absent;
-    /// `Err(ChecksumMismatch)` if present but corrupted.
+    // Some = cached & sha256 ok; None = absent; Err(ChecksumMismatch) = present but corrupt
     pub fn lookup(&self, model: &Model) -> Result<Option<PathBuf>> {
         let p = self.path_for(model);
         if !p.exists() {
@@ -109,7 +103,7 @@ impl Cache {
         }
     }
 
-    /// Like `lookup` but errors if the model is absent.
+    // like lookup but errors if absent (no None)
     pub fn require(&self, model: &Model) -> Result<PathBuf> {
         match self.lookup(model)? {
             Some(p) => Ok(p),

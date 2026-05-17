@@ -3,8 +3,6 @@ use std::fmt::Write as _;
 
 use super::{ModuleStatus, QcModule, Record};
 
-/// `FastQC` "Sequence Length Distribution" — WARN if reads are not all the
-/// same length, FAIL if any read has zero length (clean-room contract).
 pub struct SeqLengthDistribution {
     counts: BTreeMap<u64, u64>,
 }

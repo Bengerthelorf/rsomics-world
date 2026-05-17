@@ -1,4 +1,4 @@
-//! BFC read-correction core — port of `correct.c` (lh3/bfc, MIT).
+// Port of correct.c (lh3/bfc, MIT).
 
 use crate::CorrectConfig;
 use crate::count::CountTable;
@@ -10,7 +10,7 @@ const EC_HIST: usize = 5;
 const EC_HIST_HIGH: usize = 2;
 const MAX_PATHS: usize = 4;
 
-/// fastp/BFC base codes: 0..=3 = A,C,G,T; 4 = ambiguous (N).
+// BFC/fastp base codes: 0..=3 = A,C,G,T; 4 = N/ambiguous.
 pub(crate) const SEQ_NT4: [u8; 256] = build_nt4();
 
 const fn build_nt4() -> [u8; 256] {
@@ -31,9 +31,7 @@ const W_EC_HIGH: i32 = 7;
 const W_ABSENT: i32 = 3;
 const W_ABSENT_HIGH: i32 = 1;
 
-/// One base in the ec working sequence — BFC `ecbase_t` (`b`/`ob` current
-/// & original base, `q`/`oq` quality bit, `lcov`/`hcov` solid coverage,
-/// the solid/high end flags).
+// BFC ecbase_t: b/ob = current/original base, q/oq = quality bit, lcov/hcov = solid coverage.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct EcBase {
     pub(crate) b: u8,
@@ -79,8 +77,6 @@ fn revcomp(s: &mut [EcBase]) {
     }
 }
 
-/// BFC `bfc_ec_kcov`: mark each base's solid/high-end flags and accumulate
-/// `lcov`/`hcov` over the k-mers covering it.
 fn ec_kcov(k: usize, min_occ: i32, s: &mut [EcBase], ch: &CountTable) {
     let mut x = BfcKmer::NULL;
     let mut l = 0usize;
@@ -113,9 +109,7 @@ fn ec_kcov(k: usize, min_occ: i32, s: &mut [EcBase], ch: &CountTable) {
     }
 }
 
-/// BFC `bfc_ec_best_island`: longest run of `solid_end` k-mers. Returns
-/// `Some((start, end))` (the C `max_i-max-k+1 .. max_i` half-open) or
-/// `None` for no solid k-mer. Call after [`ec_kcov`].
+// BFC bfc_ec_best_island: longest solid_end run → Some((start, end)) half-open, or None.
 pub(crate) fn best_island(k: usize, s: &[EcBase]) -> Option<(usize, usize)> {
     let (mut max, mut l) = (0i64, 0i64);
     let mut max_i: i64 = -1;
@@ -138,9 +132,7 @@ pub(crate) fn best_island(k: usize, s: &[EcBase]) -> Option<(usize, usize)> {
     if max == 0 {
         return None;
     }
-    // BFC `bfc_ec_best_island`: start = first base the solid run covers =
-    // (first solid k-mer index) - k + 1. Signed like the C int math; the
-    // solid-end ⟹ index ≥ k-1 invariant makes this ≥ 0.
+    // start = first_solid_kmer_index - k + 1; solid_end ⟹ index ≥ k-1 guarantees ≥ 0.
     let start = max_i - max - k as i64 + 1;
     debug_assert!(
         start >= 0,
@@ -149,9 +141,6 @@ pub(crate) fn best_island(k: usize, s: &[EcBase]) -> Option<(usize, usize)> {
     Some((start.max(0) as usize, max_i as usize))
 }
 
-/// BFC `bfc_ec_first_kmer`: scan from `start` for the first window of `k`
-/// consecutive non-N bases. Returns `(i, x)` where `i` is the index of the
-/// k-th base (the k-mer's 3' end), or `s.len()` if no such window exists.
 fn ec_first_kmer(k: usize, s: &[EcBase], start: usize) -> (usize, BfcKmer) {
     let mut x = BfcKmer::NULL;
     let mut l = 0usize;
@@ -172,11 +161,7 @@ fn ec_first_kmer(k: usize, s: &[EcBase], start: usize) -> (usize, BfcKmer) {
     (i, x)
 }
 
-/// BFC `bfc_ec_greedy_k`: try every single-base substitution of `x`; if
-/// exactly one alternative k-mer is strongly supported (best coverage
-/// `> mode/3` and second-best `< 3`), return `pos<<2 | base` (pos counted
-/// from the 3' end), else `-1`. Rescues reads with no solid island but one
-/// confident single error in the first clean k-mer window.
+// BFC bfc_ec_greedy_k: one confident substitution (best > mode/3, 2nd < 3) → pos<<2|base; else -1.
 pub(crate) fn bfc_ec_greedy_k(k: usize, mode: i32, x: &BfcKmer, ch: &CountTable) -> i32 {
     let (mut max, mut max2, mut max_ec) = (0i32, 0i32, -1i32);
     for i in 0..k {
@@ -207,8 +192,7 @@ pub(crate) fn bfc_ec_greedy_k(k: usize, mode: i32, x: &BfcKmer, ch: &CountTable)
     }
 }
 
-// BFC `bfc_penalty_t` — four 1-bit penalty kinds + the chosen base; the
-// bool count mirrors the C bitfield, it is not a config struct.
+// BFC bfc_penalty_t: four 1-bit penalty kinds; bools mirror C bitfield, not a config struct.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Default)]
 struct Penalty {
@@ -245,11 +229,8 @@ struct StackNode {
     pen: Penalty,
 }
 
-/// BFC `bfc_ec1dir`: best-first correction from a solid anchor. A binary
-/// min-heap on `tot_pen` (BFC's `heap_lt` is `>`, i.e. lowest penalty
-/// pops first) drives an exhaustive bounded search; the lowest-penalty
-/// terminating path is back-tracked into `ec`. Returns `n_absent` (≥0) or
-/// a negative BFC code (`-2` uncorrectable N, `-3` too many failures).
+// BFC bfc_ec1dir: min-heap on tot_pen (lowest penalty pops first); returns n_absent ≥ 0,
+// -2 (uncorrectable N), or -3 (too many failures).
 #[allow(clippy::too_many_lines)]
 fn ec1dir(
     cfg: &CorrectConfig,
@@ -311,8 +292,7 @@ fn ec1dir(
             let mut os: i32 = -1;
             let mut fixed = z.i > end;
             let mut other_ext = 0;
-            // ≤ 4 by construction (`for b in 0u8..4`, ≤ 1 push/iter): a
-            // fixed array kills a per-heap-pop heap allocation.
+            // fixed array (≤4 by construction) avoids a per-heap-pop Vec allocation.
             let mut added: [(Penalty, i32); 4] = [(Penalty::default(), 0); 4];
             let mut n_added = 0usize;
 
@@ -413,9 +393,7 @@ fn ec1dir(
                 stop = true;
             }
         }
-        // Only a node with a real stack index is a valid terminating path;
-        // BFC's path[] never holds the seed's -1 (the seed always extends
-        // before any stop), so a degenerate z.k<0 stop is not a path.
+        // seed's z.k is -1 (it always extends before any stop); z.k<0 stop is not a path.
         if stop && z.k >= 0 {
             let tp = stack[z.k as usize].tot_pen;
             if tp < min_path_pen {
@@ -480,8 +458,6 @@ fn buf_update(
     heap_up(heap, last);
 }
 
-/// BFC backtrack: walk the stack parent chain, writing the chosen base and
-/// ec/absent flags at each corrected position. Returns `n_absent`.
 fn backtrack(stack: &[StackNode], mut end: i64, seq: &[EcBase], path: &mut Vec<EcBase>) -> i32 {
     path.clear();
     path.extend_from_slice(seq);
@@ -499,7 +475,7 @@ fn backtrack(stack: &[StackNode], mut end: i64, seq: &[EcBase], path: &mut Vec<E
     n_absent
 }
 
-// BFC's heap is a min-heap on tot_pen (`heap_lt(a,b) = a.tot_pen > b.tot_pen`).
+// BFC heap_lt inverts: a.tot_pen > b.tot_pen makes this a min-heap on tot_pen.
 #[inline]
 fn heap_lt(a: &HeapNode, b: &HeapNode) -> bool {
     a.tot_pen < b.tot_pen
@@ -541,15 +517,8 @@ fn heap_pop(h: &mut Vec<HeapNode>) -> HeapNode {
     top
 }
 
-/// BFC `bfc_ec1`: correct one read. N-fraction guard (>5% → drop), solid
-/// island, forward `ec1dir` over the full read, reverse-complement, second
-/// `ec1dir`, then the two directional results are merged by BFC's
-/// agreement rule and the corrected sequence + ec-encoded quality emitted.
-/// Returns `None` when the read is uncorrectable / over the N threshold.
-/// `mode` is the count-histogram peak (BFC `bfc_ch_hist`). BFC computes it
-/// once in `bfc_correct` and hands it to every per-read worker; computing
-/// it per read here was O(reads × table) = quadratic. It is now a caller
-/// argument, computed once in `Pipeline::run`.
+// BFC bfc_ec1: N-fraction guard (>5%→None), forward ec1dir, RC, second ec1dir, merge by
+// agreement rule. mode is the histogram peak — caller-supplied to avoid O(reads×table).
 pub(crate) fn correct_one(
     cfg: &CorrectConfig,
     ch: &CountTable,
@@ -566,9 +535,7 @@ pub(crate) fn correct_one(
         return None;
     }
     ec_kcov(cfg.k, cfg.min_cov, &mut s, ch);
-    // BFC `bfc_ec1`: with a solid island, anchor there. Without one, try
-    // the greedy single-substitution probe over successive first-k-mers;
-    // on success apply that one base fix and re-anchor, else NO_SOLID.
+    // no solid island: greedy single-substitution probe over successive first-k-mers.
     let (start, end) = if let Some(se) = best_island(cfg.k, &s) {
         se
     } else {
