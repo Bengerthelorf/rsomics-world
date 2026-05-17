@@ -5,7 +5,7 @@ use clap::Parser;
 use rsomics_common::{CommonFlags, Result, RsomicsError, ToolMeta};
 use rsomics_help::{Example, FlagSpec, HelpSpec, Origin, Section};
 
-use rsomics_bam_flagstat::{FlagstatCounts, count_bam, count_sam};
+use rsomics_bam_flagstat::{count_bam, count_sam};
 
 pub const META: ToolMeta = ToolMeta {
     name: env!("CARGO_PKG_NAME"),
