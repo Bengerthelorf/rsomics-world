@@ -223,7 +223,7 @@ impl Cli {
             let rec = result?;
             let (id, seq, qual) = (&rec.id, &rec.seq, &rec.qual);
 
-            if let Some((s, e)) = process(&seq, &qual, refs, cfg) {
+            if let Some((s, e)) = process(seq, qual, refs, cfg) {
                 if let Some(out) = stdout_out.as_mut() {
                     out.write_all(b"@").map_err(RsomicsError::Io)?;
                     out.write_all(id).map_err(RsomicsError::Io)?;
