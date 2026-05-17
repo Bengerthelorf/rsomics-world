@@ -39,11 +39,16 @@ impl Cli {
             let stdin = std::io::stdin().lock();
             count_sam(BufReader::new(stdin))?
         } else {
-            let ext = self.input.extension().and_then(|e| e.to_str()).unwrap_or("");
+            let ext = self
+                .input
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
             match ext {
                 "sam" => {
-                    let file = std::fs::File::open(&self.input)
-                        .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", self.input.display())))?;
+                    let file = std::fs::File::open(&self.input).map_err(|e| {
+                        RsomicsError::InvalidInput(format!("{}: {e}", self.input.display()))
+                    })?;
                     count_sam(BufReader::new(file))?
                 }
                 _ => count_bam(&self.input)?,
@@ -73,10 +78,7 @@ pub static HELP: HelpSpec = HelpSpec {
         our_license: "MIT OR Apache-2.0",
         paper_doi: Some("10.1093/bioinformatics/btp352"),
     }),
-    usage_lines: &[
-        "<INPUT.bam>",
-        "-O json <INPUT.bam>",
-    ],
+    usage_lines: &["<INPUT.bam>", "-O json <INPUT.bam>"],
     sections: &[Section {
         title: "OPTIONS",
         flags: &[

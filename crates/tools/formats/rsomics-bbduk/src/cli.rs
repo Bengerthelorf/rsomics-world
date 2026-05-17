@@ -201,8 +201,12 @@ impl Cli {
 
     fn run_se(&self, refs: &RefKmers, cfg: &Config) -> Result<()> {
         let mut reader = open_fastq(&self.in1)?;
-        let mut w1 = ChunkedWriter::create(&self.out1, 4)?;
-        let mut wm = self.outm.as_ref().map(|p| ChunkedWriter::create(p, 4)).transpose()?;
+        let mut w1 = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
+        let mut wm = self
+            .outm
+            .as_ref()
+            .map(|p| ChunkedWriter::create(std::path::Path::new(p), 4))
+            .transpose()?;
         let has_outm = wm.is_some();
 
         let mut chunk: Vec<OwnedRecord> = Vec::with_capacity(CHUNK_RECORDS);
@@ -213,27 +217,33 @@ impl Cli {
             while chunk.len() < CHUNK_RECORDS {
                 match reader.next() {
                     Some(rec) => chunk.push(rec?),
-                    None => { done = true; break; }
+                    None => {
+                        done = true;
+                        break;
+                    }
                 }
             }
-            if chunk.is_empty() { break; }
+            if chunk.is_empty() {
+                break;
+            }
 
             // Each result: (trimmed_or_none, original_if_outm_needed)
             let results: Vec<(Option<OwnedRecord>, Option<OwnedRecord>)> = chunk
                 .par_drain(..)
-                .map(|rec| {
-                    match process(&rec.seq, &rec.qual, refs, cfg) {
-                        Some((s, e)) => (Some(OwnedRecord {
+                .map(|rec| match process(&rec.seq, &rec.qual, refs, cfg) {
+                    Some((s, e)) => (
+                        Some(OwnedRecord {
                             id: rec.id,
                             seq: rec.seq[s..e].to_vec(),
                             qual: rec.qual[s..e].to_vec(),
-                        }), None),
-                        None => {
-                            if has_outm {
-                                (None, Some(rec))
-                            } else {
-                                (None, None)
-                            }
+                        }),
+                        None,
+                    ),
+                    None => {
+                        if has_outm {
+                            (None, Some(rec))
+                        } else {
+                            (None, None)
                         }
                     }
                 })
@@ -248,7 +258,9 @@ impl Cli {
             }
         }
         w1.finalize()?;
-        if let Some(wm) = wm { wm.finalize()?; }
+        if let Some(wm) = wm {
+            wm.finalize()?;
+        }
         Ok(())
     }
 
@@ -256,8 +268,8 @@ impl Cli {
         let mut r1 = open_fastq(&self.in1)?;
         let mut r2 = open_fastq(in2)?;
         let out2 = self.out2.as_ref().expect("paired ⇒ out2 set");
-        let mut w1 = ChunkedWriter::create(&self.out1, 4)?;
-        let mut w2 = ChunkedWriter::create(out2, 4)?;
+        let mut w1 = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
+        let mut w2 = ChunkedWriter::create(std::path::Path::new(out2), 4)?;
 
         let mut chunk: Vec<(OwnedRecord, OwnedRecord)> = Vec::with_capacity(CHUNK_RECORDS);
         let mut done = false;
@@ -267,22 +279,40 @@ impl Cli {
             while chunk.len() < CHUNK_RECORDS {
                 match (r1.next(), r2.next()) {
                     (Some(a), Some(b)) => chunk.push((a?, b?)),
-                    (None, None) => { done = true; break; }
-                    _ => return Err(RsomicsError::InvalidInput(
-                        "in1 and in2 have different read counts (not properly paired)".into(),
-                    )),
+                    (None, None) => {
+                        done = true;
+                        break;
+                    }
+                    _ => {
+                        return Err(RsomicsError::InvalidInput(
+                            "in1 and in2 have different read counts (not properly paired)".into(),
+                        ));
+                    }
                 }
             }
-            if chunk.is_empty() { break; }
+            if chunk.is_empty() {
+                break;
+            }
 
             // BBDuk removeifeitherbad=t: pair kept/dropped as unit
             let results: Vec<Option<(OwnedRecord, OwnedRecord)>> = chunk
                 .par_drain(..)
                 .map(|(a, b)| {
-                    match (process(&a.seq, &a.qual, refs, cfg), process(&b.seq, &b.qual, refs, cfg)) {
+                    match (
+                        process(&a.seq, &a.qual, refs, cfg),
+                        process(&b.seq, &b.qual, refs, cfg),
+                    ) {
                         (Some(t1), Some(t2)) => Some((
-                            OwnedRecord { id: a.id, seq: a.seq[t1.0..t1.1].to_vec(), qual: a.qual[t1.0..t1.1].to_vec() },
-                            OwnedRecord { id: b.id, seq: b.seq[t2.0..t2.1].to_vec(), qual: b.qual[t2.0..t2.1].to_vec() },
+                            OwnedRecord {
+                                id: a.id,
+                                seq: a.seq[t1.0..t1.1].to_vec(),
+                                qual: a.qual[t1.0..t1.1].to_vec(),
+                            },
+                            OwnedRecord {
+                                id: b.id,
+                                seq: b.seq[t2.0..t2.1].to_vec(),
+                                qual: b.qual[t2.0..t2.1].to_vec(),
+                            },
                         )),
                         _ => None,
                     }
@@ -301,7 +331,6 @@ impl Cli {
         Ok(())
     }
 }
-
 
 pub const HELP: HelpSpec = HelpSpec {
     name: META.name,
