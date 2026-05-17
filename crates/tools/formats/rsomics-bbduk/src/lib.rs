@@ -1,9 +1,28 @@
 // clap --help text names BBDuk / bbduk.sh params that read as code; backticking them clutters the help
 #![allow(clippy::doc_markdown)]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 
 use rsomics_kmer::{RollingKmers, encode, reverse_complement};
+
+// k-mer codes are already well-distributed 2-bit encodings; SipHash is wasted work
+#[derive(Default)]
+struct IdentityHasher(u64);
+
+impl Hasher for IdentityHasher {
+    fn write_u64(&mut self, n: u64) {
+        self.0 = n;
+    }
+    fn write(&mut self, _: &[u8]) {
+        unreachable!();
+    }
+    fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+type KmerSet = std::collections::HashSet<u64, BuildHasherDefault<IdentityHasher>>;
 
 // k ≤ 31: reverse_complement does 1u64 << (2*k), UB at k=32; BBDuk's own default is 27
 pub const MAX_K: usize = 31;
@@ -117,8 +136,8 @@ fn expand(buf: &mut Vec<u8>, start: usize, budget: usize, out: &mut Vec<u64>) {
 // exact ref k-mer index (not a Bloom filter — false positives would break kfilter byte-compat);
 // mink>0 also indexes shorter tip k-mers (lengths mink..k) governed by hdist2
 pub struct RefKmers {
-    full: HashSet<u64>,
-    tips: HashMap<usize, HashSet<u64>>, // length → ref k-mers of that length (mink..k)
+    full: KmerSet,
+    tips: HashMap<usize, KmerSet>, // length → ref k-mers of that length (mink..k)
     k: usize,
     mink: usize,
     // effective maskmiddle = requested && mink==0 — BBDuk disables maskmiddle when short k-mers are in play
@@ -142,8 +161,8 @@ impl RefKmers {
         let mm = cfg.maskmiddle && cfg.mink == 0;
         let key = |c: u64| if mm { mask_mid(c, cfg.k) } else { c };
 
-        let mut full = HashSet::new();
-        let mut tips: HashMap<usize, HashSet<u64>> = HashMap::new();
+        let mut full = KmerSet::default();
+        let mut tips: HashMap<usize, KmerSet> = HashMap::new();
         let tip_lens: Vec<usize> = if cfg.mink > 0 {
             (cfg.mink..cfg.k).collect()
         } else {
