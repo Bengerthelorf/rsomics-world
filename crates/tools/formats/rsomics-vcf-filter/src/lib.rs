@@ -48,13 +48,12 @@ pub fn filter_vcf(
             result.map_err(|e| RsomicsError::InvalidInput(format!("reading VCF record: {e}")))?;
         stats.total += 1;
 
-        if let Some(min_q) = cfg.min_qual {
-            if record
+        if cfg.min_qual.is_some_and(|min_q| {
+            record
                 .quality_score()
                 .is_some_and(|r| r.is_ok_and(|q| q < min_q))
-            {
-                continue;
-            }
+        }) {
+            continue;
         }
 
         writer
