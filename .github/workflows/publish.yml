@@ -77,12 +77,21 @@ jobs:
           sudo unzip -q /tmp/fastqc.zip -d /opt
           sudo chmod 0755 /opt/FastQC/fastqc
           sudo ln -sf /opt/FastQC/fastqc /usr/local/bin/fastqc
+          # BBDuk (BBTools, Java) — clean-room compat + perfgate oracle for
+          # rsomics-bbduk. Pinned BBMap_39.06: BBDuk's default kfilter is
+          # exact k-mer matching (version-stable); the pin keeps the lane
+          # reproducible. Reuses the default-jre-headless installed above.
+          curl -fsSL -o /tmp/bbmap.tar.gz \
+            "https://downloads.sourceforge.net/project/bbmap/BBMap_39.06.tar.gz"
+          sudo tar -xzf /tmp/bbmap.tar.gz -C /opt
+          sudo ln -sf /opt/bbmap/bbduk.sh /usr/local/bin/bbduk.sh
           fastp --version
           seqkit version
           bedtools --version
           hyperfine --version
           bfc -v 2>&1 | head -1 || true
           fastqc --version
+          bbduk.sh --version 2>&1 | head -2 || true
 
       - name: cargo test
         run: cargo test -p ${{ steps.parse.outputs.crate }} --all-features

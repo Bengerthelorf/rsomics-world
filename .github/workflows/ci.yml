@@ -148,12 +148,19 @@ jobs:
           sudo unzip -q /tmp/fastqc.zip -d /opt
           sudo chmod 0755 /opt/FastQC/fastqc
           sudo ln -sf /opt/FastQC/fastqc /usr/local/bin/fastqc
+          # BBDuk (BBTools, Java) — rsomics-bbduk clean-room compat oracle.
+          # Pinned BBMap_39.06; reuses default-jre-headless installed above.
+          curl -fsSL -o /tmp/bbmap.tar.gz \
+            "https://downloads.sourceforge.net/project/bbmap/BBMap_39.06.tar.gz"
+          sudo tar -xzf /tmp/bbmap.tar.gz -C /opt
+          sudo ln -sf /opt/bbmap/bbduk.sh /usr/local/bin/bbduk.sh
           fastp --version
           samtools --version | head -1
           seqkit version
           bedtools --version
           bfc -v 2>&1 | head -1 || true
           fastqc --version
+          bbduk.sh --version 2>&1 | head -2 || true
       - name: Install upstream binaries for compat tests (macOS)
         if: runner.os == 'macOS'
         run: |
