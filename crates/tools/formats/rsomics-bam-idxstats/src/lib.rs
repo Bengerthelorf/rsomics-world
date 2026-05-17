@@ -3,6 +3,7 @@ use std::path::Path;
 
 use noodles::bam;
 use noodles::bam::bai;
+use noodles::csi::binning_index::ReferenceSequence as IndexRefSeq;
 use rsomics_common::{Result, RsomicsError};
 use serde::Serialize;
 
@@ -88,7 +89,7 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         });
     }
 
-    use noodles::csi::BinningIndex;
+    use noodles::csi::BinningIndex as _;
     if let Some(n) = index.unplaced_unmapped_record_count() {
         stats.unmapped_no_ref = n;
     }
