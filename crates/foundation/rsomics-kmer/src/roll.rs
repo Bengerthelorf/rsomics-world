@@ -104,6 +104,6 @@ mod tests {
     fn rolling_seq_shorter_than_k() {
         let results: Vec<_> = RollingKmers::new(b"ACG", 4).collect();
         assert_eq!(results.len(), 3);
-        assert!(results.iter().all(|r| r.is_none()));
+        assert!(results.iter().all(Option::is_none));
     }
 }
