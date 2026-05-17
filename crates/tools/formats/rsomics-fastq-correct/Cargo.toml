@@ -23,7 +23,7 @@ path = "src/lib.rs"
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
 rsomics-seqio = { path = "../../../foundation/rsomics-seqio", version = "0.1" }
 rsomics-fqgz = { path = "../../../foundation/rsomics-fqgz", version = "0.1" }
-rsomics-kmer = { path = "../../../foundation/rsomics-kmer", version = "0.1" }
+rsomics-kmer = { path = "../../../foundation/rsomics-kmer", version = "0.2" }
 rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }

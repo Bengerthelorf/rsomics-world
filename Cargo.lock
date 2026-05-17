@@ -843,6 +843,7 @@ checksum = "34e7ed524a472dbd0dc69cc7b63408f37552e48460028af44a3024f2eb77f036"
 dependencies = [
  "noodles-bam",
  "noodles-cram",
+ "noodles-csi",
  "noodles-sam",
 ]
 
@@ -1190,6 +1191,19 @@ name = "rsomics-bam-flagstat"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
+ "noodles",
+ "rsomics-common",
+ "rsomics-help",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "rsomics-bam-idxstats"
+version = "0.1.0"
+dependencies = [
  "clap",
  "noodles",
  "rsomics-common",

@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-kmer"
-version = "0.1.0"
+version = "0.2.0"
 description = "K-mer encoding, canonicalisation, ntHash rolling hash, MurmurHash3, k-mer counting for the rsomics-* tool family. Layer A primitive."
 edition.workspace = true
 rust-version.workspace = true

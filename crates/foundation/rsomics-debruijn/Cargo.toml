@@ -11,7 +11,7 @@ categories = ["science"]
 keywords = ["debruijn", "dbg", "assembly", "bioinformatics", "unitig"]
 
 [dependencies]
-rsomics-kmer = { path = "../rsomics-kmer", version = "0.1" }
+rsomics-kmer = { path = "../rsomics-kmer", version = "0.2" }
 thiserror.workspace = true
 
 [lints]
