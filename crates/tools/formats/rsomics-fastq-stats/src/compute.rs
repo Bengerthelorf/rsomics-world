@@ -3,6 +3,7 @@
 #![allow(clippy::cast_precision_loss)]
 
 use std::path::Path;
+use std::sync::LazyLock;
 
 use needletail::parse_fastx_file;
 use rsomics_common::{Result, RsomicsError};
@@ -77,6 +78,19 @@ pub struct ExtendedStats {
 fn round2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
+
+/// Per-phred error probability `10^(-q/10)`, indexed by `q = byte - offset`
+/// (a `u8`, so `0..=255`; bytes below the offset fail loud before indexing).
+/// A transcendental call per quality base dominates this hot path; seqkit
+/// avoids it with the same lookup (`qual_map`), so this table is required
+/// to match — let alone beat — it.
+static ERR_PROB: LazyLock<[f64; 256]> = LazyLock::new(|| {
+    let mut t = [0.0f64; 256];
+    for (q, e) in t.iter_mut().enumerate() {
+        *e = 10f64.powf(-(q as f64) / 10.0);
+    }
+    t
+});
 
 #[allow(clippy::missing_errors_doc)]
 pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastqStats> {
@@ -198,20 +212,19 @@ struct QualCounts {
 /// inclusive ≥20/≥30 thresholds and sum the per-base error probabilities.
 fn accumulate_qual(qual: &[u8], offset: u8, qc: &mut QualCounts, path: &Path) -> Result<()> {
     for &qb in qual {
-        let q = i32::from(qb) - i32::from(offset);
-        if q < 0 {
+        let Some(q) = qb.checked_sub(offset) else {
             return Err(RsomicsError::InvalidInput(format!(
                 "{}: quality byte {qb} below offset {offset} (wrong --fq-encoding?)",
                 path.display()
             )));
-        }
+        };
         if q >= 20 {
             qc.q20 += 1;
             if q >= 30 {
                 qc.q30 += 1;
             }
         }
-        qc.err_sum += 10f64.powf(-f64::from(q) / 10.0);
+        qc.err_sum += ERR_PROB[q as usize];
     }
     Ok(())
 }
