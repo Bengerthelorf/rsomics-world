@@ -191,10 +191,46 @@ impl Cli {
                 .ok();
         }
 
+        let serial = threads == 1;
         if let Some(in2) = &self.in2 {
             self.run_pe(&refs, &cfg, in2)?;
+        } else if serial {
+            self.run_se_serial(&refs, &cfg)?;
         } else {
             self.run_se(&refs, &cfg)?;
+        }
+        Ok(())
+    }
+
+    fn run_se_serial(&self, refs: &RefKmers, cfg: &Config) -> Result<()> {
+        use std::io::{BufWriter, Write};
+
+        let mut reader = open_fastq(&self.in1)?;
+
+        if self.out1 == "-" {
+            let mut out = BufWriter::new(std::io::stdout().lock());
+            for rec in reader.by_ref() {
+                let rec = rec?;
+                if let Some((s, e)) = process(&rec.seq, &rec.qual, refs, cfg) {
+                    out.write_all(b"@").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.id).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.seq[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n+\n").map_err(RsomicsError::Io)?;
+                    out.write_all(&rec.qual[s..e]).map_err(RsomicsError::Io)?;
+                    out.write_all(b"\n").map_err(RsomicsError::Io)?;
+                }
+            }
+            out.flush().map_err(RsomicsError::Io)?;
+        } else {
+            let mut w = ChunkedWriter::create(std::path::Path::new(&self.out1), 4)?;
+            for rec in reader.by_ref() {
+                let rec = rec?;
+                if let Some((s, e)) = process(&rec.seq, &rec.qual, refs, cfg) {
+                    w.write_record(&rec.id, &rec.seq[s..e], &rec.qual[s..e])?;
+                }
+            }
+            w.finalize()?;
         }
         Ok(())
     }
