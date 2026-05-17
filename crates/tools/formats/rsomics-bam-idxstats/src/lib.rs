@@ -3,6 +3,7 @@ use std::path::Path;
 
 use noodles::bam;
 use noodles::bam::bai;
+use noodles::csi::BinningIndex;
 use noodles::csi::binning_index::ReferenceSequence as IndexRefSeq;
 use rsomics_common::{Result, RsomicsError};
 use serde::Serialize;
@@ -51,8 +52,9 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         )));
     };
 
-    let index = bai::fs::read(&index_path)
-        .map_err(|e| RsomicsError::InvalidInput(format!("reading index {}: {e}", index_path.display())))?;
+    let index = bai::fs::read(&index_path).map_err(|e| {
+        RsomicsError::InvalidInput(format!("reading index {}: {e}", index_path.display()))
+    })?;
 
     let file = File::open(bam_path)
         .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", bam_path.display())))?;
@@ -62,6 +64,7 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         .map_err(|e| RsomicsError::InvalidInput(format!("reading header: {e}")))?;
 
     let ref_seqs = header.reference_sequences();
+    let idx_refs = index.reference_sequences();
     let mut stats = IdxStats {
         refs: Vec::with_capacity(ref_seqs.len()),
         unmapped_no_ref: 0,
@@ -69,18 +72,12 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
 
     for (i, (name, map)) in ref_seqs.iter().enumerate() {
         let length = map.length().get();
-        let idx_refs = index.reference_sequences();
-        let (mapped, unmapped) = if let Some(ref_idx) = idx_refs.get(i) {
-            let m = ref_idx
-                .metadata()
-                .map_or(0, |md| md.mapped_record_count());
-            let u = ref_idx
-                .metadata()
-                .map_or(0, |md| md.unmapped_record_count());
-            (m, u)
-        } else {
-            (0, 0)
-        };
+        let (mapped, unmapped) = idx_refs
+            .get(i)
+            .and_then(IndexRefSeq::metadata)
+            .map_or((0, 0), |md| {
+                (md.mapped_record_count(), md.unmapped_record_count())
+            });
         stats.refs.push(RefStats {
             name: name.to_string(),
             length,
@@ -89,7 +86,6 @@ pub fn idxstats(bam_path: &Path) -> Result<IdxStats> {
         });
     }
 
-    use noodles::csi::BinningIndex as _;
     if let Some(n) = index.unplaced_unmapped_record_count() {
         stats.unmapped_no_ref = n;
     }
