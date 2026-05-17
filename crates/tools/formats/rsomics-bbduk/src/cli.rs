@@ -212,13 +212,11 @@ impl Cli {
             while !done {
                 chunk.clear();
                 while chunk.len() < CHUNK_RECORDS {
-                    match reader.next() {
-                        Some(rec) => chunk.push(rec?),
-                        None => {
-                            done = true;
-                            break;
-                        }
-                    }
+                    let Some(rec) = reader.next() else {
+                        done = true;
+                        break;
+                    };
+                    chunk.push(rec?);
                 }
                 if chunk.is_empty() {
                     break;
@@ -255,13 +253,11 @@ impl Cli {
             while !done {
                 chunk.clear();
                 while chunk.len() < CHUNK_RECORDS {
-                    match reader.next() {
-                        Some(rec) => chunk.push(rec?),
-                        None => {
-                            done = true;
-                            break;
-                        }
-                    }
+                    let Some(rec) = reader.next() else {
+                        done = true;
+                        break;
+                    };
+                    chunk.push(rec?);
                 }
                 if chunk.is_empty() {
                     break;
@@ -351,11 +347,9 @@ impl Cli {
                 })
                 .collect();
 
-            for opt in results {
-                if let Some((a, b)) = opt {
-                    w1.write_record(&a.id, &a.seq, &a.qual)?;
-                    w2.write_record(&b.id, &b.seq, &b.qual)?;
-                }
+            for (a, b) in results.into_iter().flatten() {
+                w1.write_record(&a.id, &a.seq, &a.qual)?;
+                w2.write_record(&b.id, &b.seq, &b.qual)?;
             }
         }
         w1.finalize()?;
