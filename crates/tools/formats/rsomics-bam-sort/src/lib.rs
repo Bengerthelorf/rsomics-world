@@ -5,6 +5,7 @@ use std::path::Path;
 use noodles::bam;
 use noodles::sam;
 use noodles::sam::alignment::RecordBuf;
+use noodles::sam::io::Write as SamWrite;
 use rsomics_common::{Result, RsomicsError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,28 +49,16 @@ pub fn sort_bam(input: &Path, output: &Path, order: SortOrder) -> Result<()> {
         }
     }
 
-    let mut new_header = header.clone();
-    let so = match order {
-        SortOrder::Coordinate => "coordinate",
-        SortOrder::Name => "queryname",
-    };
-    if let Some(hd) = new_header.header_mut() {
-        hd.insert(
-            sam::header::record::value::map::header::tag::SORT_ORDER,
-            so.into(),
-        );
-    }
-
     let out_file = File::create(output)
         .map_err(|e| RsomicsError::InvalidInput(format!("creating {}: {e}", output.display())))?;
     let mut writer = bam::io::Writer::new(out_file);
     writer
-        .write_header(&new_header)
+        .write_alignment_header(&header)
         .map_err(|e| RsomicsError::InvalidInput(format!("writing header: {e}")))?;
 
     for record in &records {
         writer
-            .write_alignment_record(&new_header, record)
+            .write_alignment_record(&header, record)
             .map_err(|e| RsomicsError::InvalidInput(format!("writing record: {e}")))?;
     }
 
