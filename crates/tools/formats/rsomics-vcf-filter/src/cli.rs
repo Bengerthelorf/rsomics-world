@@ -24,11 +24,11 @@ pub struct Cli {
     output: String,
 
     /// Keep only PASS variants (FILTER == PASS or .).
-    #[arg(short = 'f', long = "pass-only")]
+    #[arg(long = "pass-only")]
     pass_only: bool,
 
     /// Minimum QUAL score.
-    #[arg(short = 'q', long = "min-qual")]
+    #[arg(long = "min-qual")]
     min_qual: Option<f32>,
 
     #[command(flatten)]
@@ -87,7 +87,7 @@ pub static HELP: HelpSpec = HelpSpec {
                 why_default: None,
             },
             FlagSpec {
-                short: Some('f'),
+                short: None,
                 long: "pass-only",
                 aliases: &[],
                 value: None,
@@ -98,7 +98,7 @@ pub static HELP: HelpSpec = HelpSpec {
                 why_default: None,
             },
             FlagSpec {
-                short: Some('q'),
+                short: None,
                 long: "min-qual",
                 aliases: &[],
                 value: Some("<N>"),
