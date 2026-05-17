@@ -84,11 +84,14 @@ fix_size=$(wc -c < "$FIXTURE" | tr -d ' ')
 fix_sha=$(sha256 "$FIXTURE")
 up_ver_str=$([ -n "$UP_VER" ] && eval "$UP_VER" 2>&1 | head -1 || echo "n/a")
 
-# FIX2 before FIX (FIX is a prefix of FIX2). Substituted paths keep the
-# original extension so extension-sniffing upstreams detect compression.
-subst() { local s=$1; s=${s//FIX2/$work/${FIX2_NAME:-fixture2}}; s=${s//FIX/$work/$FIX_NAME}; s=${s//OUT/$work/$2}; echo "$s"; }
+# FIX2 before FIX, OUTDIR before OUT (each is a prefix of the next).
+# Substituted paths keep the original extension so extension-sniffing
+# upstreams detect compression. OUT = a scratch output file; OUTDIR = a
+# pre-created scratch directory (for report/dir-output tools, e.g. fastqc).
+subst() { local s=$1; s=${s//FIX2/$work/${FIX2_NAME:-fixture2}}; s=${s//FIX/$work/$FIX_NAME}; s=${s//OUTDIR/$work/$2.d}; s=${s//OUT/$work/$2}; echo "$s"; }
 ours_args=$(subst "$OURS_ARGS" out.ours)
 up_args=$(subst "$UP_ARGS" out.up)
+mkdir -p "$work/out.ours.d" "$work/out.up.d"
 
 tmp_json=$(mktemp); trap 'rm -rf "$work" "$tmp_json"' EXIT
 hyperfine --warmup "$WARMUP" --min-runs "$MINRUNS" --shell=sh \

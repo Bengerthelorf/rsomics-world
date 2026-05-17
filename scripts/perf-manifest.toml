@@ -140,3 +140,15 @@ ours_args        = "-i FIX -o OUT --mode full"
 upstream_bin     = "seqkit"
 upstream_args    = "rmdup -s FIX -o OUT"
 upstream_version = "seqkit version"
+
+# FastQC (Java, GPL) is the reference; the user-facing operation is
+# "produce the QC report dir" — both sides write into a pre-created
+# OUTDIR (perfgate's directory placeholder). FastQC also renders
+# HTML/PNG/zip (its inherent overhead); the wall-clock contract is the
+# report a user consumes. Single-threaded both sides.
+[spec.rsomics-fastqc]
+fixture          = "fastq:200000:150"
+ours_args        = "-t 1 -o OUTDIR FIX"
+upstream_bin     = "fastqc"
+upstream_args    = "--quiet --extract --threads 1 -o OUTDIR FIX"
+upstream_version = "fastqc --version"
