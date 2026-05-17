@@ -6,24 +6,13 @@ use std::path::Path;
 use noodles::vcf;
 use rsomics_common::{Result, RsomicsError};
 
+#[derive(Default)]
 pub struct FilterConfig {
     pub min_qual: Option<f32>,
     pub pass_only: bool,
     pub regions: Vec<String>,
     pub include_expr: Option<String>,
     pub exclude_expr: Option<String>,
-}
-
-impl Default for FilterConfig {
-    fn default() -> Self {
-        Self {
-            min_qual: None,
-            pass_only: false,
-            regions: Vec::new(),
-            include_expr: None,
-            exclude_expr: None,
-        }
-    }
 }
 
 pub struct FilterStats {
@@ -60,11 +49,12 @@ pub fn filter_vcf(
         stats.total += 1;
 
         if let Some(min_q) = cfg.min_qual {
-            if let Some(q) = record.quality_score() {
-                let q = q.map_err(|e| RsomicsError::InvalidInput(format!("QUAL: {e}")))?;
-                if q < min_q {
-                    continue;
-                }
+            let dominated = record
+                .quality_score()
+                .map(|r| r.map_or(false, |q| q < min_q))
+                .unwrap_or(false);
+            if dominated {
+                continue;
             }
         }
 
