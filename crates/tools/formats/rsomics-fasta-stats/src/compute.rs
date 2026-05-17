@@ -6,7 +6,7 @@ use std::path::Path;
 
 use needletail::parse_fastx_file;
 use rsomics_common::{Result, RsomicsError};
-use rsomics_seqstats::{LengthStats, classify, count_any_of};
+use rsomics_seqstats::{DEFAULT_ALPHABET_GUESS_LEN, LengthStats, classify, count_any_of};
 use serde::Serialize;
 
 pub use rsomics_seqstats::SeqType;
@@ -60,8 +60,6 @@ pub struct ExtendedStats {
     pub sum_n: u64,
 }
 
-const ALPHABET_GUESS_LIMIT: usize = 10_000;
-
 #[allow(clippy::missing_errors_doc)]
 pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
     let mut reader = parse_fastx_file(path)
@@ -77,7 +75,8 @@ pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
     let mut sum_n_nuc: u64 = 0;
     let mut sum_n_prot: u64 = 0;
 
-    let mut alphabet_sample: Vec<u8> = Vec::with_capacity(ALPHABET_GUESS_LIMIT);
+    // seqkit guesses `type` from the first record only; classify it inline.
+    let mut seq_type: Option<SeqType> = None;
 
     while let Some(record) = reader.next() {
         let rec = record
@@ -98,9 +97,9 @@ pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
             lengths.push(len);
         }
 
-        if alphabet_sample.len() < ALPHABET_GUESS_LIMIT {
-            let take = (ALPHABET_GUESS_LIMIT - alphabet_sample.len()).min(seq.len());
-            alphabet_sample.extend_from_slice(&seq[..take]);
+        if seq_type.is_none() {
+            let take = seq.len().min(DEFAULT_ALPHABET_GUESS_LEN);
+            seq_type = Some(classify(&seq[..take]));
         }
 
         if cfg.extended {
@@ -111,15 +110,16 @@ pub fn compute_stats(path: &Path, cfg: &Config) -> Result<FastaStats> {
         }
     }
 
-    if num_seqs == 0 {
+    // `seq_type` is `None` exactly when there were no records — the
+    // first record always sets it (even an empty record ⇒ Unlimit).
+    let Some(seq_type) = seq_type else {
         return Err(RsomicsError::InvalidInput(format!(
             "{} contained no FASTA records",
             path.display()
         )));
-    }
+    };
 
     let avg_len = sum_len as f64 / num_seqs as f64;
-    let seq_type = classify(&alphabet_sample);
 
     let extended = if cfg.extended {
         let n_count = match seq_type {
@@ -162,7 +162,9 @@ fn extend(
     let ls = LengthStats::new(std::mem::take(lengths));
     let (q1, q2, q3) = (ls.q1(), ls.q2(), ls.q3());
     let (n50, l50) = ls.n50_l50();
-    let gc_percent = if matches!(seq_type, SeqType::Protein) || sum_len == 0 {
+    // No `sum_len == 0` guard: seqkit emits `NaN` for empty input (0.0/0.0),
+    // and guarding it would be defensive programming.
+    let gc_percent = if matches!(seq_type, SeqType::Protein) {
         0.0
     } else {
         sum_gc as f64 * 100.0 / sum_len as f64

@@ -1,6 +1,6 @@
 [package]
 name = "rsomics-fasta-stats"
-version = "0.4.4"
+version = "0.4.5"
 description = "Per-record statistics for FASTA files (num_seqs, sum_len, GC%, N50, …) — Rust port of `seqkit stats` (FASTA-only subset)."
 edition.workspace = true
 rust-version.workspace = true
@@ -18,7 +18,7 @@ path = "src/main.rs"
 [dependencies]
 rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
 rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
-rsomics-seqstats = { path = "../../../foundation/rsomics-seqstats", version = "0.1" }
+rsomics-seqstats = { path = "../../../foundation/rsomics-seqstats", version = "0.2" }
 clap = { workspace = true, features = ["derive"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

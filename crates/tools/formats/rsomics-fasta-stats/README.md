@@ -83,7 +83,8 @@ the measured ratio at one thread for fairness.
     {
       "file": "chr22.fa",          // path as supplied on CLI
       "format": "FASTA",
-      "type": "DNA",               // DNA | RNA | Protein | Other
+      "type": "DNA",               // DNA | RNA | Protein | Unlimit (seqkit's
+                                   // names; guessed from the first record)
       "num_seqs": 1,               // record count
       "sum_len": 50818468,         // total bases, gaps stripped
       "min_len": 50818468,
