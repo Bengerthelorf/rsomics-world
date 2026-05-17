@@ -59,10 +59,10 @@ fn first_index(name: &[u8]) -> Vec<u8> {
 #[derive(Debug, Clone)]
 pub struct UmiConfig {
     pub loc: UmiLoc,
-    pub len: usize,        // fastp --umi_len
-    pub skip: usize,       // fastp --umi_skip: extra 5' bases removed after the UMI
-    pub prefix: Vec<u8>,   // fastp --umi_prefix: joined to the UMI with _ when non-empty
-    pub delimiter: u8,     // read-name / UMI separator; fastp default :
+    pub len: usize,      // fastp --umi_len
+    pub skip: usize,     // fastp --umi_skip: extra 5' bases removed after the UMI
+    pub prefix: Vec<u8>, // fastp --umi_prefix: joined to the UMI with _ when non-empty
+    pub delimiter: u8,   // read-name / UMI separator; fastp default :
 }
 
 impl UmiConfig {
