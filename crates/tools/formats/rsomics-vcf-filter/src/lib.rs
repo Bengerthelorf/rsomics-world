@@ -1,0 +1,76 @@
+#![allow(clippy::cast_possible_truncation)]
+
+use std::io;
+use std::path::Path;
+
+use noodles::vcf;
+use rsomics_common::{Result, RsomicsError};
+
+pub struct FilterConfig {
+    pub min_qual: Option<f32>,
+    pub pass_only: bool,
+    pub regions: Vec<String>,
+    pub include_expr: Option<String>,
+    pub exclude_expr: Option<String>,
+}
+
+impl Default for FilterConfig {
+    fn default() -> Self {
+        Self {
+            min_qual: None,
+            pass_only: false,
+            regions: Vec::new(),
+            include_expr: None,
+            exclude_expr: None,
+        }
+    }
+}
+
+pub struct FilterStats {
+    pub total: u64,
+    pub passed: u64,
+}
+
+pub fn filter_vcf(input: &Path, output: &mut dyn io::Write, cfg: &FilterConfig) -> Result<FilterStats> {
+    let mut reader = vcf::io::reader::Builder::default()
+        .build_from_path(input)
+        .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", input.display())))?;
+
+    let header = reader.read_header()
+        .map_err(|e| RsomicsError::InvalidInput(format!("reading VCF header: {e}")))?;
+
+    let mut writer = vcf::io::Writer::new(output);
+    writer.write_header(&header)
+        .map_err(|e| RsomicsError::InvalidInput(format!("writing header: {e}")))?;
+
+    let mut stats = FilterStats { total: 0, passed: 0 };
+
+    for result in reader.records() {
+        let record = result
+            .map_err(|e| RsomicsError::InvalidInput(format!("reading VCF record: {e}")))?;
+        stats.total += 1;
+
+        if cfg.pass_only {
+            let filters = record.filters();
+            if let Some(Ok(f)) = filters {
+                if !f.is_pass(&header) {
+                    continue;
+                }
+            }
+        }
+
+        if let Some(min_q) = cfg.min_qual {
+            if let Some(Ok(q)) = record.quality_score() {
+                if q < min_q {
+                    continue;
+                }
+            }
+        }
+
+        writer.write_record(&header, &record)
+            .map_err(|e| RsomicsError::InvalidInput(format!("writing record: {e}")))?;
+        stats.passed += 1;
+    }
+
+    Ok(stats)
+}
