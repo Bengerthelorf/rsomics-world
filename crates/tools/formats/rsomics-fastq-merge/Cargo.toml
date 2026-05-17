@@ -1,0 +1,37 @@
+[package]
+name = "rsomics-fastq-merge"
+version = "0.1.0"
+description = "Merge overlapping paired-end FASTQ reads into consensus reads — Rust port of fastp's overlap merge (+ optional overlap base correction)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+categories = ["science", "command-line-utilities"]
+keywords = ["fastq", "bioinformatics", "paired-end", "merge", "fastp"]
+
+[[bin]]
+name = "rsomics-fastq-merge"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+clap = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+anyhow.workspace = true
+needletail = { version = "0.7", default-features = false, features = ["compression"] }
+
+[dev-dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5", features = ["test-support", "rayon"] }
+tempfile = "3"
+criterion.workspace = true
+
+[[bench]]
+name = "fastq_merge"
+harness = false
+
+[lints]
+workspace = true
