@@ -19,8 +19,12 @@ use super::{ModuleStatus, QcModule, Record};
 /// `Σ|obs−theo| / 2 / total` ∈ [0,1] — the fraction of reads that would
 /// have to move to turn the observed distribution into the reference.
 pub struct PerSeqGc {
-    /// Observed read count per integer GC% bucket, 0..=100.
-    obs: [u64; 101],
+    /// Observed read weight per integer GC% bucket, 0..=100. Each read's
+    /// real-valued GC% is split linearly between its two adjacent integer
+    /// buckets (`FastQC`'s method), so the distribution is smooth — bucketing
+    /// to a single rounded bin would alias into a comb for read lengths not
+    /// a multiple of 100 and spuriously inflate the deviation.
+    obs: [f64; 101],
     total: u64,
 }
 
@@ -28,7 +32,7 @@ impl PerSeqGc {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            obs: [0; 101],
+            obs: [0.0; 101],
             total: 0,
         }
     }
@@ -45,13 +49,13 @@ impl PerSeqGc {
         let total = self.total as f64;
         let mut mean = 0.0_f64;
         for (g, &c) in self.obs.iter().enumerate() {
-            mean += g as f64 * c as f64;
+            mean += g as f64 * c;
         }
         mean /= total;
         let mut var = 0.0_f64;
         for (g, &c) in self.obs.iter().enumerate() {
             let d = g as f64 - mean;
-            var += d * d * c as f64;
+            var += d * d * c;
         }
         let sigma = (var / total).sqrt();
         if sigma == 0.0 {
@@ -83,7 +87,7 @@ impl PerSeqGc {
         let theo = self.theoretical();
         let mut dev = 0.0_f64;
         for (g, &t) in theo.iter().enumerate() {
-            dev += (self.obs[g] as f64 - t).abs();
+            dev += (self.obs[g] - t).abs();
         }
         // Σtheo == Σobs == total, so the absolute difference double-counts
         // every moved read (once as a deficit, once as a surplus); halving
@@ -112,11 +116,21 @@ impl QcModule for PerSeqGc {
             .iter()
             .filter(|&&b| matches!(b, b'G' | b'C' | b'g' | b'c'))
             .count();
-        let pct = (gc as f64 / rec.seq.len() as f64 * 100.0).round();
-        // pct ∈ 0.0..=100.0 after round(); fits usize and is a valid index into obs[101]
+        // FastQC splits each read's real-valued GC% linearly across the two
+        // adjacent integer buckets (yielding a smooth distribution); a
+        // single rounded bin would alias into a comb. pct ∈ 0.0..=100.0 so
+        // floor/ceil are valid indices into obs[101].
+        let pct = gc as f64 / rec.seq.len() as f64 * 100.0;
+        let lo = pct.floor();
+        let hi = pct.ceil();
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let pct_idx = pct as usize;
-        self.obs[pct_idx] += 1;
+        let (lo_i, hi_i) = (lo as usize, hi as usize);
+        if lo_i == hi_i {
+            self.obs[lo_i] += 1.0;
+        } else {
+            self.obs[lo_i] += hi - pct;
+            self.obs[hi_i] += pct - lo;
+        }
         self.total += 1;
     }
 
@@ -135,10 +149,10 @@ impl QcModule for PerSeqGc {
 
     fn write_data(&self, out: &mut String) {
         out.push_str("#GC Content\tCount\n");
+        // FastQC emits every bucket 0..=100 with one decimal (counts are
+        // fractional because each read is split across two buckets).
         for (g, &c) in self.obs.iter().enumerate() {
-            if c > 0 {
-                let _ = writeln!(out, "{g}\t{c}");
-            }
+            let _ = writeln!(out, "{g}\t{c:.1}");
         }
     }
 }
