@@ -214,7 +214,10 @@ impl RefKmers {
         }
         RollingKmers::new(seq, self.k)
             .enumerate()
-            .find_map(|(i, opt)| opt.filter(|&c| self.full.contains(&self.key(c))).map(|_| i))
+            .find_map(|(i, opt)| {
+                opt.filter(|&c| self.full.contains(&self.key(c)))
+                    .map(|_| i + 1 - self.k)
+            })
     }
 
     // ktrim=r cut: full-k-mer hit, else (mink>0) start of the longest ref-matching 3' tip — BBDuk never trims an internal short k-mer
