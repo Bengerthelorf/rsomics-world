@@ -1,6 +1,3 @@
-// Result::ok as method ref doesn't compile (E0631) but clippy suggests it — suppress
-#![allow(clippy::redundant_closure)]
-
 use std::cmp::Ordering;
 use std::fs::File;
 use std::path::Path;
@@ -12,6 +9,14 @@ use rsomics_common::{Result, RsomicsError};
 pub enum SortOrder {
     Coordinate,
     Name,
+}
+
+fn tid(r: &bam::Record) -> Option<usize> {
+    r.reference_sequence_id().transpose().ok().flatten()
+}
+
+fn pos(r: &bam::Record) -> Option<noodles::core::Position> {
+    r.alignment_start().transpose().ok().flatten()
 }
 
 pub fn sort_bam(input: &Path, output: &Path, order: SortOrder) -> Result<()> {
@@ -31,19 +36,11 @@ pub fn sort_bam(input: &Path, output: &Path, order: SortOrder) -> Result<()> {
 
     match order {
         SortOrder::Coordinate => {
-            records.sort_by(|a, b| {
-                let tid_a = a.reference_sequence_id().and_then(|r| r.ok());
-                let tid_b = b.reference_sequence_id().and_then(|r| r.ok());
-                match (tid_a, tid_b) {
-                    (None, None) => Ordering::Equal,
-                    (None, Some(_)) => Ordering::Greater,
-                    (Some(_), None) => Ordering::Less,
-                    (Some(ta), Some(tb)) => ta.cmp(&tb).then_with(|| {
-                        let pa = a.alignment_start().and_then(|r| r.ok());
-                        let pb = b.alignment_start().and_then(|r| r.ok());
-                        pa.cmp(&pb)
-                    }),
-                }
+            records.sort_by(|a, b| match (tid(a), tid(b)) {
+                (None, None) => Ordering::Equal,
+                (None, Some(_)) => Ordering::Greater,
+                (Some(_), None) => Ordering::Less,
+                (Some(ta), Some(tb)) => ta.cmp(&tb).then_with(|| pos(a).cmp(&pos(b))),
             });
         }
         SortOrder::Name => {
