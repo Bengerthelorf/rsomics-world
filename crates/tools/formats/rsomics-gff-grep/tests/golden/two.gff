@@ -1,0 +1,3 @@
+##gff-version 3
+chr1	.	gene	1	100	.	+	.	gene_name=TP53
+chr1	.	gene	200	300	.	+	.	gene_name=BRCA1
