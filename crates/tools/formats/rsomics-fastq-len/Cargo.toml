@@ -1,0 +1,22 @@
+[package]
+name = "rsomics-fastq-len"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Output per-read lengths from FASTQ — for read-length distribution QC"
+
+[[bin]]
+name = "rsomics-fastq-len"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+rsomics-seqio = { path = "../../../foundation/rsomics-seqio", version = "0.1" }
+clap.workspace = true
+
+[lints]
+workspace = true
