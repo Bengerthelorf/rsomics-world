@@ -11,8 +11,9 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
-fn runs_with_fixture() {
+fn runs_with_pattern() {
     let out = Command::new(ours())
+        .args(["-p", "TP53"])
         .arg(fixture("two.gff"))
         .output()
         .expect("spawn");
