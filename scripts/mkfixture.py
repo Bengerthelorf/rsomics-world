@@ -76,6 +76,61 @@ elif KIND == "genome":
     with open(OUT, "w") as f:
         f.writelines(f"{c}\t300000000\n" for c in chroms)
 
+elif KIND == "bam":
+    # A = n_records, B = read_len. Generates a coordinate-sorted BAM via
+    # samtools (must be on PATH). Paired-end, 2 chroms, ~50% properly paired.
+    import subprocess, tempfile, os
+    n_chroms = 2
+    sam_lines = [
+        "@HD\tVN:1.6\tSO:coordinate",
+        *[f"@SQ\tSN:chr{c}\tLN:300000000" for c in range(1, n_chroms + 1)],
+    ]
+    for i in range(A):
+        chrom = f"chr{random.randint(1, n_chroms)}"
+        pos = random.randint(1, 299_000_000)
+        seq = "".join(chr(ACGT[random.getrandbits(2)]) for _ in range(B))
+        qual = "".join(chr(33 + min(40, 20 + random.randint(-8, 15))) for _ in range(B))
+        flag = 99 if random.random() < 0.5 else 0
+        sam_lines.append(f"r{i}\t{flag}\t{chrom}\t{pos}\t60\t{B}M\t*\t0\t0\t{seq}\t{qual}")
+    sam_content = "\n".join(sam_lines) + "\n"
+    with tempfile.NamedTemporaryFile(suffix=".sam", mode="w", delete=False) as tmp:
+        tmp.write(sam_content)
+        tmp_name = tmp.name
+    subprocess.run(["samtools", "view", "-bS", tmp_name, "-o", OUT], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["samtools", "sort", OUT, "-o", OUT], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["samtools", "index", OUT], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.unlink(tmp_name)
+
+elif KIND == "vcf":
+    # A = n_variants, B = n_samples. Generates a minimal VCF with random SNPs.
+    chroms = [f"chr{c}" for c in range(1, 3)]
+    with open(OUT, "w") as f:
+        f.write("##fileformat=VCFv4.3\n")
+        for c in chroms:
+            f.write(f"##contig=<ID={c},length=300000000>\n")
+        samples = [f"SAMPLE{s}" for s in range(1, B + 1)]
+        f.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT")
+        for s in samples:
+            f.write(f"\t{s}")
+        f.write("\n")
+        for i in range(A):
+            chrom = chroms[random.randint(0, len(chroms) - 1)]
+            pos = random.randint(1, 299_000_000)
+            ref = chr(ACGT[random.getrandbits(2)])
+            alt = chr(ACGT[random.getrandbits(2)])
+            while alt == ref:
+                alt = chr(ACGT[random.getrandbits(2)])
+            qual = random.randint(1, 99)
+            filt = "PASS" if qual > 30 else "LowQual"
+            gts = "\t".join(
+                f"{random.randint(0,1)}/{random.randint(0,1)}:{random.randint(5,50)}"
+                for _ in samples
+            )
+            f.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t{qual}\t{filt}\t.\tGT:DP\t{gts}\n")
+
 else:
     sys.exit(f"unknown kind {KIND}")
 print(f"wrote {OUT}")
