@@ -19,7 +19,7 @@ pub fn random_bed(
     if chroms.is_empty() {
         return Err(RsomicsError::InvalidInput("empty genome file".into()));
     }
-    let total_len: u64 = chroms.iter().map(|(_, l)| *l).sum();
+    let total_len: u64 = chroms.iter().map(|(_, l)| **l).sum();
     let mut rng = StdRng::seed_from_u64(seed);
     let mut out = BufWriter::with_capacity(64 * 1024, output);
 
@@ -27,11 +27,11 @@ pub fn random_bed(
         let mut pos_in_genome = rng.gen_range(0..total_len.saturating_sub(length));
         let mut chrom_name = "";
         for (name, clen) in &chroms {
-            if pos_in_genome < *clen {
+            if pos_in_genome < **clen {
                 chrom_name = name;
                 break;
             }
-            pos_in_genome -= *clen;
+            pos_in_genome -= **clen;
         }
         let start = pos_in_genome;
         let end = start + length;
