@@ -22,8 +22,7 @@ fn sorts_by_chrom_pos() {
     let s = String::from_utf8(out.stdout).unwrap();
     let first_data = s
         .lines()
-        .filter(|l| !l.starts_with('#') && !l.is_empty())
-        .next()
+        .find(|l| !l.starts_with('#') && !l.is_empty())
         .unwrap();
     assert!(first_data.starts_with("chr1"), "chr1 first: {first_data}");
 }
