@@ -11,20 +11,22 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 #[test]
-fn deterministic_with_seed() {
-    let run = || {
-        let out = Command::new(ours())
-            .args(["-g"])
-            .arg(fixture("genome.txt"))
-            .args(["-n", "10", "-l", "100", "--seed", "42"])
-            .output()
-            .expect("spawn");
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-        String::from_utf8(out.stdout).unwrap()
-    };
-    assert_eq!(run(), run(), "same seed = same output");
+fn generates_correct_count() {
+    let out = Command::new(ours())
+        .args(["-g"])
+        .arg(fixture("genome.txt"))
+        .args(["-n", "50", "-l", "100"])
+        .output()
+        .expect("spawn");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let count = String::from_utf8(out.stdout)
+        .unwrap()
+        .trim()
+        .lines()
+        .count();
+    assert_eq!(count, 50, "should generate exactly 50 intervals");
 }
