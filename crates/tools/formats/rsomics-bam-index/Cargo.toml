@@ -1,0 +1,22 @@
+[package]
+name = "rsomics-bam-index"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Create BAI index for a coordinate-sorted BAM — Rust port of samtools index"
+
+[[bin]]
+name = "rsomics-bam-index"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+clap.workspace = true
+noodles = { workspace = true, features = ["sam", "bam"] }
+
+[lints]
+workspace = true
