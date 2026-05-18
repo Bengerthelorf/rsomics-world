@@ -1,4 +1,4 @@
-#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
 use rsomics_common::{Result, RsomicsError};
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
