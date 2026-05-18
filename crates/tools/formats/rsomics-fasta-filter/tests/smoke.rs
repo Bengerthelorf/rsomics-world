@@ -20,7 +20,7 @@ fn filter_by_min_length() {
     assert!(out.status.success());
     let s = String::from_utf8(out.stdout).unwrap();
     let count = s.lines().filter(|l| l.starts_with('>')).count();
-    assert_eq!(count, 5, "5 long seqs >= 20bp: got {count}");
+    assert_eq!(count, 6, "short4(20bp) + 5 long(40bp) >= 20bp: got {count}");
 }
 
 #[test]
