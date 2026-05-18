@@ -1,0 +1,4 @@
+##gff-version 3
+chr1	Ensembl	gene	1	1000	.	+	.	ID=g1
+chr1	Ensembl	exon	100	200	.	+	.	Parent=g1
+chr2	RefSeq	gene	1	500	.	-	.	ID=g2
