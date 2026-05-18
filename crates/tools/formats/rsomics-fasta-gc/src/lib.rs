@@ -22,7 +22,7 @@ pub fn gc_content(input: &Path, output: &mut dyn Write) -> Result<u64> {
             gc as f64 / seq.len() as f64 * 100.0
         };
         out.write_all(rec.id()).map_err(RsomicsError::Io)?;
-        writeln!(out, "\t{:.2}", pct).map_err(RsomicsError::Io)?;
+        writeln!(out, "\t{pct:.2}").map_err(RsomicsError::Io)?;
         count += 1;
     }
     out.flush().map_err(RsomicsError::Io)?;
