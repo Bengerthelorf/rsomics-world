@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
+
 fn ours() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_rsomics-fasta-index"))
 }
@@ -8,10 +9,15 @@ fn fixture(name: &str) -> PathBuf {
         .join("tests/golden")
         .join(name)
 }
+
 #[test]
-fn runs_successfully() {
+fn index_creates_fai() {
+    let tmp = tempfile::tempdir().unwrap();
+    let fa = tmp.path().join("test.fa");
+    std::fs::copy(fixture("two.fa"), &fa).unwrap();
     let out = Command::new(ours())
-        .arg(fixture("two.fa"))
+        .args(["index"])
+        .arg(&fa)
         .output()
         .expect("spawn");
     assert!(
@@ -19,5 +25,6 @@ fn runs_successfully() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(!out.stdout.is_empty(), "should produce output");
+    let fai = fa.with_extension("fa.fai");
+    assert!(fai.exists(), ".fai must be created");
 }
