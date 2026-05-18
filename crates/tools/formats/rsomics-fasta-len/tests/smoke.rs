@@ -8,7 +8,8 @@ fn fixture(name: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).jo
 fn outputs_correct_lengths() {
     let out = Command::new(bin()).arg(fixture("three.fa")).output().expect("spawn");
     assert!(out.status.success());
-    let lengths: Vec<&str> = String::from_utf8(out.stdout).unwrap().trim().split('\n').collect::<Vec<_>>().into_iter().collect();
+    let s = String::from_utf8(out.stdout).unwrap();
+    let lengths: Vec<&str> = s.trim().lines().collect();
     assert_eq!(lengths, vec!["4", "8", "2"]);
 }
 

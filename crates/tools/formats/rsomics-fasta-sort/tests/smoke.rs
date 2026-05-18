@@ -8,10 +8,9 @@ fn fixture(name: &str) -> PathBuf { PathBuf::from(env!("CARGO_MANIFEST_DIR")).jo
 fn sort_by_name() {
     let out = Command::new(bin()).arg(fixture("unsorted.fa")).output().expect("spawn");
     assert!(out.status.success());
-    let names: Vec<&str> = String::from_utf8(out.stdout).unwrap()
-        .lines().filter(|l| l.starts_with('>')).map(|l| l.trim_start_matches('>')).collect::<Vec<_>>()
-        .into_iter().collect();
-    assert_eq!(names, vec!["aaa", "mmm", "zzz"]);
+    let s = String::from_utf8(out.stdout).unwrap();
+    let names: Vec<&str> = s.lines().filter(|l| l.starts_with('>')).collect();
+    assert_eq!(names, vec![">aaa", ">mmm", ">zzz"]);
 }
 
 #[test]
