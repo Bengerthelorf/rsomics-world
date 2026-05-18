@@ -1,0 +1,12 @@
+@readA_match
+ACGT
++
+IIII
+@readB_nomatch
+ACGT
++
+IIII
+@readC_match
+ACGT
++
+IIII
