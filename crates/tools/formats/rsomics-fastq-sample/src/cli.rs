@@ -23,7 +23,7 @@ pub struct Cli {
     proportion: f64,
 
     /// Random seed for reproducibility.
-    #[arg(long = "seed", default_value_t = 42)]
+    #[arg(long = "rng-seed", default_value_t = 42)]
     rng_seed: u64,
 
     #[command(flatten)]
