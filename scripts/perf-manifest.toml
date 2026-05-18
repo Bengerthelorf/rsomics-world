@@ -182,6 +182,9 @@ reason = "Reads BAI index metadata only (no full-BAM scan). Runtime is dominated
 [exempt.rsomics-fasta-index]
 reason = "No FASTA fixture generator in mkfixture.py yet. faidx indexing is IO-bound sequential scan; fetch is a seek+read. Covered by compat test vs samtools faidx. Perfgate will activate when FASTA fixture generator lands."
 
+[exempt.rsomics-vcf-filter]
+reason = "No VCF fixture generator in mkfixture.py yet. Filtering is a linear scan with trivial per-record QUAL comparison. Covered by compat test vs bcftools view. Perfgate will activate when VCF fixture generator lands."
+
 # gz input: .fastq.gz is the real-world workload (universal sequencer
 # distribution); the gate must cover gz decode + k-mer scan. Both sides
 # read the same gzip; bbduk.sh uses Java's GZIPInputStream, we use
