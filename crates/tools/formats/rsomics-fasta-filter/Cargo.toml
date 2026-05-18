@@ -1,0 +1,22 @@
+[package]
+name = "rsomics-fasta-filter"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Filter FASTA sequences by length — seqkit seq -m equivalent"
+
+[[bin]]
+name = "rsomics-fasta-filter"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+clap.workspace = true
+needletail = { version = "0.7", default-features = false, features = ["compression"] }
+
+[lints]
+workspace = true
