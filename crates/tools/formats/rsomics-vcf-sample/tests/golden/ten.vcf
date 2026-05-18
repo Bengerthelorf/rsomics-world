@@ -1,0 +1,12 @@
+##fileformat=VCFv4.3
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	100	.	A	G	30	.	.
+chr1	200	.	A	G	30	.	.
+chr1	300	.	A	G	30	.	.
+chr1	400	.	A	G	30	.	.
+chr1	500	.	A	G	30	.	.
+chr1	600	.	A	G	30	.	.
+chr1	700	.	A	G	30	.	.
+chr1	800	.	A	G	30	.	.
+chr1	900	.	A	G	30	.	.
+chr1	1000	.	A	G	30	.	.
