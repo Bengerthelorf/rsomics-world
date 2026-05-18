@@ -1,3 +1,4 @@
+#![allow(clippy::cast_possible_wrap)]
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
