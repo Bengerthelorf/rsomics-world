@@ -30,15 +30,15 @@ pub fn sort_bam(input: &Path, output: &Path, order: SortOrder) -> Result<()> {
     match order {
         SortOrder::Coordinate => {
             records.sort_by(|a, b| {
-                let tid_a = a.reference_sequence_id(&header).ok().flatten();
-                let tid_b = b.reference_sequence_id(&header).ok().flatten();
+                let tid_a = a.reference_sequence_id().and_then(Result::ok);
+                let tid_b = b.reference_sequence_id().and_then(Result::ok);
                 match (tid_a, tid_b) {
                     (None, None) => Ordering::Equal,
                     (None, Some(_)) => Ordering::Greater,
                     (Some(_), None) => Ordering::Less,
                     (Some(ta), Some(tb)) => ta.cmp(&tb).then_with(|| {
-                        let pa = a.alignment_start().ok().flatten();
-                        let pb = b.alignment_start().ok().flatten();
+                        let pa = a.alignment_start().and_then(Result::ok);
+                        let pb = b.alignment_start().and_then(Result::ok);
                         pa.cmp(&pb)
                     }),
                 }
