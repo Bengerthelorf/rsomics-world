@@ -49,7 +49,7 @@ pub fn stats(input: &Path) -> Result<BedStats> {
     lengths.sort_unstable();
     let total: u64 = lengths.iter().sum();
     let n = lengths.len();
-    let median = if n % 2 == 0 {
+    let median = if n.is_multiple_of(2) {
         (lengths[n / 2 - 1] + lengths[n / 2]) as f64 / 2.0
     } else {
         lengths[n / 2] as f64
