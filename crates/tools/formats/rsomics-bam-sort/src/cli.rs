@@ -51,7 +51,10 @@ pub static HELP: HelpSpec = HelpSpec {
         our_license: "MIT OR Apache-2.0",
         paper_doi: Some("10.1093/bioinformatics/btp352"),
     }),
-    usage_lines: &["<INPUT.bam> -o <OUTPUT.bam>", "-n <INPUT.bam> -o <OUTPUT.bam>"],
+    usage_lines: &[
+        "<INPUT.bam> -o <OUTPUT.bam>",
+        "-n <INPUT.bam> -o <OUTPUT.bam>",
+    ],
     sections: &[Section {
         title: "OPTIONS",
         flags: &[
