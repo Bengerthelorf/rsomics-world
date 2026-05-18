@@ -47,11 +47,9 @@ pub fn isec(a_path: &Path, b_path: &Path, output: &mut dyn Write) -> Result<u64>
             writeln!(out, "{line}").map_err(RsomicsError::Io)?;
             continue;
         }
-        if let Some(k) = variant_key(&line) {
-            if b_keys.contains(&k) {
-                writeln!(out, "{line}").map_err(RsomicsError::Io)?;
-                count += 1;
-            }
+        if variant_key(&line).is_some_and(|k| b_keys.contains(&k)) {
+            writeln!(out, "{line}").map_err(RsomicsError::Io)?;
+            count += 1;
         }
     }
 
