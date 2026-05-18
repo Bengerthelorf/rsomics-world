@@ -1,0 +1,21 @@
+[package]
+name = "rsomics-gff-count"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Count features in GFF/GTF files"
+
+[[bin]]
+name = "rsomics-gff-count"
+path = "src/main.rs"
+
+[dependencies]
+rsomics-common = { path = "../../../foundation/rsomics-common", version = "0.5" }
+rsomics-help = { path = "../../../foundation/rsomics-help", version = "0.3" }
+clap.workspace = true
+
+[lints]
+workspace = true
