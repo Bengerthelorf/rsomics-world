@@ -28,7 +28,10 @@ fn upper_matches_seqkit() {
     }
     let input = fixture("lower.fa");
 
-    let ours_out = Command::new(ours()).arg(&input).output().expect("spawn ours");
+    let ours_out = Command::new(ours())
+        .arg(&input)
+        .output()
+        .expect("spawn ours");
     assert!(ours_out.status.success());
 
     let seqkit_out = Command::new("seqkit")
