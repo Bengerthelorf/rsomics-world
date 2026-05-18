@@ -13,7 +13,7 @@ pub fn uppercase(input: &Path, output: &mut dyn Write) -> Result<u64> {
         out.write_all(b">").map_err(RsomicsError::Io)?;
         out.write_all(rec.id()).map_err(RsomicsError::Io)?;
         out.write_all(b"\n").map_err(RsomicsError::Io)?;
-        let upper: Vec<u8> = rec.seq().iter().map(|b| b.to_ascii_uppercase()).collect();
+        let upper: Vec<u8> = rec.seq().iter().map(u8::to_ascii_uppercase).collect();
         out.write_all(&upper).map_err(RsomicsError::Io)?;
         out.write_all(b"\n").map_err(RsomicsError::Io)?;
         count += 1;
