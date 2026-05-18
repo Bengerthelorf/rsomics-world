@@ -33,16 +33,12 @@ pub fn filter_gff(
             continue;
         }
 
-        if let Some(ft) = feature_type {
-            if fields[2] != ft {
-                continue;
-            }
+        if feature_type.is_some_and(|ft| fields[2] != ft) {
+            continue;
         }
 
-        if let Some(ref re) = re {
-            if !re.is_match(&line) {
-                continue;
-            }
+        if re.as_ref().is_some_and(|r| !r.is_match(&line)) {
+            continue;
         }
 
         writeln!(out, "{line}").map_err(RsomicsError::Io)?;
