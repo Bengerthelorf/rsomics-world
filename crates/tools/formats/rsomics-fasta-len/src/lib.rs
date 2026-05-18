@@ -15,7 +15,7 @@ pub fn lengths(input: &Path, tab: bool, output: &mut dyn Write) -> Result<u64> {
         let len = rec.seq().len();
         if tab {
             out.write_all(rec.id()).map_err(RsomicsError::Io)?;
-            write!(out, "\t{len}\n").map_err(RsomicsError::Io)?;
+            writeln!(out, "\t{len}").map_err(RsomicsError::Io)?;
         } else {
             writeln!(out, "{len}").map_err(RsomicsError::Io)?;
         }
