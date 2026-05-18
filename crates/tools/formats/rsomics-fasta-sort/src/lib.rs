@@ -24,7 +24,7 @@ pub fn sort(input: &Path, key: SortKey, output: &mut dyn Write) -> Result<u64> {
     match key {
         SortKey::Name => records.sort_by(|a, b| a.0.cmp(&b.0)),
         SortKey::Length => records.sort_by_key(|r| r.1.len()),
-        SortKey::LengthDesc => records.sort_by(|a, b| b.1.len().cmp(&a.1.len())),
+        SortKey::LengthDesc => records.sort_by_key(|r| std::cmp::Reverse(r.1.len())),
     }
 
     let mut out = BufWriter::with_capacity(256 * 1024, output);
