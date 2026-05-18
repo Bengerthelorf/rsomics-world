@@ -1,12 +1,12 @@
-@readA_match
+@readA_yes
 ACGT
 +
 IIII
-@readB_nomatch
+@readB_no
 ACGT
 +
 IIII
-@readC_match
+@readC_yes
 ACGT
 +
 IIII

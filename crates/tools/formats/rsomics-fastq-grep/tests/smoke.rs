@@ -13,7 +13,7 @@ fn fixture(name: &str) -> PathBuf {
 #[test]
 fn grep_matches_pattern() {
     let out = Command::new(bin())
-        .args(["-p", "match$"])
+        .args(["-p", "yes$"])
         .arg(fixture("three.fq"))
         .output()
         .expect("spawn");
@@ -26,7 +26,7 @@ fn grep_matches_pattern() {
 #[test]
 fn grep_invert_match() {
     let out = Command::new(bin())
-        .args(["-p", "match$", "--invert-match"])
+        .args(["-p", "yes$", "--invert-match"])
         .arg(fixture("three.fq"))
         .output()
         .expect("spawn");
