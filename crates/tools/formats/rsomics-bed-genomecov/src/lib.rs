@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss)]
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -24,13 +25,13 @@ pub fn genomecov(bed_path: &Path, genome_path: &Path, output: &mut dyn Write) ->
             continue;
         }
         let chrom = f[0];
-        let _start: u64 = f[1]
+        let start: u64 = f[1]
             .parse()
             .map_err(|e| RsomicsError::InvalidInput(format!("start: {e}")))?;
-        let _end: u64 = f[2]
+        let end: u64 = f[2]
             .parse()
             .map_err(|e| RsomicsError::InvalidInput(format!("end: {e}")))?;
-        let len = _end.saturating_sub(_start);
+        let len = end.saturating_sub(start);
         let hist = depth_hist.entry(chrom.to_string()).or_default();
         *hist.entry(1).or_insert(0) += len;
     }
