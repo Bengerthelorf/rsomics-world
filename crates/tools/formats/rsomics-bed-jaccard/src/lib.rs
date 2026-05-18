@@ -1,3 +1,4 @@
+#![allow(clippy::cast_precision_loss)]
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
