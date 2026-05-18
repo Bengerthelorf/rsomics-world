@@ -15,8 +15,12 @@ fn tid(r: &bam::Record) -> Option<usize> {
     r.reference_sequence_id().transpose().ok().flatten()
 }
 
-fn pos(r: &bam::Record) -> Option<noodles::core::Position> {
-    r.alignment_start().transpose().ok().flatten()
+fn pos(r: &bam::Record) -> Option<usize> {
+    r.alignment_start()
+        .transpose()
+        .ok()
+        .flatten()
+        .map(|p| p.get())
 }
 
 pub fn sort_bam(input: &Path, output: &Path, order: SortOrder) -> Result<()> {
