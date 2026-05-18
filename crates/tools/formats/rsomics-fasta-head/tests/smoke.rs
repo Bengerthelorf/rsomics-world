@@ -17,10 +17,17 @@ fn default_head_outputs_10_records() {
         .arg(fixture("twenty.fa"))
         .output()
         .expect("spawn");
-    assert!(out.status.success(), "failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8(out.stdout).unwrap();
     let record_count = stdout.lines().filter(|l| l.starts_with('>')).count();
-    assert_eq!(record_count, 10, "default -n 10 should output 10 records, got {record_count}");
+    assert_eq!(
+        record_count, 10,
+        "default -n 10 should output 10 records, got {record_count}"
+    );
 }
 
 #[test]
@@ -57,5 +64,8 @@ fn head_n100_outputs_all_20() {
     assert!(out.status.success());
     let stdout = String::from_utf8(out.stdout).unwrap();
     let record_count = stdout.lines().filter(|l| l.starts_with('>')).count();
-    assert_eq!(record_count, 20, "requesting more than available should output all");
+    assert_eq!(
+        record_count, 20,
+        "requesting more than available should output all"
+    );
 }
