@@ -19,7 +19,7 @@ pub fn sort_vcf(input: &Path, output: &mut dyn Write) -> Result<u64> {
             continue;
         }
         let pos = line
-            .splitn(3, '\t')
+            .split('\t')
             .nth(1)
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
