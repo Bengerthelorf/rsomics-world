@@ -21,7 +21,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn execute(self) -> Result<()> {
-        let paths: Vec<&std::path::Path> = self.inputs.iter().map(|p| p.as_path()).collect();
+        let paths: Vec<&std::path::Path> = self.inputs.iter().map(PathBuf::as_path).collect();
         let mut out = std::io::stdout().lock();
         let n = concat(&paths, &mut out)?;
         eprintln!("{n} variants concatenated from {} files", self.inputs.len());
