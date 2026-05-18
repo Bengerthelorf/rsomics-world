@@ -52,7 +52,7 @@ pub fn merge(inputs: &[&Path], output: &mut dyn Write) -> Result<u64> {
     }
 
     let mut count: u64 = 0;
-    for (_, lines) in &all_records {
+    for lines in all_records.values() {
         writeln!(out, "{}", lines[0]).map_err(RsomicsError::Io)?;
         count += 1;
     }
