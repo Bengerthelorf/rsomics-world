@@ -12,7 +12,7 @@ pub fn rename(input: &Path, prefix: &str, output: &mut dyn Write) -> Result<u64>
 
     while let Some(record) = reader.next() {
         let rec = record.map_err(|e| RsomicsError::InvalidInput(format!("parsing: {e}")))?;
-        write!(out, ">{prefix}{count}\n").map_err(RsomicsError::Io)?;
+        writeln!(out, ">{prefix}{count}").map_err(RsomicsError::Io)?;
         out.write_all(&rec.seq()).map_err(RsomicsError::Io)?;
         out.write_all(b"\n").map_err(RsomicsError::Io)?;
         count += 1;
