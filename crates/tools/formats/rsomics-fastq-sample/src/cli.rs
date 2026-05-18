@@ -23,7 +23,6 @@ pub struct Cli {
     proportion: f64,
 
     /// Random seed for reproducibility.
-    #[arg(long = "rng-seed", default_value_t = 42)]
     rng_seed: u64,
 
     #[command(flatten)]
@@ -33,7 +32,7 @@ pub struct Cli {
 impl Cli {
     pub fn execute(self) -> Result<()> {
         let mut out = std::io::stdout().lock();
-        let n = sample(&self.input, self.proportion, self.rng_seed, &mut out)?;
+        let n = sample(&self.input, self.proportion, self.common.seed_rng(), &mut out)?;
         if !self.common.json {
             eprintln!("{n} records sampled");
         }
