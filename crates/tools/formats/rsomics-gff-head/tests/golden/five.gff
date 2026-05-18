@@ -1,0 +1,6 @@
+##gff-version 3
+chr1	.	gene	1	100	.	+	.	ID=1
+chr1	.	gene	200	300	.	+	.	ID=2
+chr1	.	gene	400	500	.	+	.	ID=3
+chr1	.	gene	600	700	.	+	.	ID=4
+chr1	.	gene	800	900	.	+	.	ID=5
